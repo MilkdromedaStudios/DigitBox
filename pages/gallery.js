@@ -10,10 +10,12 @@ export default function GalleryPage() {
   const [projectHtml, setProjectHtml] = useState("");
   const [savedProgress, setSavedProgress] = useState(null);
   const [showModal, setShowModal] = useState(false);
+
   const iframeRef = useRef(null);
 
   useEffect(() => {
     loadProjects();
+
     supabase.auth.getUser().then(({ data }) => {
       setUser(data?.user || null);
     });
@@ -24,6 +26,7 @@ export default function GalleryPage() {
 
       if (event.data.type === "saveProgress") {
         const data = event.data.data ?? null;
+
         await supabase.from("project_saves").upsert(
           {
             user_id: user.id,
@@ -32,6 +35,7 @@ export default function GalleryPage() {
           },
           { onConflict: "user_id,project_id" }
         );
+
         setSavedProgress(data);
       }
 
@@ -65,7 +69,6 @@ export default function GalleryPage() {
     setSelectedProject(project);
     setShowModal(true);
 
-    // Load full HTML code
     const { data: projData } = await supabase
       .from("projects")
       .select("html_code")
@@ -74,7 +77,6 @@ export default function GalleryPage() {
 
     setProjectHtml(projData?.html_code || "");
 
-    // Load saved progress if logged in
     if (user) {
       const { data: saveData } = await supabase
         .from("project_saves")
@@ -114,21 +116,25 @@ export default function GalleryPage() {
 
   function downloadCode() {
     if (!selectedProject || !projectHtml) return;
+
     const blob = new Blob([projectHtml], { type: "text/html" });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement("a");
     a.href = url;
     a.download = `${selectedProject.title || "project"}.html`;
     a.click();
+
     URL.revokeObjectURL(url);
   }
 
   function getIframeSrcDoc() {
     if (!selectedProject) return "";
+
     const title = selectedProject.title || "Project";
     const html = projectHtml || "";
 
-    const wrapper = `
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -137,16 +143,11 @@ export default function GalleryPage() {
 </head>
 <body>
 ${html}
-<script>
-  // Game can call:
-  //   saveProgress(stateObject)
-  //   requestProgress()
-  //
-  // To handle loaded progress:
-  //   window.onProgressLoaded = function(data) { ... }
 
+<script>
   window.addEventListener("message", function(e) {
     if (!e.data || !e.data.type) return;
+
     if (e.data.type === "loadProgress") {
       if (typeof window.onProgressLoaded === "function") {
         window.onProgressLoaded(e.data.data || null);
@@ -162,18 +163,18 @@ ${html}
     parent.postMessage({ type: "requestProgress" }, "*");
   };
 
-  // Automatically request progress on load
   window.requestProgress();
 </script>
+
 </body>
 </html>
 `;
-    return wrapper;
   }
 
   return (
     <div className="content">
       <h1>Projects Gallery</h1>
+
       <div className="gallery-grid">
         {projects.map((project) => (
           <figure key={project.id} className="gallery-item">
@@ -181,6 +182,7 @@ ${html}
             {project.description && (
               <p className="post-meta">{project.description}</p>
             )}
+
             <div className="gallery-actions">
               <button
                 className="auth-btn"
@@ -188,6 +190,7 @@ ${html}
               >
                 Play
               </button>
+
               <button
                 className="like-btn"
                 onClick={() => likeProject(project.id)}
@@ -211,15 +214,18 @@ ${html}
                   </p>
                 )}
               </div>
+
               <div className="project-modal-buttons">
                 <button className="auth-btn" onClick={downloadCode}>
                   Download Code
                 </button>
+
                 <button className="exit-btn" onClick={closeModal}>
                   Exit
                 </button>
               </div>
             </div>
+
             <div className="project-modal-frame-wrapper">
               <iframe
                 ref={iframeRef}
