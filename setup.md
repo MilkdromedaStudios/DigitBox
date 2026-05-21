@@ -12,7 +12,17 @@ This guide configures your app to:
    - **Project URL**
    - **anon public key**
 
-## 2) Add environment variables in Next.js
+## 2) Connect to your project from Supabase
+
+In the Supabase dashboard, open your project and click **Connect** (top-right), then choose **Connect to your project**.
+
+Use the **App Frameworks → Next.js** snippet to confirm the two values you need:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+> Tip: this is the fastest way to copy the exact environment-variable names and values for this app.
+
+## 3) Add environment variables in Next.js
 
 Create `.env.local` in your repo root:
 
@@ -23,7 +33,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 
 Restart your dev server after editing env vars.
 
-## 3) Configure Auth (email/password only)
+## 4) Configure Auth (email/password only)
 
 In Supabase dashboard:
 
@@ -36,7 +46,7 @@ In Supabase dashboard:
 
 > ⚠️ Security note: disabling email verification is less secure and allows signups with unowned email addresses.
 
-## 4) Run SQL setup
+## 5) Run SQL setup
 
 Open **SQL Editor** in Supabase and run the following script.
 
@@ -188,7 +198,7 @@ on public.project_saves for delete
 using (auth.uid() = user_id);
 ```
 
-## 5) Set your admin user
+## 6) Set your admin user
 
 After you sign up with your admin email, run this in SQL Editor:
 
@@ -198,7 +208,7 @@ set role = 'admin'
 where email = 'your-admin-email@example.com';
 ```
 
-## 6) Create storage buckets
+## 7) Create storage buckets
 
 In **Storage**, create buckets:
 - `post-images`
@@ -233,7 +243,7 @@ using (
 
 Repeat similarly for `gallery-images`.
 
-## 7) Verify locally
+## 8) Verify locally
 
 ```bash
 npm install
@@ -247,7 +257,7 @@ Then test:
 4. Create a post/project and verify they appear on `/posts` and `/gallery`.
 5. Open a project in `/gallery` and confirm save data persists per user.
 
-## 8) Troubleshooting
+## 9) Troubleshooting
 
 - **"Invalid login credentials"**: wrong password or user not created.
 - **401/403 from Supabase**: missing RLS policy or role not set to admin.
