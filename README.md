@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DigitBox (Next.js + Supabase)
 
-## Getting Started
+This project uses **Next.js (Pages Router)** with **Supabase** for authentication and data storage.
 
-First, run the development server:
+## Option A Auth Setup (Supabase only, no Google)
+
+This repo is configured for **email + password** auth only.
+
+### 1) Add environment variables
+Create `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2) Configure Supabase Auth
+In Supabase Dashboard:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Go to **Authentication → Providers → Email**.
+2. Enable Email provider.
+3. Enable **Email + Password** sign-in.
+4. If you want users to log in immediately without email verification:
+   - Disable **Confirm email** in auth settings.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> Note: Disabling email verification is less secure and can allow fake/unowned emails.
 
-## Learn More
+### 3) Create required tables (minimum)
+You should create and secure these tables:
 
-To learn more about Next.js, take a look at the following resources:
+- `posts`
+- `projects`
+- `project_saves`
+- `gallery_images`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Recommended: add `author_id` (`uuid`) fields referencing `auth.users.id` instead of only email strings.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4) Enable RLS
+Enable Row Level Security for all app tables and add policies so:
 
-## Deploy on Vercel
+- Public can read posts/projects/gallery.
+- Users can write only their own saves in `project_saves`.
+- Only admins can create/update/delete posts/projects/gallery.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Local Development
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Build
+
+```bash
+npm run build
+npm start
+```
