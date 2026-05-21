@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Supabase likes RPC
+
+Create an atomic likes increment function in Supabase with the SQL in `supabase/sql/increment_project_likes.sql`, then call it from the frontend via:
+
+```js
+const { data: updatedLikes, error } = await supabase.rpc("increment_project_likes", {
+  project_id_input: projectId,
+});
+```
+
+The gallery UI updates from `updatedLikes` returned by Supabase instead of doing local read-then-write math.
