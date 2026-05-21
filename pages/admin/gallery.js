@@ -2,14 +2,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
-
-const adminEmails = [
-  "wong.christopher501@gmail.com",
-  "Studio.Milkdromeda@planetmail.net",
-];
+import { getCurrentUserWithRole, isAdminRole } from "../../lib/roles";
 
 export default function AdminGalleryPage() {
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
   const [title, setTitle] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -17,10 +14,10 @@ export default function AdminGalleryPage() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const u = data?.user || null;
+    getCurrentUserWithRole().then(({ user: u, role: r }) => {
       setUser(u);
-      if (!u || !adminEmails.includes(u.email)) {
+      setRole(r);
+      if (!u || !isAdminRole(r)) {
         router.replace("/");
       }
     });
@@ -39,7 +36,7 @@ export default function AdminGalleryPage() {
   async function handleUpload(e) {
     e.preventDefault();
     if (!title || !imageFile) return;
-    if (!user || !adminEmails.includes(user.email)) return;
+    if (!user || !isAdminRole(role)) return;
 
     setLoading(true);
 
@@ -76,7 +73,7 @@ export default function AdminGalleryPage() {
     loadImages();
   }
 
-  if (!user || !adminEmails.includes(user.email)) {
+  if (!user || !isAdminRole(role)) {
     return <div className="content">Checking admin access…</div>;
   }
 

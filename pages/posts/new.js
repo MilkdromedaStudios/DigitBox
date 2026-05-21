@@ -10,6 +10,7 @@ const adminEmails = [
 
 export default function NewPost() {
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const router = useRouter();
 

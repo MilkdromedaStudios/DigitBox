@@ -11,6 +11,7 @@ const adminEmails = [
 
 export default function AdminPage() {
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
 
   const [posts, setPosts] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -23,11 +24,11 @@ export default function AdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const u = data?.user || null;
+    getCurrentUserWithRole().then(({ user: u, role: r }) => {
       setUser(u);
+      setRole(r);
 
-      if (!u || !adminEmails.includes(u.email)) {
+      if (!u || !isAdminRole(r)) {
         router.replace("/");
       } else {
         loadPosts();
@@ -84,7 +85,7 @@ export default function AdminPage() {
     loadProjects();
   }
 
-  if (!user || !adminEmails.includes(user.email)) {
+  if (!user || !isAdminRole(role)) {
     return <div className="content">Checking admin access…</div>;
   }
 
