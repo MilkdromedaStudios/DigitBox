@@ -2,6 +2,27 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+
+const ALLOWED_MESSAGE_TYPES = new Set(["saveProgress", "requestProgress"]);
+
+function isValidMessage(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+  if (typeof data.type !== "string" || !ALLOWED_MESSAGE_TYPES.has(data.type)) return false;
+
+  if (data.type === "saveProgress" && !("data" in data)) return false;
+
+  return true;
+}
+
+function sanitizeProjectHtml(html) {
+  if (!html) return "";
+
+  return html
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+\s*=\s*(["']).*?\1/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/javascript:/gi, "");
+}
 export default function GalleryPage() {
   const [projects, setProjects] = useState([]);
   const [user, setUser] = useState(null);
@@ -21,7 +42,9 @@ export default function GalleryPage() {
     });
 
     const handleMessage = async (event) => {
-      if (!event.data || !event.data.type) return;
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (!iframeWindow || event.source !== iframeWindow) return;
+      if (!isValidMessage(event.data)) return;
       if (!user || !selectedProject) return;
 
       if (event.data.type === "saveProgress") {
@@ -136,7 +159,7 @@ export default function GalleryPage() {
     if (!selectedProject) return "";
 
     const title = selectedProject.title || "Project";
-    const html = projectHtml || "";
+    const html = sanitizeProjectHtml(projectHtml || "");
 
     return `
 <!DOCTYPE html>
@@ -234,6 +257,7 @@ ${html}
               <iframe
                 ref={iframeRef}
                 className="project-modal-iframe"
+                sandbox="allow-scripts"
                 srcDoc={getIframeSrcDoc()}
                 title={selectedProject.title}
               />

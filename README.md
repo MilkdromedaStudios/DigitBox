@@ -1,48 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DigitBox (Next.js + Supabase)
 
-## Getting Started
+This project uses **Next.js (Pages Router)** with **Supabase** for authentication and data storage.
 
-First, run the development server:
+## Option A Auth Setup (Supabase only, no Google)
+
+This repo is configured for **email + password** auth only.
+
+### 1) Add environment variables
+Create `.env.local`:
 
 ```bash
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 2) Configure Supabase Auth
+In Supabase Dashboard:
+
+1. Go to **Authentication → Providers → Email**.
+2. Enable Email provider.
+3. Enable **Email + Password** sign-in.
+4. If you want users to log in immediately without email verification:
+   - Disable **Confirm email** in auth settings.
+
+> Note: Disabling email verification is less secure and can allow fake/unowned emails.
+
+### 3) Create required tables (minimum)
+You should create and secure these tables:
+
+- `posts`
+- `projects`
+- `project_saves`
+- `gallery_images`
+
+Recommended: add `author_id` (`uuid`) fields referencing `auth.users.id` instead of only email strings.
+
+### 4) Enable RLS
+Enable Row Level Security for all app tables and add policies so:
+
+- Public can read posts/projects/gallery.
+- Users can write only their own saves in `project_saves`.
+- Only admins can create/update/delete posts/projects/gallery.
+
+## Local Development
+
+```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Supabase likes RPC
-
-Create an atomic likes increment function in Supabase with the SQL in `supabase/sql/increment_project_likes.sql`, then call it from the frontend via:
-
-```js
-const { data: updatedLikes, error } = await supabase.rpc("increment_project_likes", {
-  project_id_input: projectId,
-});
+```bash
+npm run build
+npm start
 ```
-
-The gallery UI updates from `updatedLikes` returned by Supabase instead of doing local read-then-write math.

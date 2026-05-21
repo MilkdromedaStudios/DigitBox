@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
+import PostForm from "../../components/PostForm";
 
 const adminEmails = [
   "wong.christopher501@gmail.com",
@@ -13,11 +14,6 @@ export default function AdminPage() {
 
   const [posts, setPosts] = useState([]);
   const [projects, setProjects] = useState([]);
-
-  const [postTitle, setPostTitle] = useState("");
-  const [postContent, setPostContent] = useState("");
-  const [postImageFile, setPostImageFile] = useState(null);
-  const [postLoading, setPostLoading] = useState(false);
 
   const [projTitle, setProjTitle] = useState("");
   const [projDescription, setProjDescription] = useState("");
@@ -56,43 +52,6 @@ export default function AdminPage() {
       .order("created_at", { ascending: false });
 
     setProjects(data || []);
-  }
-
-  async function createPost(e) {
-    e.preventDefault();
-    if (!postTitle || !postContent) return;
-
-    setPostLoading(true);
-
-    let image_url = null;
-
-    if (postImageFile) {
-      const ext = postImageFile.name.split(".").pop();
-      const fileName = `${crypto.randomUUID()}.${ext}`;
-
-      const { data: upload } = await supabase.storage
-        .from("post-images")
-        .upload(fileName, postImageFile);
-
-      const { data: publicUrl } = supabase.storage
-        .from("post-images")
-        .getPublicUrl(upload.path);
-
-      image_url = publicUrl.publicUrl;
-    }
-
-    await supabase.from("posts").insert({
-      title: postTitle,
-      content: postContent,
-      image_url,
-      author: user.email,
-    });
-
-    setPostLoading(false);
-    setPostTitle("");
-    setPostContent("");
-    setPostImageFile(null);
-    loadPosts();
   }
 
   async function createProject(e) {
@@ -139,29 +98,7 @@ export default function AdminPage() {
       {/* Create Post */}
       <section style={{ marginBottom: "2rem" }}>
         <h2>Create Post</h2>
-        <form className="post-form" onSubmit={createPost}>
-          <input
-            className="auth-input"
-            placeholder="Post title"
-            value={postTitle}
-            onChange={(e) => setPostTitle(e.target.value)}
-          />
-          <textarea
-            className="auth-input"
-            placeholder="Write your post (Markdown allowed)..."
-            value={postContent}
-            onChange={(e) => setPostContent(e.target.value)}
-            rows={6}
-          />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setPostImageFile(e.target.files[0] || null)}
-          />
-          <button className="auth-btn" type="submit" disabled={postLoading}>
-            {postLoading ? "Posting..." : "Create Post"}
-          </button>
-        </form>
+        <PostForm authorEmail={user.email} onCreated={loadPosts} />
       </section>
 
       {/* Create Project */}

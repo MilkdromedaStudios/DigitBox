@@ -1,75 +1,41 @@
-// digitbox/pages/posts/new.js
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
-import styles from "../../styles/Posts.module.css";
+import PostForm from "../../components/PostForm";
+
+const adminEmails = [
+  "wong.christopher501@gmail.com",
+  "Studio.Milkdromeda@planetmail.net",
+];
 
 export default function NewPost() {
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
-
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [message, setMessage] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setUser(data?.user || null);
+      const currentUser = data?.user || null;
+      setUser(currentUser);
       setLoadingUser(false);
+
+      if (!currentUser || !adminEmails.includes(currentUser.email)) {
+        router.replace("/admin");
+      }
     });
-  }, []);
+  }, [router]);
 
-  const isAdmin = user?.email === "wong.christopher501@gmail.com";
+  if (loadingUser) return <div className="content">Loading...</div>;
 
-  if (loadingUser) return <p className={styles.centerText}>Loading...</p>;
-
-  if (!isAdmin) {
-    return (
-      <div className={styles.centerText}>
-        <h1>Access Denied</h1>
-        <p>You do not have permission to create posts.</p>
-      </div>
-    );
-  }
-
-  function handleFakeSubmit(e) {
-    e.preventDefault();
-    setMessage(
-      "Post editor UI ready. Next step: wire this to Supabase and a markdown/BBCode/LaTeX renderer."
-    );
+  if (!user || !adminEmails.includes(user.email)) {
+    return <div className="content">Redirecting to admin...</div>;
   }
 
   return (
-    <div className={styles.container}>
+    <div className="content">
       <h1>New Post</h1>
-
-      <form className={styles.editorForm} onSubmit={handleFakeSubmit}>
-        <input
-          type="text"
-          placeholder="Post title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className={styles.editorTitle}
-        />
-
-        <textarea
-          placeholder="Write your post here (Markdown, BBCode, LaTeX)..."
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={12}
-          className={styles.editorTextarea}
-        />
-
-        <button type="submit" className={styles.editorSubmit}>
-          Save post (not wired yet)
-        </button>
-      </form>
-
-      {message && <p className={styles.editorMessage}>{message}</p>}
-
-      <div className={styles.previewBox}>
-        <h2>Live Preview (raw)</h2>
-        <pre>{content}</pre>
-      </div>
+      <p className="admin-subtitle">Create and publish a post.</p>
+      <PostForm authorEmail={user.email} />
     </div>
   );
 }

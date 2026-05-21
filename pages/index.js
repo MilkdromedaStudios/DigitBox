@@ -48,7 +48,7 @@ export default function Home() {
             </p>
           </a>
 
-          <a href="/projects" className="card card-link">
+          <a href="/gallery" className="card card-link">
             <h3>Projects</h3>
             <p>
               Check out my latest coding projects, where creativity meets
