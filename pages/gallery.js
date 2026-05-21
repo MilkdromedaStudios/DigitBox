@@ -122,17 +122,21 @@ export default function GalleryPage() {
   }
 
   async function likeProject(projectId) {
-    const project = projects.find((p) => p.id === projectId);
-    const newLikes = (project?.likes || 0) + 1;
+    const { data: updatedLikes, error } = await supabase.rpc(
+      "increment_project_likes",
+      { project_id_input: projectId }
+    );
 
-    await supabase
-      .from("projects")
-      .update({ likes: newLikes })
-      .eq("id", projectId);
+    if (error) {
+      console.error("Failed to increment likes:", error);
+      return;
+    }
 
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === projectId ? { ...p, likes: newLikes } : p
+        p.id === projectId
+          ? { ...p, likes: updatedLikes ?? p.likes ?? 0 }
+          : p
       )
     );
   }
