@@ -1,10 +1,11 @@
 // digitbox/pages/posts/new.js
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { getCurrentUserWithRole, isAdminRole } from "../../lib/roles";
 import styles from "../../styles/Posts.module.css";
 
 export default function NewPost() {
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
   const [title, setTitle] = useState("");
@@ -12,13 +13,14 @@ export default function NewPost() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data?.user || null);
+    getCurrentUserWithRole().then(({ user: u, role: r }) => {
+      setUser(u);
+      setRole(r);
       setLoadingUser(false);
     });
   }, []);
 
-  const isAdmin = user?.email === "wong.christopher501@gmail.com";
+  const isAdmin = isAdminRole(role);
 
   if (loadingUser) return <p className={styles.centerText}>Loading...</p>;
 
