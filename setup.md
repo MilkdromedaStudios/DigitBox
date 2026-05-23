@@ -263,3 +263,34 @@ Then test:
 - **401/403 from Supabase**: missing RLS policy or role not set to admin.
 - **Images upload fails**: missing bucket or storage insert policy.
 - **Session not persisting**: ensure browser allows local storage/cookies.
+
+
+## 10) Free Supabase tier notes for game save data
+
+The current gallery page saves per-user game state into `project_saves` using a single row per `(user_id, project_id)` and `upsert`, which is free-tier friendly and keeps row growth controlled. Apply `supabase/sql/project_saves_free_tier.sql` to ensure table, index, trigger, and RLS policies are present.
+
+### Quick Supabase setup verification checklist
+
+Run these in Supabase SQL Editor:
+
+```sql
+-- 1) Ensure required tables exist.
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+  and table_name in ('posts', 'projects', 'gallery_images', 'project_saves', 'profiles')
+order by table_name;
+
+-- 2) Ensure RLS is enabled on game saves.
+select relname as table_name, relrowsecurity as rls_enabled
+from pg_class
+where relname = 'project_saves';
+
+-- 3) Ensure save policies exist.
+select policyname, cmd
+from pg_policies
+where schemaname = 'public' and tablename = 'project_saves'
+order by policyname;
+```
+
+If all 3 checks return expected rows, your Supabase save setup is configured correctly for this app.
