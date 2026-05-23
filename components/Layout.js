@@ -90,23 +90,6 @@ export default function Layout({ children }) {
         </nav>
       </header>
 
-      {settingsOpen && (
-        <aside className="settings-panel" id="site-settings">
-          <h3>Site Settings</h3>
-          <label htmlFor="theme-select">Theme</label>
-          <select
-            id="theme-select"
-            className="theme-select"
-            value={theme}
-            onChange={(e) => onThemeChange(e.target.value)}
-          >
-            <option value="default">Default</option>
-            <option value="forest">Forest</option>
-            <option value="sunset">Sunset</option>
-            <option value="ocean">Ocean</option>
-          </select>
-        </aside>
-      )}
 
       <footer className="footer">© {new Date().getFullYear()} digitbox.dev</footer>
     </div>
