@@ -162,3 +162,86 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
   .profile-box { width: 100%; justify-content: space-between; }
   .project-modal-inner { width: 96vw !important; }
 }
+
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.hero-box {
+  max-width: 640px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.hero-scroller {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-top: .85rem;
+}
+
+.hero-scroller span {
+  display: inline-flex;
+  align-items: center;
+  padding: .35rem .6rem;
+  border-radius: 999px;
+  font-size: .82rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-soft) 90%, transparent);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: .85rem;
+}
+
+.card {
+  padding: 1rem;
+}
+
+.card-link {
+  color: var(--text);
+}
+
+.card-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, white);
+}
+
+
+/* Hard guardrails to keep page content visible */
+#__next,
+.page {
+  width: 100%;
+}
+
+.main {
+  display: block;
+  width: 100%;
+}
+
+.content {
+  width: 100%;
+  display: block;
+}
+
+.content > * {
+  display: block;
+}
+
+.hero-overlay {
+  display: none;
+}
+
+.section h2,
+.card h3,
+.card p {
+  color: var(--text);
+}
