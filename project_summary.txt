@@ -1,0 +1,17 @@
+==== PAGES FOLDER ====
+admin
+gallery.js
+index.js
+login.js
+posts
+posts.js
+_app.js
+
+==== APP FOLDER ====
+test-supabase
+
+==== STYLES FOLDER ====
+Gallery.module.css
+global.css
+login.css
+Posts.module.css
