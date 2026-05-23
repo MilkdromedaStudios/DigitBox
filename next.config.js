@@ -2,10 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: true,
+  experimental: {
+    appDir: true,
+  },
 };
-
-experimental: {
-  appDir: true
-}
 
 module.exports = nextConfig;
