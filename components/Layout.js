@@ -8,11 +8,9 @@ const THEME_OPTIONS = ["default", "forest", "sunset", "ocean"];
 export default function Layout({ children }) {
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState("default");
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const savedTheme =
-      typeof window !== "undefined" ? localStorage.getItem("digitbox-theme") : null;
+    const savedTheme = typeof window !== "undefined" ? localStorage.getItem("digitbox-theme") : null;
     const initialTheme = THEME_OPTIONS.includes(savedTheme) ? savedTheme : "default";
     setTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
@@ -50,6 +48,7 @@ export default function Layout({ children }) {
   const avatar =
     user?.user_metadata?.avatar_url ||
     "https://ui-avatars.com/api/?name=User&background=444&color=fff";
+
   const username = user?.user_metadata?.user_name || user?.email?.split("@")[0] || "User";
 
   return (
@@ -66,15 +65,17 @@ export default function Layout({ children }) {
           {isAdmin && <Link href="/admin">Admin</Link>}
           {!user && <Link href="/login">Login</Link>}
 
-          <button
-            type="button"
-            className="xp-btn settings-trigger"
-            aria-expanded={settingsOpen}
-            aria-controls="site-settings"
-            onClick={() => setSettingsOpen((v) => !v)}
+          <select
+            className="theme-select"
+            aria-label="Select theme"
+            value={theme}
+            onChange={(e) => onThemeChange(e.target.value)}
           >
-            ⚙ Settings
-          </button>
+            <option value="default">Theme: Default</option>
+            <option value="forest">Theme: Forest</option>
+            <option value="sunset">Theme: Sunset</option>
+            <option value="ocean">Theme: Ocean</option>
+          </select>
 
           {user && (
             <div className="profile-box">
@@ -83,7 +84,7 @@ export default function Layout({ children }) {
                 <span className="profile-name">{username}</span>
                 {isAdmin && <span className="admin-badge">Admin</span>}
               </div>
-              <button className="logout-btn xp-btn" onClick={logout}>Logout</button>
+              <button className="logout-btn btn-base" onClick={logout}>Logout</button>
             </div>
           )}
         </nav>
@@ -107,7 +108,6 @@ export default function Layout({ children }) {
         </aside>
       )}
 
-      <main className="main">{children}</main>
       <footer className="footer">© {new Date().getFullYear()} digitbox.dev</footer>
     </div>
   );
