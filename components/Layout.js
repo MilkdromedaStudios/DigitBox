@@ -1,13 +1,18 @@
-// digitbox/components/Layout.js
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 const THEME_OPTIONS = ["default", "forest", "sunset", "ocean"];
 
+const ADMIN_EMAILS = [
+  "wong.christopher501@gmail.com",
+  "Studio.Milkdromeda@planetmail.net",
+];
+
 export default function Layout({ children }) {
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState("default");
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
     const savedTheme = typeof window !== "undefined" ? localStorage.getItem("digitbox-theme") : null;
@@ -15,16 +20,23 @@ export default function Layout({ children }) {
     setTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
 
+    let isMounted = true;
+
     supabase.auth.getUser().then(({ data }) => {
+      if (!isMounted) return;
       setUser(data?.user || null);
+      setIsAuthLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setUser(session?.user || null);
+      setIsAuthLoading(false);
     });
 
     return () => {
-      if (listener && listener.subscription) listener.subscription.unsubscribe();
+      isMounted = false;
+      listener?.subscription?.unsubscribe();
     };
   }, []);
 
@@ -39,16 +51,10 @@ export default function Layout({ children }) {
     setUser(null);
   }
 
-  const adminEmails = [
-    "wong.christopher501@gmail.com",
-    "Studio.Milkdromeda@planetmail.net",
-  ];
-
-  const isAdmin = user && adminEmails.includes(user.email);
+  const isAdmin = Boolean(user && ADMIN_EMAILS.includes(user.email));
   const avatar =
     user?.user_metadata?.avatar_url ||
     "https://ui-avatars.com/api/?name=User&background=444&color=fff";
-
   const username = user?.user_metadata?.user_name || user?.email?.split("@")[0] || "User";
 
   return (
@@ -58,12 +64,12 @@ export default function Layout({ children }) {
           <Link href="/">digitbox.dev</Link>
         </div>
 
-        <nav className="nav">
+        <nav className="nav" aria-label="Primary navigation">
           <Link href="/">Home</Link>
           <Link href="/gallery">Gallery</Link>
           <Link href="/posts">Posts</Link>
           {isAdmin && <Link href="/admin">Admin</Link>}
-          {!user && <Link href="/login">Login</Link>}
+          {!isAuthLoading && !user && <Link href="/login">Login</Link>}
 
           <select
             className="theme-select"
@@ -90,23 +96,9 @@ export default function Layout({ children }) {
         </nav>
       </header>
 
-      {settingsOpen && (
-        <aside className="settings-panel" id="site-settings">
-          <h3>Site Settings</h3>
-          <label htmlFor="theme-select">Theme</label>
-          <select
-            id="theme-select"
-            className="theme-select"
-            value={theme}
-            onChange={(e) => onThemeChange(e.target.value)}
-          >
-            <option value="default">Default</option>
-            <option value="forest">Forest</option>
-            <option value="sunset">Sunset</option>
-            <option value="ocean">Ocean</option>
-          </select>
-        </aside>
-      )}
+      <main className="main">
+        <div className="content">{children}</div>
+      </main>
 
       <footer className="footer">© {new Date().getFullYear()} digitbox.dev</footer>
     </div>
