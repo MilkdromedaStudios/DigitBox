@@ -83,7 +83,6 @@ export default function Home() {
           >
             <div className="support-pill">
               <img src="/logos/kofi.png" alt="Ko-fi" className="support-icon" />
-              <span className="support-text">Ko‑fi</span>
             </div>
           </a>
 
@@ -94,7 +93,6 @@ export default function Home() {
           >
             <div className="support-pill">
               <img src="/logos/pmc.png" alt="Planet Minecraft" className="support-icon" />
-              <span className="support-text">Planet Minecraft</span>
             </div>
           </a>
 
@@ -105,18 +103,16 @@ export default function Home() {
           >
             <div className="support-pill">
               <img src="/logos/youtube.png" alt="YouTube" className="support-icon" />
-              <span className="support-text">YouTube</span>
             </div>
           </a>
 
           <a
-            href="https://modrinth.com/user/Error9998252"
+            href="https://www.steamgriddb.com/logo/97323"
             target="_blank"
             rel="noreferrer"
           >
             <div className="support-pill">
               <img src="/logos/modrinth.png" alt="Modrinth" className="support-icon" />
-              <span className="support-text">Modrinth</span>
             </div>
           </a>
         </div>
