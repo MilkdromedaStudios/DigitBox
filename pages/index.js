@@ -57,7 +57,7 @@ export default function Home() {
           </a>
 
           <a
-            href="https://ko-fi.com/respawnerzstudioz"
+            href="https://rakosell.com/en/blog/membership_platform_comparison"
             target="_blank"
             rel="noreferrer"
             className="card card-link"
@@ -77,7 +77,7 @@ export default function Home() {
 
         <div className="support-grid">
           <a
-            href="https://ko-fi.com/respawnerzstudioz"
+            href="https://rakosell.com/en/blog/membership_platform_comparison"
             target="_blank"
             rel="noreferrer"
           >
@@ -107,7 +107,7 @@ export default function Home() {
           </a>
 
           <a
-            href="https://www.steamgriddb.com/logo/97323"
+            href="https://crowdin.com/project/modrinth-platform"
             target="_blank"
             rel="noreferrer"
           >
