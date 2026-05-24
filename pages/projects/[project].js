@@ -14,9 +14,14 @@ function authHeaders() {
   };
 }
 
-export default function ProjectRunner({ html, title }) {
+
+function isGitLfsPointer(content = "") {
+  return content.includes("version https://git-lfs.github.com/spec/v1") && content.includes("oid sha256:");
+}
+
+export default function ProjectRunner({ html, title, unavailableReason }) {
   const srcDoc = useMemo(() => {
-    if (!html) return "<!doctype html><html><body><h1>Project unavailable.</h1></body></html>";
+    if (!html || unavailableReason) return `<!doctype html><html><body style="font-family:Arial;padding:24px;background:#090f22;color:#f5f7ff;"><h1>Project unavailable</h1><p>${unavailableReason || "Project file is missing."}</p></body></html>`;
 
     return html.includes("<html")
       ? html
@@ -67,6 +72,7 @@ export async function getServerSideProps({ params }) {
     props: {
       html,
       title: slug,
+      unavailableReason: isGitLfsPointer(html) ? "This project file is a Git LFS pointer. Pull LFS assets before deploying." : "",
     },
   };
 }
