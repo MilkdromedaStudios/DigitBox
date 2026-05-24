@@ -1,91 +1,66 @@
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import PostForm from "../../components/PostForm";
 import { getCurrentUserWithRole, isAdminRole } from "../../lib/roles";
-import { fetchWithRetry, toFriendlyNetworkError } from "../../lib/fetchWithRetry";
 
-export default function AdminPage() {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
-  const [projTitle, setProjTitle] = useState("");
-  const [projectFile, setProjectFile] = useState(null);
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
+const TASKS = [
+  {
+    title: "Task 1 · Project Management",
+    description: "Upload, launch, and delete project builds with a clean operational workflow.",
+    href: "/admin/projects",
+    cta: "Manage Projects",
+  },
+  {
+    title: "Task 2 · Analytics Dashboard",
+    description: "Track project views, opens, and popularity rankings from Supabase analytics data.",
+    href: "/admin/analytics",
+    cta: "View Analytics",
+  },
+];
+
+export default function AdminHomePage() {
+  const [allowed, setAllowed] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    getCurrentUserWithRole().then(({ user: u, role: r }) => {
-      setUser(u);
-      setRole(r);
-      if (!u || !isAdminRole(r)) router.replace("/");
+    getCurrentUserWithRole().then(({ user, role }) => {
+      if (!user || !isAdminRole(role)) return router.replace("/");
+      setAllowed(true);
     });
   }, [router]);
 
-  function onSelectProjectFile(e) {
-    const file = e.target.files?.[0] || null;
-    setProjectFile(file);
-    if (file && !projTitle.trim()) {
-      setProjTitle(file.name.replace(/\.html?$/i, ""));
-    }
-  }
-
-  async function createProject(e) {
-    e.preventDefault();
-    if (!projectFile) {
-      setStatus("Error: Please choose one HTML file.");
-      return;
-    }
-
-    const html = await projectFile.text();
-    const title = projTitle.trim() || projectFile.name.replace(/\.html?$/i, "");
-
-    if (!title || !html.trim()) {
-      setStatus("Error: Title and file content are required.");
-      return;
-    }
-
-    setLoading(true);
-    setStatus("");
-
-    try {
-      const res = await fetchWithRetry(
-        "/api/content/publish",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "project", title, html }),
-        },
-        { retries: 3, timeoutMs: 30000 }
-      );
-      const payload = await res.json().catch(() => ({}));
-      setStatus(res.ok ? `Published: ${payload.htmlPath}` : `Error: ${payload.error || "Failed to publish"}`);
-
-      if (res.ok) {
-        setProjTitle("");
-        setProjectFile(null);
-      }
-    } catch (error) {
-      setStatus(`Error: ${toFriendlyNetworkError(error)}`);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (!user || !isAdminRole(role)) return <div className="content">Checking admin access…</div>;
+  if (!allowed) return <div className="content">Checking admin access…</div>;
 
   return (
-    <div className="content">
-      <h1>Admin Dashboard</h1>
-      <section style={{ marginBottom: "2rem" }}><h2>Create Post</h2><PostForm /></section>
-      <section>
-        <h2>Create Project</h2>
-        <form className="post-form" onSubmit={createProject}>
-          <input className="auth-input" placeholder="Project title" value={projTitle} onChange={(e) => setProjTitle(e.target.value)} />
-          <input type="file" accept=".html,text/html" onChange={onSelectProjectFile} />
-          {projectFile && <p className="post-meta">Selected file: {projectFile.name}</p>}
-          <button className="auth-btn" type="submit" disabled={loading || !projectFile}>{loading ? "Publishing..." : "Publish Project"}</button>
-          {status && <p>{status}</p>}
-        </form>
+    <div className="content admin-shell">
+      <section className="admin-hero">
+        <h1>Admin Control Center</h1>
+        <p className="post-meta">Professional dashboard with separated operational lanes for content and analytics.</p>
+        <div className="gallery-actions">
+          <Link className="auth-btn action-btn" href="/admin/projects">Projects</Link>
+          <Link className="like-btn action-btn" href="/admin/analytics">Analytics</Link>
+        </div>
+      </section>
+
+      <section className="admin-kpi-grid">
+        <article className="admin-kpi-card"><h3>2</h3><p>Task Lanes</p></article>
+        <article className="admin-kpi-card"><h3>100%</h3><p>Role-Gated Access</p></article>
+        <article className="admin-kpi-card"><h3>Supabase</h3><p>Analytics Backend</p></article>
+      </section>
+
+      <section className="admin-task-grid">
+        {TASKS.map((task) => (
+          <article key={task.href} className="admin-task-card">
+            <h3>{task.title}</h3>
+            <p>{task.description}</p>
+            <Link className="auth-btn action-btn" href={task.href}>{task.cta}</Link>
+          </article>
+        ))}
+      </section>
+
+      <section className="admin-setup-card">
+        <h3>Setup Instructions</h3>
+        <p className="post-meta">Open <code>docs/SUPABASE_DASHBOARD_SETUP.md</code> and follow steps to configure table, RPC, and env vars.</p>
       </section>
     </div>
   );
