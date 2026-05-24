@@ -1,57 +1,47 @@
-import { useEffect, useState } from "react";
-import { createClient } from "../lib/supabase/client";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useEffect, useMemo, useState } from "react";
 
 export default function PostsPage() {
-  const supabase = createClient();
   const [posts, setPosts] = useState([]);
+  const [viewMode, setViewMode] = useState("tiles");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadPosts();
   }, []);
 
   async function loadPosts() {
-    const { data, error } = await supabase
-      .from("posts")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (!error) setPosts(data || []);
+    setError("");
+    const res = await fetch("/api/content/list?type=post");
+    const payload = await res.json();
+    if (!res.ok) {
+      setError(payload.error || "Failed to load posts");
+      return;
+    }
+    setPosts(payload.items || []);
   }
+
+  const containerClass = useMemo(
+    () => (viewMode === "tiles" ? "gallery-grid" : "content-list"),
+    [viewMode]
+  );
 
   return (
     <div className="content">
       <h1>Posts</h1>
+      <div className="view-toggle-row">
+        <button className="auth-btn" onClick={() => setViewMode("tiles")}>Tiles</button>
+        <button className="like-btn" onClick={() => setViewMode("list")}>List</button>
+      </div>
+      {error && <p className="post-meta">{error}</p>}
 
-      <div className="posts-list">
+      <div className={containerClass}>
         {posts.map((post) => (
-          <article key={post.id} className="post-card">
+          <article key={post.path} className="post-card">
             <h2>{post.title}</h2>
-
-            <p className="post-meta">
-              By {post.author} ·{" "}
-              {new Date(post.created_at).toLocaleString()}
-            </p>
-
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                p: ({node, ...props}) => (
-                  <p className="post-content" {...props} />
-                ),
-              }}
-            >
-              {post.content}
-            </ReactMarkdown>
-
-            {post.image_url && (
-              <img
-                src={post.image_url}
-                alt={post.title}
-                className="post-image"
-              />
-            )}
+            <p className="post-meta">{post.name}</p>
+            <a className="auth-btn" href={post.download_url} target="_blank" rel="noreferrer">
+              Open Post
+            </a>
           </article>
         ))}
       </div>
