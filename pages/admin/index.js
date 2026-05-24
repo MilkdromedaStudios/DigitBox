@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import PostForm from "../../components/PostForm";
 import { getCurrentUserWithRole, isAdminRole } from "../../lib/roles";
+import { fetchWithRetry, toFriendlyNetworkError } from "../../lib/fetchWithRetry";
 
 export default function AdminPage() {
   const [user, setUser] = useState(null);
@@ -26,12 +27,19 @@ export default function AdminPage() {
     if (!projTitle || !html) return;
 
     const res = await fetch("/api/content/publish", {
+    try {
+      const res = await fetchWithRetry("/api/content/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "project", title: projTitle, html }),
     });
     const payload = await res.json();
     setStatus(res.ok ? `Published: ${payload.htmlPath}` : `Error: ${payload.error}`);
+      const payload = await res.json();
+      setStatus(res.ok ? `Published: ${payload.htmlPath}` : `Error: ${payload.error}`);
+    } catch (error) {
+      setStatus(`Error: ${toFriendlyNetworkError(error)}`);
+    }
   }
 
   if (!user || !isAdminRole(role)) return <div className="content">Checking admin access…</div>;
