@@ -30,10 +30,28 @@ export default function PostsPage() {
           <article key={post.path} className="post-card">
             <h2>{post.title}</h2>
             <p className="post-meta">{post.name}</p>
-            <p className="post-excerpt">{post.excerpt || "No preview available yet."}</p>
-            <Link className="auth-btn action-btn" href={`/posts/${encodeURIComponent(post.slug)}`}>
-              Open Post
+            <p className="post-excerpt">
+              {post.excerpt || "No preview available yet."}
+            </p>
+
+            {/* View Post button */}
+            <Link
+              href={`/posts/${encodeURIComponent(post.slug)}`}
+              className="auth-btn action-btn"
+            >
+              View Post
             </Link>
+
+            {/* Download button */}
+            <a
+              className="auth-btn action-btn"
+              href={post.download_url}
+              target="_blank"
+              rel="noreferrer"
+              style={{ marginLeft: "10px" }}
+            >
+              Download
+            </a>
           </article>
         ))}
       </div>
