@@ -2,8 +2,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const THEME_OPTIONS = ["default", "forest", "sunset", "ocean"];
-
 const ADMIN_EMAILS = [
   "wong.christopher501@gmail.com",
   "Studio.Milkdromeda@planetmail.net",
@@ -11,15 +9,9 @@ const ADMIN_EMAILS = [
 
 export default function Layout({ children }) {
   const [user, setUser] = useState(null);
-  const [theme, setTheme] = useState("default");
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
-    const savedTheme = typeof window !== "undefined" ? localStorage.getItem("digitbox-theme") : null;
-    const initialTheme = THEME_OPTIONS.includes(savedTheme) ? savedTheme : "default";
-    setTheme(initialTheme);
-    document.documentElement.setAttribute("data-theme", initialTheme);
-
     let isMounted = true;
 
     supabase.auth.getUser().then(({ data }) => {
@@ -39,12 +31,6 @@ export default function Layout({ children }) {
       listener?.subscription?.unsubscribe();
     };
   }, []);
-
-  function onThemeChange(nextTheme) {
-    setTheme(nextTheme);
-    document.documentElement.setAttribute("data-theme", nextTheme);
-    localStorage.setItem("digitbox-theme", nextTheme);
-  }
 
   async function logout() {
     await supabase.auth.signOut();
@@ -70,18 +56,6 @@ export default function Layout({ children }) {
           <Link href="/posts">Posts</Link>
           {isAdmin && <Link href="/admin">Admin</Link>}
           {!isAuthLoading && !user && <Link href="/login">Login</Link>}
-
-          <select
-            className="theme-select"
-            aria-label="Select theme"
-            value={theme}
-            onChange={(e) => onThemeChange(e.target.value)}
-          >
-            <option value="default">Theme: Default</option>
-            <option value="forest">Theme: Forest</option>
-            <option value="sunset">Theme: Sunset</option>
-            <option value="ocean">Theme: Ocean</option>
-          </select>
 
           {user && (
             <div className="profile-box">

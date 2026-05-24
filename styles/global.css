@@ -3,60 +3,27 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0b1020;
-  --bg-elev: #111931;
-  --surface: #1b2742;
-  --surface-soft: #233154;
-  --text: #e2e8f0;
-  --muted: #9fb0c7;
-  --border: rgba(148, 163, 184, 0.28);
-  --accent: #7c3aed;
-  --accent-2: #06b6d4;
+  --bg: #060b1a;
+  --bg-elev: #0b1330;
+  --surface: #121d3f;
+  --surface-soft: #1a2852;
+  --text: #e5e9ff;
+  --muted: #a9b6e3;
+  --border: rgba(138, 159, 255, 0.3);
+  --accent: #8b5cf6;
+  --accent-2: #4cc9f0;
   --danger: #ef4444;
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
-}
-
-html[data-theme="forest"] {
-  --bg: #08130d;
-  --bg-elev: #102217;
-  --surface: #1a3324;
-  --surface-soft: #244832;
-  --text: #d9fbe7;
-  --muted: #9dcab0;
-  --border: rgba(94, 164, 123, 0.34);
-  --accent: #22c55e;
-  --accent-2: #14b8a6;
-}
-
-html[data-theme="sunset"] {
-  --bg: #170d1f;
-  --bg-elev: #2a1332;
-  --surface: #3c1f47;
-  --surface-soft: #542a55;
-  --text: #fde7ff;
-  --muted: #efbde7;
-  --border: rgba(241, 155, 224, 0.35);
-  --accent: #f97316;
-  --accent-2: #ec4899;
-}
-
-html[data-theme="ocean"] {
-  --bg: #04101f;
-  --bg-elev: #0b2240;
-  --surface: #133660;
-  --surface-soft: #1f4f83;
-  --text: #dbeafe;
-  --muted: #9fbee6;
-  --border: rgba(96, 165, 250, 0.32);
-  --accent: #3b82f6;
-  --accent-2: #22d3ee;
+  --shadow: 0 12px 32px rgba(3, 8, 28, 0.55);
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
   padding: 0;
-  background: radial-gradient(circle at top, var(--bg-elev), var(--bg));
+  background:
+    radial-gradient(circle at 15% -20%, rgba(76, 201, 240, 0.2), transparent 35%),
+    radial-gradient(circle at 85% 0%, rgba(139, 92, 246, 0.2), transparent 40%),
+    linear-gradient(180deg, var(--bg-elev), var(--bg));
   color: var(--text);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -92,7 +59,7 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
   min-height: 2.35rem;
   border-radius: .75rem;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--surface-soft), var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-soft) 88%, #1a237e), var(--surface));
   color: var(--text);
   font-size: .9rem;
   font-weight: 600;
@@ -101,14 +68,6 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
 }
 .nav a:hover, .btn-base:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 60%, white); }
 
-.theme-select {
-  border-radius: .75rem;
-  border: 1px solid var(--border);
-  padding: .55rem .7rem;
-  color: var(--text);
-  background: var(--surface);
-}
-
 .profile-box { display: flex; align-items: center; gap: .6rem; }
 .profile-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); }
 .profile-name { font-size: .85rem; }
@@ -116,7 +75,14 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
 .logout-btn { background: linear-gradient(180deg, #7f1d1d, #450a0a); border-color: rgba(248,113,113,.45); color: #fee2e2; }
 
 .hero { background-image: url('/hero-gaming-bg.jpg'); background-size: cover; background-position: center; padding: 3rem 1rem; border-radius: 1rem; position: relative; overflow: hidden; }
-.hero::after { content:''; position:absolute; inset:0; background: linear-gradient(180deg, rgba(3,7,18,.35), rgba(3,7,18,.7)); }
+.hero::after { content:''; position:absolute; inset:0; background: linear-gradient(180deg, rgba(3,7,18,.35), rgba(3,7,18,.72)); }
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: -30% -10%;
+  background: conic-gradient(from 200deg at 50% 0%, transparent 0deg, rgba(76, 201, 240, 0.2) 30deg, transparent 55deg, rgba(139, 92, 246, 0.22) 140deg, transparent 170deg);
+  opacity: 0.8;
+}
 .hero > * { position: relative; z-index: 1; }
 .hero h1 { font-size: clamp(1.6rem, 4vw, 2.5rem); margin-bottom: .5rem; }
 .hero p { font-size: 1rem; color: #dbe3ef; }
