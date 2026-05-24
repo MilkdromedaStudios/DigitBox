@@ -294,3 +294,19 @@ order by policyname;
 ```
 
 If all 3 checks return expected rows, your Supabase save setup is configured correctly for this app.
+
+## GitHub auto-publish setup (posts/projects)
+
+1. Create a GitHub Personal Access Token with `repo` permissions.
+2. Add these environment variables to `.env.local`:
+   - `GITHUB_TOKEN=...`
+   - `GITHUB_REPO_OWNER=<your-github-username-or-org>`
+   - `GITHUB_REPO_NAME=<your-repo-name>`
+   - `GITHUB_REPO_BRANCH=main` (or your publish branch)
+3. Restart the Next.js server.
+4. In `/admin`, use **Create Post** (Markdown editor) or **Create Project** (paste HTML or upload `.html`).
+5. Each publish call writes files directly to your repo:
+   - Projects: `public/projects/<slug>.html`
+   - Posts: `public/posts/<slug>.html` and `public/posts/<slug>.md`
+
+If your repo is connected to GitHub Pages, new files will be deployed on the next Pages build.
