@@ -1,16 +1,26 @@
-import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { useMemo, useState } from "react";
 
-export default function PostForm({ authorEmail, onCreated, className = "post-form" }) {
+function markdownToHtml(md) {
+  return md
+    .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+    .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+    .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+    .replace(/\*\*(.*?)\*\*/gim, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/gim, "<em>$1</em>")
+    .replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2">$1</a>')
+    .replace(/\n$/gim, "<br />");
+}
+
+export default function PostForm({ className = "post-form" }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
 
+  const preview = useMemo(() => markdownToHtml(content), [content]);
+
   async function createPost(e) {
     e.preventDefault();
-
     if (!title.trim() || !content.trim()) {
       setStatus({ type: "error", message: "Title and content are required." });
       return;
@@ -20,50 +30,20 @@ export default function PostForm({ authorEmail, onCreated, className = "post-for
     setStatus({ type: "", message: "" });
 
     try {
-      let image_url = null;
-
-      if (imageFile) {
-        const ext = imageFile.name.includes(".")
-          ? imageFile.name.split(".").pop()
-          : "bin";
-        const fileName = `${crypto.randomUUID()}.${ext}`;
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("post-images")
-          .upload(fileName, imageFile);
-
-        if (uploadError || !uploadData?.path) {
-          throw new Error(uploadError?.message || "Image upload failed.");
-        }
-
-        const { data: publicUrlData } = supabase.storage
-          .from("post-images")
-          .getPublicUrl(uploadData.path);
-
-        image_url = publicUrlData?.publicUrl || null;
-      }
-
-      const { error: insertError } = await supabase.from("posts").insert({
-        title: title.trim(),
-        content: content.trim(),
-        image_url,
-        author: authorEmail,
+      const html = `<!doctype html><html><head><meta charset=\"utf-8\"/><title>${title}</title></head><body><article>${preview}</article></body></html>`;
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "post", title, html, markdown: content }),
       });
-
-      if (insertError) {
-        throw new Error(insertError.message || "Failed to create post.");
-      }
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || "Failed to publish post");
 
       setTitle("");
       setContent("");
-      setImageFile(null);
-      setStatus({ type: "success", message: "Post created successfully." });
-      onCreated?.();
+      setStatus({ type: "success", message: `Post published to ${payload.htmlPath}` });
     } catch (error) {
-      setStatus({
-        type: "error",
-        message: error?.message || "Failed to create post.",
-      });
+      setStatus({ type: "error", message: error.message || "Failed to create post." });
     } finally {
       setLoading(false);
     }
@@ -71,36 +51,11 @@ export default function PostForm({ authorEmail, onCreated, className = "post-for
 
   return (
     <form className={className} onSubmit={createPost}>
-      <input
-        className="auth-input"
-        placeholder="Post title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <textarea
-        className="auth-input"
-        placeholder="Write your post (Markdown allowed)..."
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={6}
-      />
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-      />
-      <button className="auth-btn" type="submit" disabled={loading}>
-        {loading ? "Posting..." : "Create Post"}
-      </button>
-
-      {status.message && (
-        <p
-          className="post-meta"
-          style={{ color: status.type === "error" ? "#ffb3b3" : "#9effb1" }}
-        >
-          {status.message}
-        </p>
-      )}
+      <input className="auth-input" placeholder="Post title" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <textarea className="auth-input" placeholder="Write Markdown..." value={content} onChange={(e) => setContent(e.target.value)} rows={10} />
+      <div className="post-body" dangerouslySetInnerHTML={{ __html: preview }} />
+      <button className="auth-btn" type="submit" disabled={loading}>{loading ? "Publishing..." : "Publish Post"}</button>
+      {status.message && <p className="post-meta" style={{ color: status.type === "error" ? "#ffb3b3" : "#9effb1" }}>{status.message}</p>}
     </form>
   );
 }
