@@ -32,7 +32,6 @@ export default function PostForm({ className = "post-form" }) {
 
     try {
       const html = `<!doctype html><html><head><meta charset=\"utf-8\"/><title>${title}</title></head><body><article>${preview}</article></body></html>`;
-      const res = await fetch("/api/content/publish", {
       const res = await fetchWithRetry("/api/content/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -45,7 +44,6 @@ export default function PostForm({ className = "post-form" }) {
       setContent("");
       setStatus({ type: "success", message: `Post published to ${payload.htmlPath}` });
     } catch (error) {
-      setStatus({ type: "error", message: error.message || "Failed to create post." });
       setStatus({ type: "error", message: toFriendlyNetworkError(error) || "Failed to create post." });
     } finally {
       setLoading(false);
