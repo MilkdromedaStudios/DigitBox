@@ -32,6 +32,7 @@ export default function PostsPage() {
             <p className="post-meta">{post.name}</p>
             <p className="post-excerpt">{post.excerpt || "No preview available yet."}</p>
             <Link className="auth-btn action-btn" href={`/posts/${encodeURIComponent(post.slug)}`}>
+            <a className="auth-btn action-btn" href={post.download_url} target="_blank" rel="noreferrer">
               Open Post
             </Link>
           </article>
