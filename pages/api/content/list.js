@@ -20,7 +20,7 @@ async function listDirectory(path) {
   const branch = process.env.GITHUB_REPO_BRANCH || "main";
 
   const res = await fetch(
-    `${GITHUB_API}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`,
+    `${GITHUB_API}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${branch}`,
     { headers: authHeaders() }
   );
 

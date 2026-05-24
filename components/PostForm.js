@@ -42,12 +42,6 @@ export default function PostForm({ className = "post-form" }) {
         { retries: 3, timeoutMs: 30000 }
       );
       const payload = await res.json().catch(() => ({}));
-      const res = await fetchWithRetry("/api/content/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "post", title, html, markdown: content }),
-      });
-      const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || "Failed to publish post");
 
       setTitle("");

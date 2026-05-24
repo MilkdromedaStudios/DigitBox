@@ -261,3 +261,32 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
 }
 
 .post-card { padding: 1rem; }
+
+.post-form {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.auth-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-soft) 90%, #0b112b);
+  color: var(--text);
+}
+
+.auth-input::placeholder {
+  color: var(--muted);
+}
+
+.post-body {
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.75rem;
+  background: rgba(7, 12, 32, 0.55);
+}
