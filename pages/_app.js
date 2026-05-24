@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import "../styles/global.css";
 import "../styles/login.css";
 import Layout from "../components/Layout";
-import { readProfilePrefsFromCookie } from "../lib/profilePreferences";
+import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
 export default function MyApp({ Component, pageProps, router }) {
   useEffect(() => {
@@ -14,7 +14,14 @@ export default function MyApp({ Component, pageProps, router }) {
 
     applyTheme();
     window.addEventListener("focus", applyTheme);
-    return () => window.removeEventListener("focus", applyTheme);
+    window.addEventListener(PROFILE_PREFS_UPDATED_EVENT, applyTheme);
+    window.addEventListener("storage", applyTheme);
+
+    return () => {
+      window.removeEventListener("focus", applyTheme);
+      window.removeEventListener(PROFILE_PREFS_UPDATED_EVENT, applyTheme);
+      window.removeEventListener("storage", applyTheme);
+    };
   }, []);
 
   if (router?.pathname?.startsWith("/projects/")) {
