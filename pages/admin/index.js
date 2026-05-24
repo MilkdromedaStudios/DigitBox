@@ -1,92 +1,52 @@
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import PostForm from "../../components/PostForm";
 import { getCurrentUserWithRole, isAdminRole } from "../../lib/roles";
-import { fetchWithRetry, toFriendlyNetworkError } from "../../lib/fetchWithRetry";
 
-export default function AdminPage() {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
-  const [projTitle, setProjTitle] = useState("");
-  const [projectFile, setProjectFile] = useState(null);
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
+const TASKS = [
+  {
+    title: "Task 1: Project Runtime + Management",
+    description: "Run projects in fullscreen, track views, and manage project files (add/delete).",
+    href: "/admin/projects",
+    cta: "Open Projects",
+  },
+  {
+    title: "Task 2: Analytics Dashboard",
+    description: "See total views, click-throughs, and most popular projects with room for future insights.",
+    href: "/admin/analytics",
+    cta: "Open Analytics",
+  },
+];
+
+export default function AdminHomePage() {
+  const [allowed, setAllowed] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    getCurrentUserWithRole().then(({ user: u, role: r }) => {
-      setUser(u);
-      setRole(r);
-      if (!u || !isAdminRole(r)) router.replace("/");
+    getCurrentUserWithRole().then(({ user, role }) => {
+      if (!user || !isAdminRole(role)) {
+        router.replace("/");
+        return;
+      }
+      setAllowed(true);
     });
   }, [router]);
 
-  function onSelectProjectFile(e) {
-    const file = e.target.files?.[0] || null;
-    setProjectFile(file);
-    if (file && !projTitle.trim()) {
-      setProjTitle(file.name.replace(/\.html?$/i, ""));
-    }
-  }
-
-  async function createProject(e) {
-    e.preventDefault();
-    if (!projectFile) {
-      setStatus("Error: Please choose one HTML file.");
-      return;
-    }
-
-    const html = await projectFile.text();
-    const title = projTitle.trim() || projectFile.name.replace(/\.html?$/i, "");
-
-    if (!title || !html.trim()) {
-      setStatus("Error: Title and file content are required.");
-      return;
-    }
-
-    setLoading(true);
-    setStatus("");
-
-    try {
-      const res = await fetchWithRetry(
-        "/api/content/publish",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "project", title, html }),
-        },
-        { retries: 3, timeoutMs: 30000 }
-      );
-      const payload = await res.json().catch(() => ({}));
-      setStatus(res.ok ? `Published: ${payload.htmlPath}` : `Error: ${payload.error || "Failed to publish"}`);
-
-      if (res.ok) {
-        setProjTitle("");
-        setProjectFile(null);
-      }
-    } catch (error) {
-      setStatus(`Error: ${toFriendlyNetworkError(error)}`);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (!user || !isAdminRole(role)) return <div className="content">Checking admin access…</div>;
+  if (!allowed) return <div className="content">Checking admin access…</div>;
 
   return (
     <div className="content">
       <h1>Admin Dashboard</h1>
-      <section style={{ marginBottom: "2rem" }}><h2>Create Post</h2><PostForm /></section>
-      <section>
-        <h2>Create Project</h2>
-        <form className="post-form" onSubmit={createProject}>
-          <input className="auth-input" placeholder="Project title" value={projTitle} onChange={(e) => setProjTitle(e.target.value)} />
-          <input type="file" accept=".html,text/html" onChange={onSelectProjectFile} />
-          {projectFile && <p className="post-meta">Selected file: {projectFile.name}</p>}
-          <button className="auth-btn" type="submit" disabled={loading || !projectFile}>{loading ? "Publishing..." : "Publish Project"}</button>
-          {status && <p>{status}</p>}
-        </form>
-      </section>
+      <p className="post-meta">Choose a task lane below. This separates project management and analytics into two focused workflows.</p>
+      <div className="card-grid" style={{ marginTop: "1rem" }}>
+        {TASKS.map((task) => (
+          <article key={task.href} className="card">
+            <h3>{task.title}</h3>
+            <p>{task.description}</p>
+            <Link className="auth-btn action-btn" href={task.href}>{task.cta}</Link>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
