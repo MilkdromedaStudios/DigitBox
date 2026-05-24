@@ -1,6 +1,55 @@
 // digitbox/pages/index.js
 
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
 export default function Home() {
+  const [updates, setUpdates] = useState([]);
+  const [updatesError, setUpdatesError] = useState("");
+
+  useEffect(() => {
+    loadUpdates();
+  }, []);
+
+  async function loadUpdates() {
+    setUpdatesError("");
+    try {
+      const [projectsRes, postsRes] = await Promise.all([
+        fetch("/api/content/list?type=project&limit=5"),
+        fetch("/api/content/list?type=post&limit=5"),
+      ]);
+
+      const [projectsPayload, postsPayload] = await Promise.all([
+        projectsRes.json(),
+        postsRes.json(),
+      ]);
+
+      if (!projectsRes.ok || !postsRes.ok) {
+        setUpdatesError(
+          projectsPayload.error || postsPayload.error || "Failed to load latest updates"
+        );
+        return;
+      }
+
+      const projectItems = (projectsPayload.items || []).map((item) => ({
+        ...item,
+        contentType: "project",
+      }));
+      const postItems = (postsPayload.items || []).map((item) => ({
+        ...item,
+        contentType: "post",
+      }));
+
+      const merged = [...projectItems, ...postItems]
+        .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+        .slice(0, 6);
+
+      setUpdates(merged);
+    } catch {
+      setUpdatesError("Failed to load latest updates");
+    }
+  }
+
   return (
     <>
       {/* HERO SECTION */}
@@ -28,10 +77,29 @@ export default function Home() {
       <section className="section">
         <h2>Latest Updates</h2>
         <div className="card-grid">
-          <div className="card">
-            <h3>Coming Soon</h3>
-            <p>Posts will appear here once the database is connected.</p>
-          </div>
+          {updatesError && <p className="post-meta">{updatesError}</p>}
+
+          {!updatesError && updates.length === 0 && (
+            <div className="card">
+              <h3>No updates yet</h3>
+              <p>Recent projects and posts will show up here once published.</p>
+            </div>
+          )}
+
+          {updates.map((item) => (
+            <Link
+              key={`${item.contentType}-${item.path}`}
+              href={item.contentType === "project" ? `/projects/${encodeURIComponent(item.slug)}` : `/posts/${encodeURIComponent(item.slug)}`}
+              className="card card-link"
+            >
+              <h3>{item.title}</h3>
+              <p className="post-meta">
+                {item.contentType === "project" ? "Project" : "Post"}
+                {item.updated_at ? ` • ${new Date(item.updated_at).toLocaleDateString()}` : ""}
+              </p>
+              {item.excerpt && <p>{item.excerpt}</p>}
+            </Link>
+          ))}
         </div>
       </section>
 

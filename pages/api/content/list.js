@@ -45,6 +45,18 @@ async function fetchPostExcerpt(owner, repo, branch, path) {
   return toExcerpt(content);
 }
 
+async function fetchLastUpdatedAt(owner, repo, branch, filePath) {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/commits?path=${encodeURIComponent(filePath)}&sha=${encodeURIComponent(branch)}&per_page=1`,
+    { headers: authHeaders() }
+  );
+
+  if (!res.ok) return null;
+  const commits = await res.json();
+  const commit = Array.isArray(commits) ? commits[0] : null;
+  return commit?.commit?.author?.date || commit?.commit?.committer?.date || null;
+}
+
 async function listDirectory(path, type) {
   const owner = required("GITHUB_REPO_OWNER");
   const repo = required("GITHUB_REPO_NAME");
@@ -67,6 +79,7 @@ async function listDirectory(path, type) {
         const base = item.name.replace(/\.html$/i, "");
         const markdownPath = `public/posts/${base}.md`;
         const excerpt = await fetchPostExcerpt(owner, repo, branch, markdownPath);
+        const updated_at = await fetchLastUpdatedAt(owner, repo, branch, item.path);
 
         return {
           name: item.name,
@@ -75,25 +88,31 @@ async function listDirectory(path, type) {
           path: item.path,
           download_url: item.download_url,
           excerpt,
+          updated_at,
         };
       })
     );
 
-    return posts.sort((a, b) => a.title.localeCompare(b.title));
+    return posts.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
   }
 
-  return htmlFiles
-    .map((item) => {
+  const projects = await Promise.all(
+    htmlFiles.map(async (item) => {
       const base = item.name.replace(/\.html$/i, "");
+      const updated_at = await fetchLastUpdatedAt(owner, repo, branch, item.path);
+
       return {
         name: item.name,
         title: base,
         slug: base,
         path: item.path,
         download_url: item.download_url,
+        updated_at,
       };
     })
-    .sort((a, b) => a.title.localeCompare(b.title));
+  );
+
+  return projects.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
 }
 
 export default async function handler(req, res) {
@@ -105,7 +124,9 @@ export default async function handler(req, res) {
 
     const path = type === "project" ? "public/projects" : "public/posts";
     const items = await listDirectory(path, type);
-    return res.status(200).json({ items });
+    const limit = Number(req.query.limit || 0);
+    const limitedItems = Number.isFinite(limit) && limit > 0 ? items.slice(0, limit) : items;
+    return res.status(200).json({ items: limitedItems });
   } catch (error) {
     return res.status(500).json({ error: error.message || "List failed" });
   }
