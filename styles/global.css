@@ -310,3 +310,86 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Professional admin dashboard */
+.admin-shell {
+  max-width: 1120px;
+  padding-bottom: 2rem;
+}
+
+.admin-hero,
+.admin-setup-card,
+.admin-task-card,
+.admin-kpi-card,
+.admin-post-row {
+  background: linear-gradient(180deg, rgba(24, 37, 78, 0.82), rgba(14, 22, 47, 0.9));
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.admin-hero,
+.admin-setup-card {
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.admin-kpi-grid,
+.admin-task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: .85rem;
+  margin-bottom: 1rem;
+}
+
+.admin-kpi-card,
+.admin-task-card {
+  padding: 1rem;
+}
+
+.admin-task-card p,
+.admin-setup-card p,
+.admin-hero p {
+  margin-bottom: .8rem;
+}
+
+.admin-posts {
+  display: grid;
+  gap: .75rem;
+  margin-top: 1rem;
+}
+
+.admin-post-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .9rem 1rem;
+}
+
+.project-preview-shell {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+.project-preview-frame {
+  width: 100%;
+  height: 100vh;
+  border: none;
+  background: #0a1024;
+}
+
+.project-back-btn {
+  position: fixed;
+  top: .8rem;
+  left: .8rem;
+  z-index: 999;
+  border: 1px solid var(--border);
+  border-radius: .7rem;
+  padding: .55rem .85rem;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--surface-soft) 88%, #111938);
+}
