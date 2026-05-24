@@ -26,16 +26,17 @@ export default function AdminPage() {
     const html = projectFile ? await projectFile.text() : projHtml;
     if (!projTitle || !html) return;
 
-    const res = await fetch("/api/content/publish", {
     try {
-      const res = await fetchWithRetry("/api/content/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "project", title: projTitle, html }),
-    });
-    const payload = await res.json();
-    setStatus(res.ok ? `Published: ${payload.htmlPath}` : `Error: ${payload.error}`);
-      const payload = await res.json();
+      const res = await fetchWithRetry(
+        "/api/content/publish",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "project", title: projTitle, html }),
+        },
+        { retries: 3, timeoutMs: 30000 }
+      );
+      const payload = await res.json().catch(() => ({}));
       setStatus(res.ok ? `Published: ${payload.htmlPath}` : `Error: ${payload.error}`);
     } catch (error) {
       setStatus(`Error: ${toFriendlyNetworkError(error)}`);
