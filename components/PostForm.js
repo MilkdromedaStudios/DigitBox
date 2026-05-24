@@ -32,6 +32,16 @@ export default function PostForm({ className = "post-form" }) {
 
     try {
       const html = `<!doctype html><html><head><meta charset=\"utf-8\"/><title>${title}</title></head><body><article>${preview}</article></body></html>`;
+      const res = await fetchWithRetry(
+        "/api/content/publish",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "post", title, html, markdown: content }),
+        },
+        { retries: 3, timeoutMs: 30000 }
+      );
+      const payload = await res.json().catch(() => ({}));
       const res = await fetchWithRetry("/api/content/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

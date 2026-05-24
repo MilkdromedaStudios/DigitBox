@@ -27,6 +27,16 @@ export default function AdminPage() {
     if (!projTitle || !html) return;
 
     try {
+      const res = await fetchWithRetry(
+        "/api/content/publish",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "project", title: projTitle, html }),
+        },
+        { retries: 3, timeoutMs: 30000 }
+      );
+      const payload = await res.json().catch(() => ({}));
       const res = await fetchWithRetry("/api/content/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
