@@ -1,183 +1,54 @@
-// digitbox/pages/admin/index.js
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { supabase } from "../../lib/supabaseClient";
 import PostForm from "../../components/PostForm";
-
-const adminEmails = [
-  "wong.christopher501@gmail.com",
-  "Studio.Milkdromeda@planetmail.net",
-];
+import { getCurrentUserWithRole, isAdminRole } from "../../lib/roles";
 
 export default function AdminPage() {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
-
-  const [posts, setPosts] = useState([]);
-  const [projects, setProjects] = useState([]);
-
   const [projTitle, setProjTitle] = useState("");
-  const [projDescription, setProjDescription] = useState("");
   const [projHtml, setProjHtml] = useState("");
-  const [projLoading, setProjLoading] = useState(false);
-
+  const [projectFile, setProjectFile] = useState(null);
+  const [status, setStatus] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     getCurrentUserWithRole().then(({ user: u, role: r }) => {
       setUser(u);
       setRole(r);
-
-      if (!u || !isAdminRole(r)) {
-        router.replace("/");
-      } else {
-        loadPosts();
-        loadProjects();
-      }
+      if (!u || !isAdminRole(r)) router.replace("/");
     });
-  }, []);
-
-  async function loadPosts() {
-    const { data } = await supabase
-      .from("posts")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    setPosts(data || []);
-  }
-
-  async function loadProjects() {
-    const { data } = await supabase
-      .from("projects")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    setProjects(data || []);
-  }
+  }, [router]);
 
   async function createProject(e) {
     e.preventDefault();
-    if (!projTitle || !projHtml) return;
+    const html = projectFile ? await projectFile.text() : projHtml;
+    if (!projTitle || !html) return;
 
-    setProjLoading(true);
-
-    await supabase.from("projects").insert({
-      title: projTitle,
-      description: projDescription,
-      html_code: projHtml,
-      author: user.email,
+    const res = await fetch("/api/content/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "project", title: projTitle, html }),
     });
-
-    setProjLoading(false);
-    setProjTitle("");
-    setProjDescription("");
-    setProjHtml("");
-    loadProjects();
+    const payload = await res.json();
+    setStatus(res.ok ? `Published: ${payload.htmlPath}` : `Error: ${payload.error}`);
   }
 
-  async function deletePost(id) {
-    await supabase.from("posts").delete().eq("id", id);
-    loadPosts();
-  }
-
-  async function deleteProject(id) {
-    await supabase.from("projects").delete().eq("id", id);
-    loadProjects();
-  }
-
-  if (!user || !isAdminRole(role)) {
-    return <div className="content">Checking admin access…</div>;
-  }
+  if (!user || !isAdminRole(role)) return <div className="content">Checking admin access…</div>;
 
   return (
     <div className="content">
       <h1>Admin Dashboard</h1>
-      <p className="admin-subtitle">
-        Create posts and HTML5 projects, and manage existing content.
-      </p>
-
-      {/* Create Post */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2>Create Post</h2>
-        <PostForm authorEmail={user.email} onCreated={loadPosts} />
-      </section>
-
-      {/* Create Project */}
-      <section style={{ marginBottom: "2rem" }}>
+      <section style={{ marginBottom: "2rem" }}><h2>Create Post</h2><PostForm /></section>
+      <section>
         <h2>Create Project</h2>
         <form className="post-form" onSubmit={createProject}>
-          <input
-            className="auth-input"
-            placeholder="Project title"
-            value={projTitle}
-            onChange={(e) => setProjTitle(e.target.value)}
-          />
-          <textarea
-            className="auth-input"
-            placeholder="Project description (optional)"
-            value={projDescription}
-            onChange={(e) => setProjDescription(e.target.value)}
-            rows={3}
-          />
-          <textarea
-            className="auth-input code-editor"
-            placeholder="Paste full HTML for your game here..."
-            value={projHtml}
-            onChange={(e) => setProjHtml(e.target.value)}
-            rows={14}
-          />
-          <button className="auth-btn" type="submit" disabled={projLoading}>
-            {projLoading ? "Saving..." : "Create Project"}
-          </button>
+          <input className="auth-input" placeholder="Project title" value={projTitle} onChange={(e) => setProjTitle(e.target.value)} />
+          <textarea className="auth-input" placeholder="Paste project HTML" value={projHtml} onChange={(e) => setProjHtml(e.target.value)} rows={8} />
+          <input type="file" accept=".html,text/html" onChange={(e) => setProjectFile(e.target.files?.[0] || null)} />
+          <button className="auth-btn" type="submit">Publish Project</button>
+          {status && <p>{status}</p>}
         </form>
-      </section>
-
-      {/* Manage Posts */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2>Manage Posts</h2>
-        <div className="admin-posts">
-          {posts.map((post) => (
-            <div key={post.id} className="admin-post-row">
-              <div>
-                <strong>{post.title}</strong>
-                <div className="post-meta">
-                  {post.author} ·{" "}
-                  {new Date(post.created_at).toLocaleString()}
-                </div>
-              </div>
-              <button
-                className="logout-btn"
-                onClick={() => deletePost(post.id)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Manage Projects */}
-      <section>
-        <h2>Manage Projects</h2>
-        <div className="admin-posts">
-          {projects.map((proj) => (
-            <div key={proj.id} className="admin-post-row">
-              <div>
-                <strong>{proj.title}</strong>
-                <div className="post-meta">
-                  {proj.author} ·{" "}
-                  {new Date(proj.created_at).toLocaleString()}
-                </div>
-              </div>
-              <button
-                className="logout-btn"
-                onClick={() => deleteProject(proj.id)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
       </section>
     </div>
   );

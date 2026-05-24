@@ -275,3 +275,23 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
 .card p {
   color: var(--text);
 }
+
+.view-toggle-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.content-list .gallery-item,
+.content-list .post-card {
+  width: 100%;
+  padding: 1rem;
+}
+
+.post-card { padding: 1rem; }
