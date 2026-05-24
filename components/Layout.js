@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { readProfilePrefsFromCookie } from "../lib/profilePreferences";
+import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
 const ADMIN_EMAILS = [
   "wong.christopher501@gmail.com",
@@ -19,6 +19,8 @@ export default function Layout({ children }) {
     const loadPrefs = () => setProfilePrefs(readProfilePrefsFromCookie());
     loadPrefs();
     window.addEventListener("focus", loadPrefs);
+    window.addEventListener(PROFILE_PREFS_UPDATED_EVENT, loadPrefs);
+    window.addEventListener("storage", loadPrefs);
 
     supabase.auth.getUser().then(({ data }) => {
       if (!isMounted) return;
@@ -35,6 +37,8 @@ export default function Layout({ children }) {
     return () => {
       isMounted = false;
       window.removeEventListener("focus", loadPrefs);
+      window.removeEventListener(PROFILE_PREFS_UPDATED_EVENT, loadPrefs);
+      window.removeEventListener("storage", loadPrefs);
       listener?.subscription?.unsubscribe();
     };
   }, []);
