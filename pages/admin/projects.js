@@ -27,6 +27,9 @@ export default function AdminProjectsPage() {
   }
 
   async function deleteProject(slug) {
+    const confirmed = window.confirm(`Delete project "${slug}"? This cannot be undone.`);
+    if (!confirmed) return;
+
     setBusySlug(slug);
     setStatus("");
     try {
