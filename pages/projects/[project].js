@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useMemo } from "react";
 
 function required(name) {
   const value = process.env[name];
@@ -15,26 +15,31 @@ function authHeaders() {
 }
 
 export default function ProjectRunner({ html, title }) {
-  useEffect(() => {
-    if (!html) return;
+  const srcDoc = useMemo(() => {
+    if (!html) return "<!doctype html><html><body><h1>Project unavailable.</h1></body></html>";
 
-    const fullDocument = html.includes("<html")
+    return html.includes("<html")
       ? html
-      : `<!doctype html><html><head><meta charset=\"utf-8\"/><title>${title || "Project"}</title></head><body>${html}</body></html>`;
-
-    document.open();
-    document.write(fullDocument);
-    document.close();
+      : `<!doctype html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><title>${title || "Project"}</title></head><body style=\"margin:0;\">${html}</body></html>`;
   }, [html, title]);
 
-  return null;
+  return (
+    <iframe
+      title={title || "Project"}
+      srcDoc={srcDoc}
+      sandbox="allow-scripts allow-pointer-lock allow-popups allow-modals allow-forms"
+      allow="autoplay; fullscreen; gamepad"
+      style={{ width: "100%", height: "100vh", border: "none", display: "block", background: "#000" }}
+    />
+  );
 }
 
 export async function getServerSideProps({ params }) {
   const owner = required("GITHUB_REPO_OWNER");
   const repo = required("GITHUB_REPO_NAME");
   const branch = process.env.GITHUB_REPO_BRANCH || "main";
-  const slug = Array.isArray(params.project) ? params.project[0] : params.project;
+  const rawSlug = Array.isArray(params.project) ? params.project[0] : params.project;
+  const slug = decodeURIComponent(rawSlug || "");
   const filename = `${slug}.html`;
 
   const res = await fetch(

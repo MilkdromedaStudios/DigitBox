@@ -393,3 +393,26 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
   font-weight: 700;
   background: color-mix(in srgb, var(--surface-soft) 88%, #111938);
 }
+
+body[data-theme="light"] {
+  --bg: #eff3ff;
+  --bg-elev: #f8faff;
+  --surface: #ffffff;
+  --surface-soft: #e8eeff;
+  --text: #111827;
+  --muted: #4b5563;
+  --border: rgba(99, 102, 241, 0.25);
+  --shadow: 0 8px 26px rgba(15, 23, 42, 0.14);
+}
+
+.theme-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.8rem;
+}
+
+.theme-presets {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}

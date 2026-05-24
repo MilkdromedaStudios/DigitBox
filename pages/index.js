@@ -15,8 +15,8 @@ export default function Home() {
     setUpdatesError("");
     try {
       const [projectsRes, postsRes] = await Promise.all([
-        fetch("/api/content/list?type=project&limit=3"),
-        fetch("/api/content/list?type=post&limit=3"),
+        fetch("/api/content/list?type=project&limit=5"),
+        fetch("/api/content/list?type=post&limit=5"),
       ]);
 
       const [projectsPayload, postsPayload] = await Promise.all([
@@ -42,7 +42,7 @@ export default function Home() {
 
       const merged = [...projectItems, ...postItems]
         .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
-        .slice(0, 3);
+        .slice(0, 6);
 
       setUpdates(merged);
     } catch {
