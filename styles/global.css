@@ -143,6 +143,15 @@ a { color: color-mix(in srgb, var(--accent-2) 70%, white); text-decoration: none
 .exit-btn { background: linear-gradient(135deg, #b91c1c, #ef4444); border: none; color:#fff; }
 .auth-btn:hover,.like-btn:hover,.exit-btn:hover{ transform: translateY(-1px); }
 
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
 .footer { margin-top:2rem; text-align:center; padding:1rem; color:var(--muted); border-top:1px solid var(--border); }
 
 @media (max-width: 768px) {
