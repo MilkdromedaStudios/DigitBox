@@ -20,10 +20,10 @@ export default function ProfilePage() {
     supabase.auth.getUser().then(async ({ data }) => {
       const user = data?.user;
       if (!user) return;
-      const { data: existing } = await supabase.from("profiles").select("display_name,identity_label,theme,accent_color,avatar_data_url,show_off_stats").eq("id", user.id).maybeSingle();
+      const { data: existing } = await supabase.from("profiles").select("display_name,identity_label,theme,accent_color,avatar_data_url").eq("id", user.id).maybeSingle();
       if (existing) {
         const merged = sanitizeProfilePrefs({
-          displayName: existing.display_name, identityLabel: existing.identity_label, theme: existing.theme, accentColor: existing.accent_color, avatarDataUrl: existing.avatar_data_url, showOffStats: !!existing.show_off_stats
+          displayName: existing.display_name, identityLabel: existing.identity_label, theme: existing.theme, accentColor: existing.accent_color, avatarDataUrl: existing.avatar_data_url
         });
         setPrefs(merged);
         saveProfilePrefsToCookie(merged);
@@ -44,7 +44,6 @@ export default function ProfilePage() {
       theme: next.theme,
       accent_color: next.accentColor,
       avatar_data_url: next.avatarDataUrl,
-      show_off_stats: !!next.showOffStats,
       updated_at: new Date().toISOString(),
     });
   }
@@ -76,6 +75,6 @@ export default function ProfilePage() {
 <label>Profile image (max 10MB)<input className="auth-input" type="file" accept="image/*" onChange={handleAvatarUpload}/></label>
 <div className="theme-row"><label>Theme<select className="auth-input" value={prefs.theme} onChange={(e)=>updateField("theme", e.target.value)}><option value="dark">Dark (default)</option><option value="light">Light</option></select></label>
 <label>Accent color (RGB picker)<input className="auth-input" type="color" value={prefs.accentColor} onChange={(e)=>updateField("accentColor", e.target.value)}/></label></div>
-<label style={{ display: "flex", gap: ".6rem", alignItems: "center" }}><input type="checkbox" checked={!!prefs.showOffStats} onChange={(e)=>updateField("showOffStats", e.target.checked)} /> Show off stats (make my profile visible in Community list)</label><div><p style={{ marginBottom: 8 }}>Preset accents</p><div className="theme-presets">{Object.entries(THEME_PRESETS).map(([key,color]) => <button key={key} type="button" className="btn-base" onClick={()=>updateField("accentColor", color)} style={{ borderColor: color }}>{key}</button>)}</div></div></form>
+<div><p style={{ marginBottom: 8 }}>Preset accents</p><div className="theme-presets">{Object.entries(THEME_PRESETS).map(([key,color]) => <button key={key} type="button" className="btn-base" onClick={()=>updateField("accentColor", color)} style={{ borderColor: color }}>{key}</button>)}</div></div></form>
 <div className="section" style={{ maxWidth: 620 }}><h3>Preview</h3><div className="profile-box"><img src={prefs.avatarDataUrl || "https://ui-avatars.com/api/?name=Player&background=333&color=fff"} alt="Avatar preview" className="profile-avatar"/><div className="profile-text"><span className="profile-name">{previewName}</span>{prefs.identityLabel && <span className="admin-badge">{prefs.identityLabel}</span>}</div></div></div>{message && <p style={{ marginTop: 12 }}>{message}</p>}</div>;
 }
