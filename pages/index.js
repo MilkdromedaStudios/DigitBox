@@ -1,6 +1,43 @@
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
 // digitbox/pages/index.js
 
 export default function Home() {
+  const [posts, setPosts] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [updatesError, setUpdatesError] = useState("");
+
+  useEffect(() => {
+    loadLatestContent();
+  }, []);
+
+  async function loadLatestContent() {
+    setUpdatesError("");
+
+    try {
+      const [postsRes, projectsRes] = await Promise.all([
+        fetch("/api/content/list?type=post"),
+        fetch("/api/content/list?type=project"),
+      ]);
+
+      const [postsPayload, projectsPayload] = await Promise.all([
+        postsRes.json(),
+        projectsRes.json(),
+      ]);
+
+      if (!postsRes.ok || !projectsRes.ok) {
+        setUpdatesError("Failed to load latest updates right now.");
+        return;
+      }
+
+      setPosts((postsPayload.items || []).slice(0, 3));
+      setProjects((projectsPayload.items || []).slice(0, 3));
+    } catch {
+      setUpdatesError("Could not reach the content service. Please try again.");
+    }
+  }
+
   return (
     <>
       {/* HERO SECTION */}
@@ -27,10 +64,47 @@ export default function Home() {
       {/* LATEST UPDATES */}
       <section className="section">
         <h2>Latest Updates</h2>
+        {updatesError && <p className="post-meta">{updatesError}</p>}
+
         <div className="card-grid">
           <div className="card">
-            <h3>Coming Soon</h3>
-            <p>Posts will appear here once the database is connected.</p>
+            <h3>Recent Posts</h3>
+            {posts.length === 0 ? (
+              <p>No posts yet.</p>
+            ) : (
+              <ul>
+                {posts.map((post) => (
+                  <li key={post.path}>
+                    <Link href={`/posts/${encodeURIComponent(post.slug)}`}>
+                      {post.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p>
+              <Link href="/posts">Browse all posts</Link>
+            </p>
+          </div>
+
+          <div className="card">
+            <h3>Recent Projects</h3>
+            {projects.length === 0 ? (
+              <p>No projects yet.</p>
+            ) : (
+              <ul>
+                {projects.map((project) => (
+                  <li key={project.path}>
+                    <Link href={`/projects/${encodeURIComponent(project.slug)}`}>
+                      {project.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p>
+              <Link href="/gallery">Browse all projects</Link>
+            </p>
           </div>
         </div>
       </section>
