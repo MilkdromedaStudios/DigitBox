@@ -57,7 +57,7 @@ export default function Home() {
           </a>
 
           <a
-            href="https://rakosell.com/en/blog/membership_platform_comparison"
+            href="https://ko-fi.com/respawnerzstudioz"
             target="_blank"
             rel="noreferrer"
             className="card card-link"
@@ -77,7 +77,7 @@ export default function Home() {
 
         <div className="support-grid">
           <a
-            href="https://rakosell.com/en/blog/membership_platform_comparison"
+            href="https://ko-fi.com/respawnerzstudioz"
             target="_blank"
             rel="noreferrer"
           >
@@ -107,7 +107,7 @@ export default function Home() {
           </a>
 
           <a
-            href="https://crowdin.com/project/modrinth-platform"
+            href="https://modrinth.com/user/Error9998252"
             target="_blank"
             rel="noreferrer"
           >
