@@ -3,19 +3,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getCurrentUserWithRole, isAdminRole } from "../../lib/roles";
 
-const TASKS = [
-  {
-    title: "Task 1: Project Runtime + Management",
-    description: "Run projects in fullscreen, track views, and manage project files (add/delete).",
-    href: "/admin/projects",
-    cta: "Open Projects",
-  },
-  {
-    title: "Task 2: Analytics Dashboard",
-    description: "See total views, click-throughs, and most popular projects with room for future insights.",
-    href: "/admin/analytics",
-    cta: "Open Analytics",
-  },
+const DASHBOARD_CARDS = [
+  { title: "Projects", description: "Publish, preview, and manage website projects.", href: "/admin/projects", cta: "Manage Projects" },
+  { title: "Posts", description: "Create announcements and updates for visitors.", href: "/posts/new", cta: "Create Post" },
+  { title: "Analytics", description: "Track what users view and what performs best.", href: "/admin/analytics", cta: "View Analytics" },
 ];
 
 export default function AdminHomePage() {
@@ -24,10 +15,7 @@ export default function AdminHomePage() {
 
   useEffect(() => {
     getCurrentUserWithRole().then(({ user, role }) => {
-      if (!user || !isAdminRole(role)) {
-        router.replace("/");
-        return;
-      }
+      if (!user || !isAdminRole(role)) return router.replace("/");
       setAllowed(true);
     });
   }, [router]);
@@ -35,15 +23,17 @@ export default function AdminHomePage() {
   if (!allowed) return <div className="content">Checking admin access…</div>;
 
   return (
-    <div className="content">
-      <h1>Admin Dashboard</h1>
-      <p className="post-meta">Choose a task lane below. This separates project management and analytics into two focused workflows.</p>
-      <div className="card-grid" style={{ marginTop: "1rem" }}>
-        {TASKS.map((task) => (
-          <article key={task.href} className="card">
-            <h3>{task.title}</h3>
-            <p>{task.description}</p>
-            <Link className="auth-btn action-btn" href={task.href}>{task.cta}</Link>
+    <div className="content admin-shell">
+      <section className="admin-hero">
+        <h1>Creator Dashboard</h1>
+        <p className="post-meta">A cleaner control center for content, projects, and growth.</p>
+      </section>
+      <div className="card-grid">
+        {DASHBOARD_CARDS.map((card) => (
+          <article key={card.href} className="card">
+            <h3>{card.title}</h3>
+            <p>{card.description}</p>
+            <Link className="auth-btn action-btn" href={card.href}>{card.cta}</Link>
           </article>
         ))}
       </div>

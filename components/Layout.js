@@ -15,7 +15,6 @@ export default function Layout({ children }) {
 
   useEffect(() => {
     let isMounted = true;
-
     const loadPrefs = () => setProfilePrefs(readProfilePrefsFromCookie());
     loadPrefs();
     window.addEventListener("focus", loadPrefs);
@@ -45,45 +44,36 @@ export default function Layout({ children }) {
   }
 
   const isAdmin = Boolean(user && ADMIN_EMAILS.includes(user.email));
-  const avatar =
-    profilePrefs?.avatarDataUrl ||
-    user?.user_metadata?.avatar_url ||
-    "https://ui-avatars.com/api/?name=User&background=444&color=fff";
+  const avatar = profilePrefs?.avatarDataUrl || user?.user_metadata?.avatar_url || "https://ui-avatars.com/api/?name=User&background=444&color=fff";
   const username = profilePrefs?.displayName || user?.user_metadata?.user_name || user?.email?.split("@")[0] || "User";
   const identityLabel = profilePrefs?.identityLabel || (isAdmin ? "Admin" : "");
 
   return (
     <div className="page">
       <header className="header">
-        <div className="logo">
-          <Link href="/">digitbox.dev</Link>
-        </div>
-
+        <div className="logo"><Link href="/">digitbox.dev</Link></div>
         <nav className="nav" aria-label="Primary navigation">
           <Link href="/">Home</Link>
           <Link href="/gallery">Gallery</Link>
           <Link href="/posts">Posts</Link>
-          <Link href="/profile">Profile</Link>
           {isAdmin && <Link href="/admin">Admin</Link>}
           {!isAuthLoading && !user && <Link href="/login">Login</Link>}
 
           {user && (
-            <div className="profile-box">
-              <img src={avatar} alt="Profile avatar" className="profile-avatar" />
-              <div className="profile-text">
-                <span className="profile-name">{username}</span>
-                {identityLabel && <span className="admin-badge">{identityLabel}</span>}
-              </div>
+            <>
+              <Link href="/profile" className="profile-box" aria-label="Open profile">
+                <img src={avatar} alt="Profile avatar" className="profile-avatar" />
+                <div className="profile-text">
+                  <span className="profile-name">{username}</span>
+                  {identityLabel && <span className="admin-badge">{identityLabel}</span>}
+                </div>
+              </Link>
               <button className="logout-btn btn-base" onClick={logout}>Logout</button>
-            </div>
+            </>
           )}
         </nav>
       </header>
-
-      <main className="main">
-        <div className="content">{children}</div>
-      </main>
-
+      <main className="main"><div className="content">{children}</div></main>
       <footer className="footer">© {new Date().getFullYear()} digitbox.dev</footer>
     </div>
   );
