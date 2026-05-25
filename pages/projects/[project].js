@@ -47,16 +47,21 @@ export async function getServerSideProps({ params }) {
   const slug = decodeURIComponent(rawSlug || "");
   const filename = `${slug}.html`;
 
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/public/projects/${encodeURIComponent(filename)}?ref=${branch}`,
-    { headers: authHeaders() }
+  const encodedPath = `public/projects/${filename}`
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+
+  const rawRes = await fetch(
+    `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${encodedPath}`,
+    { headers: { Authorization: `Bearer ${required("GITHUB_TOKEN")}` } }
   );
 
-  if (res.status === 404) {
+  if (rawRes.status === 404) {
     return { notFound: true };
   }
 
-  if (!res.ok) {
+  if (!rawRes.ok) {
     return {
       props: {
         html: "<h1>Could not load project.</h1>",
@@ -65,14 +70,13 @@ export async function getServerSideProps({ params }) {
     };
   }
 
-  const data = await res.json();
-  const html = Buffer.from(data.content || "", "base64").toString("utf8");
+  const html = await rawRes.text();
 
   return {
     props: {
       html,
       title: slug,
-      unavailableReason: isGitLfsPointer(html) ? "This project file is a Git LFS pointer. Pull LFS assets before deploying." : "",
+      unavailableReason: isGitLfsPointer(html) ? "This project file is still unavailable from GitHub raw content." : "",
     },
   };
 }

@@ -15,6 +15,19 @@ if command -v git >/dev/null 2>&1 && git lfs version >/dev/null 2>&1; then
   fi
 
   if [ -z "${lfs_url}" ]; then
+    repo_owner="${GITHUB_REPO_OWNER:-}"
+    repo_name="${GITHUB_REPO_NAME:-}"
+
+    if [ -n "${repo_owner}" ] && [ -n "${repo_name}" ]; then
+      remote_url="https://github.com/${repo_owner}/${repo_name}.git"
+      git config remote.origin.url "${remote_url}"
+      git config lfs.url "${remote_url}/info/lfs"
+      lfs_url="${remote_url}/info/lfs"
+      echo "[vercel-build] remote.origin.url and lfs.url were missing; set from GITHUB_REPO_OWNER/GITHUB_REPO_NAME"
+    fi
+  fi
+
+  if [ -z "${lfs_url}" ]; then
     echo "[vercel-build] WARNING: No LFS endpoint configured (lfs.url/remote.origin.url missing); skipping git lfs pull."
   else
     echo "[vercel-build] Running: git lfs pull --include=\"*\" --exclude=\"\""
