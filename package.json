@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "npm run typecheck",
     "typecheck": "tsc --noEmit",
-    "vercel-build": "apt-get update && apt-get install -y git-lfs && git lfs pull && next build"
+    "vercel-build": "next build"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
