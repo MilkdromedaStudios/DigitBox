@@ -1,3 +1,5 @@
+import fs from "fs/promises";
+import path from "path";
 import { useMemo } from "react";
 
 function required(name) {
@@ -14,9 +16,37 @@ function authHeaders() {
   };
 }
 
-
 function isGitLfsPointer(content = "") {
   return content.includes("version https://git-lfs.github.com/spec/v1") && content.includes("oid sha256:");
+}
+
+async function readLocalProjectFile(filename) {
+  const absolutePath = path.join(process.cwd(), "public", "projects", filename);
+  try {
+    return await fs.readFile(absolutePath, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function readGithubProjectFile(owner, repo, branch, filename) {
+  const encodedPath = `public/projects/${filename}`
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`,
+    { headers: authHeaders() }
+  );
+
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub file read failed (${res.status})`);
+
+  const data = await res.json();
+  if (data?.encoding !== "base64") throw new Error("Unsupported GitHub content encoding");
+  return Buffer.from(data.content || "", "base64").toString("utf8");
 }
 
 export default function ProjectRunner({ html, title, unavailableReason }) {
@@ -47,36 +77,23 @@ export async function getServerSideProps({ params }) {
   const slug = decodeURIComponent(rawSlug || "");
   const filename = `${slug}.html`;
 
-  const encodedPath = `public/projects/${filename}`
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  let html = await readLocalProjectFile(filename);
 
-  const rawRes = await fetch(
-    `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${encodedPath}`,
-    { headers: { Authorization: `Bearer ${required("GITHUB_TOKEN")}` } }
-  );
+  if (html == null) {
+    html = await readGithubProjectFile(owner, repo, branch, filename);
+  }
 
-  if (rawRes.status === 404) {
+  if (html == null) {
     return { notFound: true };
   }
-
-  if (!rawRes.ok) {
-    return {
-      props: {
-        html: "<h1>Could not load project.</h1>",
-        title: "Project Error",
-      },
-    };
-  }
-
-  const html = await rawRes.text();
 
   return {
     props: {
       html,
       title: slug,
-      unavailableReason: isGitLfsPointer(html) ? "This project file is still unavailable from GitHub raw content." : "",
+      unavailableReason: isGitLfsPointer(html)
+        ? "This project file is an unresolved Git LFS pointer. Confirm Git LFS assets are checked out in the deployment build."
+        : "",
     },
   };
 }
