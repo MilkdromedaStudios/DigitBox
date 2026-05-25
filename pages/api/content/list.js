@@ -1,9 +1,19 @@
 const GITHUB_API = "https://api.github.com";
+import fs from "fs/promises";
+import path from "path";
 
 function required(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Missing ${name}`);
   return value;
+}
+
+function hasGithubConfig() {
+  return Boolean(
+    process.env.GITHUB_TOKEN &&
+    process.env.GITHUB_REPO_OWNER &&
+    process.env.GITHUB_REPO_NAME
+  );
 }
 
 function authHeaders() {
@@ -58,6 +68,10 @@ async function fetchLastUpdatedAt(owner, repo, branch, filePath) {
 }
 
 async function listDirectory(path, type) {
+  if (!hasGithubConfig()) {
+    return listDirectoryFromLocalFs(path, type);
+  }
+
   const owner = required("GITHUB_REPO_OWNER");
   const repo = required("GITHUB_REPO_NAME");
   const branch = process.env.GITHUB_REPO_BRANCH || "main";
@@ -108,6 +122,66 @@ async function listDirectory(path, type) {
         path: item.path,
         download_url: item.download_url,
         updated_at,
+      };
+    })
+  );
+
+  return projects.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+}
+
+async function listDirectoryFromLocalFs(dirPath, type) {
+  const absoluteDir = path.join(process.cwd(), dirPath);
+
+  let entries = [];
+  try {
+    entries = await fs.readdir(absoluteDir, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  }
+
+  const htmlFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".html"));
+
+  if (type === "post") {
+    const posts = await Promise.all(
+      htmlFiles.map(async (entry) => {
+        const base = entry.name.replace(/\.html$/i, "");
+        const htmlPath = path.join(absoluteDir, entry.name);
+        const markdownPath = path.join(process.cwd(), "public", "posts", `${base}.md`);
+
+        const [htmlStat, markdownContent] = await Promise.all([
+          fs.stat(htmlPath),
+          fs.readFile(markdownPath, "utf8").catch(() => ""),
+        ]);
+
+        return {
+          name: entry.name,
+          title: toDisplayTitle(base),
+          slug: base,
+          path: `${dirPath}/${entry.name}`,
+          download_url: `/${dirPath}/${entry.name}`,
+          excerpt: toExcerpt(markdownContent),
+          updated_at: htmlStat.mtime.toISOString(),
+        };
+      })
+    );
+
+    return posts.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+  }
+
+  const projects = await Promise.all(
+    htmlFiles.map(async (entry) => {
+      const base = entry.name.replace(/\.html$/i, "");
+      const htmlPath = path.join(absoluteDir, entry.name);
+      const stat = await fs.stat(htmlPath);
+
+      return {
+        name: entry.name,
+        title: base,
+        slug: base,
+        path: `${dirPath}/${entry.name}`,
+        download_url: `/${dirPath}/${entry.name}`,
+        updated_at: stat.mtime.toISOString(),
       };
     })
   );
