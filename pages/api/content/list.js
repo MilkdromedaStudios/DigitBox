@@ -100,7 +100,7 @@ async function listDirectory(path, type) {
           title: toDisplayTitle(base),
           slug: base,
           path: item.path,
-          download_url: item.download_url,
+          download_url: `/api/content/file?path=${encodeURIComponent(item.path)}`,
           excerpt,
           updated_at,
         };
@@ -120,7 +120,7 @@ async function listDirectory(path, type) {
         title: base,
         slug: base,
         path: item.path,
-        download_url: item.download_url,
+        download_url: `/api/content/file?path=${encodeURIComponent(item.path)}`,
         updated_at,
       };
     })
@@ -159,7 +159,7 @@ async function listDirectoryFromLocalFs(dirPath, type) {
           title: toDisplayTitle(base),
           slug: base,
           path: `${dirPath}/${entry.name}`,
-          download_url: `/${dirPath}/${entry.name}`,
+          download_url: `/api/content/file?path=${encodeURIComponent(`${dirPath}/${entry.name}`)}`,
           excerpt: toExcerpt(markdownContent),
           updated_at: htmlStat.mtime.toISOString(),
         };
@@ -180,7 +180,7 @@ async function listDirectoryFromLocalFs(dirPath, type) {
         title: base,
         slug: base,
         path: `${dirPath}/${entry.name}`,
-        download_url: `/${dirPath}/${entry.name}`,
+        download_url: `/api/content/file?path=${encodeURIComponent(`${dirPath}/${entry.name}`)}`,
         updated_at: stat.mtime.toISOString(),
       };
     })
