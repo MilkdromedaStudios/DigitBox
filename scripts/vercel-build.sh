@@ -5,36 +5,24 @@ if command -v git >/dev/null 2>&1 && command -v git-lfs >/dev/null 2>&1; then
   echo "[vercel-build] git and git-lfs detected; checking for LFS pointers..."
 
   if git lfs ls-files >/dev/null 2>&1 && [ -n "$(git lfs ls-files | head -n 1)" ]; then
-    echo "[vercel-build] LFS pointers found; preparing LFS endpoint..."
+    echo "[vercel-build] LFS pointers found."
 
     lfs_url="$(git config --get lfs.url || true)"
 
-    if [ -z "$lfs_url" ]; then
-      remote_url="$(git config --get remote.origin.url || true)"
-
-      if [ -n "$remote_url" ]; then
-        lfs_url="${remote_url%/}/info/lfs"
-      elif [ -n "${VERCEL_GIT_REPO_OWNER:-}" ] && [ -n "${VERCEL_GIT_REPO_SLUG:-}" ]; then
-        lfs_url="https://github.com/${VERCEL_GIT_REPO_OWNER}/${VERCEL_GIT_REPO_SLUG}.git/info/lfs"
-      else
-        lfs_url="https://github.com/MilkdromedaStudios/DigitBox.git/info/lfs"
+    if [ -n "$lfs_url" ] && [[ "$lfs_url" =~ ^https?:// ]]; then
+      echo "[vercel-build] Using configured lfs.url=$lfs_url"
+      if ! git lfs pull --include="*" --exclude=""; then
+        echo "[vercel-build] ERROR: Git LFS pull failed using configured lfs.url."
+        exit 2
       fi
 
-      if [ -n "$lfs_url" ]; then
-        git config lfs.url "$lfs_url"
-        echo "[vercel-build] Configured lfs.url=$lfs_url"
+      if ! git lfs checkout; then
+        echo "[vercel-build] ERROR: Git LFS checkout failed."
+        exit 2
       fi
-    fi
-
-    if ! git lfs pull --include="*" --exclude=""; then
-      echo "[vercel-build] ERROR: Git LFS pull failed."
-      echo "[vercel-build] Ensure Vercel Project Settings > Git > Git LFS is enabled and repository access is authorized."
-      exit 2
-    fi
-
-    if ! git lfs checkout; then
-      echo "[vercel-build] ERROR: Git LFS checkout failed."
-      exit 2
+    else
+      echo "[vercel-build] No valid lfs.url configured; skipping manual git lfs pull."
+      echo "[vercel-build] In Vercel, enable Project Settings > Git > Git LFS support so cloning fetches LFS objects automatically."
     fi
   else
     echo "[vercel-build] No LFS pointers detected; skipping git lfs pull."
