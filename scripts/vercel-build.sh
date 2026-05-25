@@ -2,30 +2,17 @@
 set -euo pipefail
 
 if command -v git >/dev/null 2>&1 && command -v git-lfs >/dev/null 2>&1; then
-  echo "[vercel-build] git and git-lfs detected; checking for LFS pointers..."
+  echo "[vercel-build] git and git-lfs detected; pulling LFS objects..."
+  echo "[vercel-build] Running: git lfs pull --include=\"*\" --exclude=\"\""
 
-  if git lfs ls-files >/dev/null 2>&1 && [ -n "$(git lfs ls-files | head -n 1)" ]; then
-    echo "[vercel-build] LFS pointers found."
+  if ! git lfs pull --include="*" --exclude=""; then
+    echo "[vercel-build] WARNING: Git LFS pull failed; continuing build."
+    echo "[vercel-build] Ensure Vercel Project Settings > Git > Git LFS is enabled and repository access is authorized."
+  fi
 
-    lfs_url="$(git config --get lfs.url || true)"
-
-    if [ -n "$lfs_url" ] && [[ "$lfs_url" =~ ^https?:// ]]; then
-      echo "[vercel-build] Using configured lfs.url=$lfs_url"
-      if ! git lfs pull --include="*" --exclude=""; then
-        echo "[vercel-build] ERROR: Git LFS pull failed using configured lfs.url."
-        exit 2
-      fi
-
-      if ! git lfs checkout; then
-        echo "[vercel-build] ERROR: Git LFS checkout failed."
-        exit 2
-      fi
-    else
-      echo "[vercel-build] No valid lfs.url configured; skipping manual git lfs pull."
-      echo "[vercel-build] In Vercel, enable Project Settings > Git > Git LFS support so cloning fetches LFS objects automatically."
-    fi
-  else
-    echo "[vercel-build] No LFS pointers detected; skipping git lfs pull."
+  echo "[vercel-build] Running: git lfs checkout"
+  if ! git lfs checkout; then
+    echo "[vercel-build] WARNING: Git LFS checkout failed; continuing build."
   fi
 else
   echo "[vercel-build] git or git-lfs is unavailable; skipping git lfs pull."
