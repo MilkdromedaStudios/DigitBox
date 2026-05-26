@@ -1,4 +1,6 @@
 import { upsertRepoFile } from "../../../lib/githubContent";
+import postsIndex from "../../../data/posts-index.json";
+import projectsIndex from "../../../data/projects-index.json";
 
 function slugify(input) {
   return input
@@ -28,6 +30,31 @@ export default async function handler(req, res) {
         path: `public/posts/${slug}.md`,
         content: markdown,
         message: `Store markdown source for post: ${title}`,
+      });
+    }
+
+    if (type === "project") {
+      const updatedProjects = Array.from(new Set([title, ...projectsIndex]));
+      await upsertRepoFile({
+        path: "data/projects-index.json",
+        content: `${JSON.stringify(updatedProjects, null, 2)}\n`,
+        message: `Update projects index for: ${title}`,
+      });
+    }
+
+    if (type === "post") {
+      const nextPost = {
+        slug,
+        title,
+        excerpt: String(markdown || "").replace(/\s+/g, " ").trim().slice(0, 220),
+      };
+      const filtered = postsIndex.filter((post) => post.slug !== slug);
+      const updatedPosts = [nextPost, ...filtered];
+
+      await upsertRepoFile({
+        path: "data/posts-index.json",
+        content: `${JSON.stringify(updatedPosts, null, 2)}\n`,
+        message: `Update posts index for: ${title}`,
       });
     }
 
