@@ -1,6 +1,7 @@
 const GITHUB_API = "https://api.github.com";
 import fs from "fs/promises";
 import path from "path";
+import projectsIndex from "../../../data/projects-index.json";
 
 function required(name) {
   const value = process.env[name];
@@ -130,6 +131,17 @@ async function listDirectory(path, type) {
 }
 
 async function listDirectoryFromLocalFs(dirPath, type) {
+  if (type === "project") {
+    return projectsIndex.map((name) => ({
+      name: `${name}.html`,
+      title: name,
+      slug: name,
+      path: `public/projects/${name}.html`,
+      download_url: `/api/content/file?path=${encodeURIComponent(`public/projects/${name}.html`)}`,
+      updated_at: null,
+    }));
+  }
+
   const absoluteDir = path.join(process.cwd(), dirPath);
 
   let entries = [];
@@ -142,51 +154,29 @@ async function listDirectoryFromLocalFs(dirPath, type) {
 
   const htmlFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".html"));
 
-  if (type === "post") {
-    const posts = await Promise.all(
-      htmlFiles.map(async (entry) => {
-        const base = entry.name.replace(/\.html$/i, "");
-        const htmlPath = path.join(absoluteDir, entry.name);
-        const markdownPath = path.join(process.cwd(), "public", "posts", `${base}.md`);
-
-        const [htmlStat, markdownContent] = await Promise.all([
-          fs.stat(htmlPath),
-          fs.readFile(markdownPath, "utf8").catch(() => ""),
-        ]);
-
-        return {
-          name: entry.name,
-          title: toDisplayTitle(base),
-          slug: base,
-          path: `${dirPath}/${entry.name}`,
-          download_url: `/api/content/file?path=${encodeURIComponent(`${dirPath}/${entry.name}`)}`,
-          excerpt: toExcerpt(markdownContent),
-          updated_at: htmlStat.mtime.toISOString(),
-        };
-      })
-    );
-
-    return posts.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
-  }
-
-  const projects = await Promise.all(
+  const posts = await Promise.all(
     htmlFiles.map(async (entry) => {
       const base = entry.name.replace(/\.html$/i, "");
       const htmlPath = path.join(absoluteDir, entry.name);
-      const stat = await fs.stat(htmlPath);
+      const markdownPath = path.join(process.cwd(), "public", "posts", `${base}.md`);
+      const [htmlStat, markdownContent] = await Promise.all([
+        fs.stat(htmlPath),
+        fs.readFile(markdownPath, "utf8").catch(() => ""),
+      ]);
 
       return {
         name: entry.name,
-        title: base,
+        title: toDisplayTitle(base),
         slug: base,
         path: `${dirPath}/${entry.name}`,
         download_url: `/api/content/file?path=${encodeURIComponent(`${dirPath}/${entry.name}`)}`,
-        updated_at: stat.mtime.toISOString(),
+        excerpt: toExcerpt(markdownContent),
+        updated_at: htmlStat.mtime.toISOString(),
       };
     })
   );
 
-  return projects.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+  return posts.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
 }
 
 export default async function handler(req, res) {
