@@ -1,6 +1,7 @@
-const GITHUB_API = "https://api.github.com";
 import fs from "fs/promises";
 import path from "path";
+
+const GITHUB_API = "https://api.github.com";
 
 function required(name) {
   const value = process.env[name];
@@ -20,6 +21,25 @@ function authHeaders() {
   };
 }
 
+function isGitLfsPointer(content) {
+  return (
+    typeof content === "string" &&
+    content.startsWith("version https://git-lfs.github.com/spec/v1") &&
+    content.includes("\noid sha256:") &&
+    content.includes("\nsize ")
+  );
+}
+
+async function readGithubRawFile(downloadUrl) {
+  if (!downloadUrl) return null;
+
+  const res = await fetch(downloadUrl, { headers: hasGithubConfig() ? { Authorization: `Bearer ${required("GITHUB_TOKEN")}` } : undefined });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub raw file read failed (${res.status})`);
+
+  return res.text();
+}
+
 async function readGithubFile(filePath) {
   const owner = required("GITHUB_REPO_OWNER");
   const repo = required("GITHUB_REPO_NAME");
@@ -34,17 +54,36 @@ async function readGithubFile(filePath) {
   if (!res.ok) throw new Error(`GitHub file read failed (${res.status})`);
 
   const file = await res.json();
+  if (file.download_url) {
+    const rawContent = await readGithubRawFile(file.download_url);
+    if (rawContent != null && !isGitLfsPointer(rawContent)) return rawContent;
+  }
+
   if (file.encoding !== "base64") {
     throw new Error("Unsupported GitHub content encoding");
   }
 
-  return Buffer.from(file.content || "", "base64").toString("utf8");
+  const content = Buffer.from(file.content || "", "base64").toString("utf8");
+  if (isGitLfsPointer(content)) {
+    throw new Error("Git LFS content is unavailable. Configure GitHub repository environment variables so the app can fetch the real project file.");
+  }
+
+  return content;
 }
 
 async function readLocalFile(filePath) {
   const absolutePath = path.join(process.cwd(), filePath);
   try {
-    return await fs.readFile(absolutePath, "utf8");
+    const content = await fs.readFile(absolutePath, "utf8");
+    if (isGitLfsPointer(content) && hasGithubConfig()) {
+      return readGithubFile(filePath);
+    }
+
+    if (isGitLfsPointer(content)) {
+      throw new Error("Git LFS pointer found instead of the real project file. Run git lfs pull or configure GitHub repository environment variables in production.");
+    }
+
+    return content;
   } catch (error) {
     if (error?.code === "ENOENT") return null;
     throw error;

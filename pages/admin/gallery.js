@@ -25,6 +25,8 @@ export default function AdminGalleryPage() {
   }, []);
 
   async function loadImages() {
+    if (!supabase) return;
+
     const { data, error } = await supabase
       .from("gallery_images")
       .select("*")
@@ -36,6 +38,7 @@ export default function AdminGalleryPage() {
   async function handleUpload(e) {
     e.preventDefault();
     if (!title || !imageFile) return;
+    if (!supabase) return;
     if (!user || !isAdminRole(role)) return;
 
     setLoading(true);
@@ -69,6 +72,7 @@ export default function AdminGalleryPage() {
   }
 
   async function deleteImage(id) {
+    if (!supabase) return;
     await supabase.from("gallery_images").delete().eq("id", id);
     loadImages();
   }

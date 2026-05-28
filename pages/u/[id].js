@@ -6,6 +6,7 @@ export default function PublicProfile({ profile }) {
 }
 
 export async function getServerSideProps({ params }) {
+  if (!supabase) return { props: { profile: null } };
   const { data } = await supabase.from("profiles").select("display_name,identity_label,avatar_data_url").eq("id", params.id).maybeSingle();
   return { props: { profile: data || null } };
 }
