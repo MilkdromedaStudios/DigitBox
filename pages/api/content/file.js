@@ -13,12 +13,42 @@ function hasGithubConfig() {
   return Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
 }
 
-function authHeaders() {
-  return {
-    Authorization: `Bearer ${required("GITHUB_TOKEN")}`,
+function optionalGithubHeaders() {
+  const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
   };
+
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  return headers;
+}
+
+function hasGithubReadConfig() {
+  return Boolean(process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
+}
+
+function isGitLfsPointer(content) {
+  return (
+    typeof content === "string" &&
+    content.startsWith("version https://git-lfs.github.com/spec/v1") &&
+    content.includes("\noid sha256:") &&
+    content.includes("\nsize ")
+  );
+}
+
+async function readGithubRawFile(downloadUrl) {
+  if (!downloadUrl) return null;
+
+  const res = await fetch(downloadUrl, {
+    headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : undefined,
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub raw file read failed (${res.status})`);
+
+  return res.text();
 }
 
 function isGitLfsPointer(content) {
@@ -41,13 +71,15 @@ async function readGithubRawFile(downloadUrl) {
 }
 
 async function readGithubFile(filePath) {
-  const owner = required("GITHUB_REPO_OWNER");
-  const repo = required("GITHUB_REPO_NAME");
+  if (!hasGithubReadConfig()) return null;
+
+  const owner = process.env.GITHUB_REPO_OWNER;
+  const repo = process.env.GITHUB_REPO_NAME;
   const branch = process.env.GITHUB_REPO_BRANCH || "main";
 
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/contents/${filePath.split("/").map(encodeURIComponent).join("/")}?ref=${branch}`,
-    { headers: authHeaders() }
+    { headers: optionalGithubHeaders() }
   );
 
   if (res.status === 404) return null;
@@ -85,7 +117,7 @@ async function readLocalFile(filePath) {
 
     return content;
   } catch (error) {
-    if (error?.code === "ENOENT") return null;
+    if (error?.code === "ENOENT") return readGithubFile(filePath);
     throw error;
   }
 }
@@ -99,7 +131,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid path" });
     }
 
-    const content = hasGithubConfig() ? await readGithubFile(filePath) : await readLocalFile(filePath);
+    const content = await readLocalFile(filePath);
     if (content == null) return res.status(404).json({ error: "File not found" });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");

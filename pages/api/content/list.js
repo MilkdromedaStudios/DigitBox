@@ -3,26 +3,21 @@ import fs from "fs/promises";
 import path from "path";
 import projectsIndex from "../../../data/projects-index.json";
 
-function required(name) {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name}`);
-  return value;
+function hasGithubReadConfig() {
+  return Boolean(process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
 }
 
-function hasGithubConfig() {
-  return Boolean(
-    process.env.GITHUB_TOKEN &&
-    process.env.GITHUB_REPO_OWNER &&
-    process.env.GITHUB_REPO_NAME
-  );
-}
-
-function authHeaders() {
-  return {
-    Authorization: `Bearer ${required("GITHUB_TOKEN")}`,
+function githubReadHeaders() {
+  const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
   };
+
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  return headers;
 }
 
 function toDisplayTitle(slug) {
@@ -47,7 +42,7 @@ function toExcerpt(text, maxLength = 220) {
 async function fetchPostExcerpt(owner, repo, branch, path) {
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${branch}`,
-    { headers: authHeaders() }
+    { headers: githubReadHeaders() }
   );
 
   if (!res.ok) return "";
@@ -59,7 +54,7 @@ async function fetchPostExcerpt(owner, repo, branch, path) {
 async function fetchLastUpdatedAt(owner, repo, branch, filePath) {
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/commits?path=${encodeURIComponent(filePath)}&sha=${encodeURIComponent(branch)}&per_page=1`,
-    { headers: authHeaders() }
+    { headers: githubReadHeaders() }
   );
 
   if (!res.ok) return null;
@@ -69,17 +64,18 @@ async function fetchLastUpdatedAt(owner, repo, branch, filePath) {
 }
 
 async function listDirectory(path, type) {
-  if (!hasGithubConfig()) {
-    return listDirectoryFromLocalFs(path, type);
+  const localItems = await listDirectoryFromLocalFs(path, type);
+  if (localItems.length > 0 || !hasGithubReadConfig()) {
+    return localItems;
   }
 
-  const owner = required("GITHUB_REPO_OWNER");
-  const repo = required("GITHUB_REPO_NAME");
+  const owner = process.env.GITHUB_REPO_OWNER;
+  const repo = process.env.GITHUB_REPO_NAME;
   const branch = process.env.GITHUB_REPO_BRANCH || "main";
 
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${branch}`,
-    { headers: authHeaders() }
+    { headers: githubReadHeaders() }
   );
 
   if (res.status === 404) return [];
