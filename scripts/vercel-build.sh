@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+load_env_file() {
+  local env_file="$1"
+  if [ -f "${env_file}" ]; then
+    echo "[vercel-build] Loading environment variables from ${env_file}"
+    set -a
+    # shellcheck disable=SC1090
+    . "${env_file}"
+    set +a
+  fi
+}
+
+if [ -f ".env.local" ]; then
+  load_env_file ".env.local"
+elif [ -f ".env" ]; then
+  load_env_file ".env"
+fi
+
 if command -v git >/dev/null 2>&1 && git lfs version >/dev/null 2>&1; then
   echo "[vercel-build] git and git-lfs detected; pulling LFS objects..."
   lfs_url="$(git config --get lfs.url || true)"
