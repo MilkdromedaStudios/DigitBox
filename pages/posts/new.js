@@ -15,6 +15,12 @@ export default function NewPost() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!supabase) {
+      setLoadingUser(false);
+      router.replace("/admin");
+      return;
+    }
+
     supabase.auth.getUser().then(({ data }) => {
       const currentUser = data?.user || null;
       setUser(currentUser);

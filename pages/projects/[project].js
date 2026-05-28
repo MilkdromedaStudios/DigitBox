@@ -13,14 +13,11 @@ export default function ProjectRunner({ src, title }) {
 export async function getServerSideProps({ params }) {
   const rawSlug = Array.isArray(params.project) ? params.project[0] : params.project;
   const slug = decodeURIComponent(rawSlug || "");
-  const filename = `${slug}.html`
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  const filePath = `public/projects/${slug}.html`;
 
   return {
     props: {
-      src: `/projects/${filename}`,
+      src: `/api/content/file?path=${encodeURIComponent(filePath)}`,
       title: slug,
     },
   };

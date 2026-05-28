@@ -5,22 +5,22 @@ function getValidatedSupabaseEnv() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local."
-    );
+    return null;
   }
 
   if (!supabaseUrl.startsWith("https://") || !supabaseUrl.includes(".supabase.co")) {
-    throw new Error(
-      `Invalid NEXT_PUBLIC_SUPABASE_URL: \"${supabaseUrl}\". Expected format: https://<project-ref>.supabase.co`
-    );
+    return null;
   }
 
   return { supabaseUrl, supabaseAnonKey };
 }
 
 export function createClient() {
-  const { supabaseUrl, supabaseAnonKey } = getValidatedSupabaseEnv();
+  const env = getValidatedSupabaseEnv();
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  if (!env) {
+    return null;
+  }
+
+  return createBrowserClient(env.supabaseUrl, env.supabaseAnonKey);
 }

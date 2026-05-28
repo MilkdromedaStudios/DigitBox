@@ -17,6 +17,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const localPrefs = readProfilePrefsFromCookie();
     setPrefs(localPrefs);
+    if (!supabase) return;
     supabase.auth.getUser().then(async ({ data }) => {
       const user = data?.user;
       if (!user) return;
@@ -34,6 +35,7 @@ export default function ProfilePage() {
   const previewName = useMemo(() => prefs.displayName || "Player", [prefs.displayName]);
 
   async function syncProfile(next) {
+    if (!supabase) return;
     const { data } = await supabase.auth.getUser();
     const user = data?.user;
     if (!user) return;
