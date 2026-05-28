@@ -186,7 +186,7 @@ export default async function handler(req, res) {
     const { type } = req.query;
     if (!["project", "post"].includes(type)) return res.status(400).json({ error: "Invalid type" });
 
-    const items = type === "project" ? projectItems() : postItems();
+    const items = await listDirectory(type === "project" ? "public/projects" : "public/posts", type);
     const limit = Number(req.query.limit || 0);
     const limitedItems = Number.isFinite(limit) && limit > 0 ? items.slice(0, limit) : items;
     return res.status(200).json({ items: limitedItems });

@@ -21,6 +21,16 @@ export default function Layout({ children }) {
     window.addEventListener(PROFILE_PREFS_UPDATED_EVENT, loadPrefs);
     window.addEventListener("storage", loadPrefs);
 
+    if (!supabase) {
+      setIsAuthLoading(false);
+      return () => {
+        isMounted = false;
+        window.removeEventListener("focus", loadPrefs);
+        window.removeEventListener(PROFILE_PREFS_UPDATED_EVENT, loadPrefs);
+        window.removeEventListener("storage", loadPrefs);
+      };
+    }
+
     supabase.auth.getUser().then(({ data }) => {
       if (!isMounted) return;
       setUser(data?.user || null);
@@ -43,7 +53,7 @@ export default function Layout({ children }) {
   }, []);
 
   async function logout() {
-    await supabase.auth.signOut();
+    if (supabase) await supabase.auth.signOut();
     setUser(null);
   }
 

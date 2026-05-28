@@ -17,6 +17,11 @@ export default function LoginPage() {
       return;
     }
 
+    if (!supabase) {
+      setMessage("Login is unavailable until Supabase environment variables are configured.");
+      return;
+    }
+
     setLoading(true);
 
     if (mode === "login") {
