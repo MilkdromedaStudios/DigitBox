@@ -4,6 +4,11 @@ export default function TestSupabase() {
   const supabase = createClient();
 
   async function test() {
+    if (!supabase) {
+      alert("Supabase environment variables are not configured.");
+      return;
+    }
+
     const { data, error } = await supabase.from("posts").select("*");
 
     console.log("DATA:", data);
