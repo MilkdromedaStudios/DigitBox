@@ -59,3 +59,14 @@ npm start
 ```
 
 Note: project is actively being developed...
+
+## Supabase keepalive
+
+This repository includes a daily GitHub Actions workflow that sends a small request to Supabase so the project receives regular activity. If you want it to perform an actual sign-in and sign-out cycle, create a dedicated low-privilege Supabase user and add these GitHub repository secrets:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_KEEPALIVE_EMAIL` (optional; enables sign-in/sign-out)
+- `SUPABASE_KEEPALIVE_PASSWORD` (optional; enables sign-in/sign-out)
+
+If the optional keepalive credentials are not set, the workflow only calls the Supabase Auth settings endpoint with the anon key. You can also run it manually from the Actions tab with the `Supabase Keepalive` workflow.
