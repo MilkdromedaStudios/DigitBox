@@ -1,15 +1,14 @@
-function required(name) {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name}`);
-  return value;
-}
-
 function authHeaders() {
-  return {
-    Authorization: `Bearer ${required("GITHUB_TOKEN")}`,
+  const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
   };
+
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  return headers;
 }
 
 function toDisplayTitle(slug) {
@@ -32,9 +31,18 @@ export default function PostPage({ title, html }) {
 }
 
 export async function getServerSideProps({ params }) {
-  const owner = required("GITHUB_REPO_OWNER");
-  const repo = required("GITHUB_REPO_NAME");
+  const owner = process.env.GITHUB_REPO_OWNER;
+  const repo = process.env.GITHUB_REPO_NAME;
   const branch = process.env.GITHUB_REPO_BRANCH || "main";
+
+  if (!owner || !repo) {
+    return {
+      props: {
+        title: "Post Unavailable",
+        html: "<p>Posts are not configured yet. Set the GitHub repository environment variables to enable them.</p>",
+      },
+    };
+  }
   const slug = Array.isArray(params.post) ? params.post[0] : params.post;
   const filename = `${slug}.html`;
 
