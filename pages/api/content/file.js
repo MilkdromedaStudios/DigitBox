@@ -3,12 +3,6 @@ import path from "path";
 
 const GITHUB_API = "https://api.github.com";
 
-function required(name) {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name}`);
-  return value;
-}
-
 function hasGithubConfig() {
   return Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
 }
@@ -45,25 +39,6 @@ async function readGithubRawFile(downloadUrl) {
   const res = await fetch(downloadUrl, {
     headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : undefined,
   });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GitHub raw file read failed (${res.status})`);
-
-  return res.text();
-}
-
-function isGitLfsPointer(content) {
-  return (
-    typeof content === "string" &&
-    content.startsWith("version https://git-lfs.github.com/spec/v1") &&
-    content.includes("\noid sha256:") &&
-    content.includes("\nsize ")
-  );
-}
-
-async function readGithubRawFile(downloadUrl) {
-  if (!downloadUrl) return null;
-
-  const res = await fetch(downloadUrl, { headers: hasGithubConfig() ? { Authorization: `Bearer ${required("GITHUB_TOKEN")}` } : undefined });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub raw file read failed (${res.status})`);
 
