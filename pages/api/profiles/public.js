@@ -1,11 +1,16 @@
 import { supabase } from "../../../lib/supabaseClient";
+import { jsonResponse } from "../../../lib/apiResponse";
 
-export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
-  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 10);
-  const offset = Math.max(Number(req.query.offset) || 0, 0);
+export const config = { runtime: "edge" };
 
-  if (!supabase) return res.status(200).json({ items: [] });
+export default async function handler(req) {
+  if (req.method !== "GET") return jsonResponse({ error: "Method not allowed" }, 405);
+
+  const { searchParams } = new URL(req.url);
+  const limit = Math.min(Math.max(Number(searchParams.get("limit")) || 10, 1), 10);
+  const offset = Math.max(Number(searchParams.get("offset")) || 0, 0);
+
+  if (!supabase) return jsonResponse({ items: [] });
 
   const { data, error } = await supabase
     .from("profiles")
@@ -14,6 +19,6 @@ export default async function handler(req, res) {
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ items: data || [] });
+  if (error) return jsonResponse({ error: error.message }, 500);
+  return jsonResponse({ items: data || [] });
 }

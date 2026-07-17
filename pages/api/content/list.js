@@ -1,7 +1,11 @@
-const GITHUB_API = "https://api.github.com";
-import fs from "fs/promises";
-import path from "path";
+import postsIndex from "../../../data/posts-index.json";
 import projectsIndex from "../../../data/projects-index.json";
+import { decodeBase64Utf8 } from "../../../lib/base64";
+import { jsonResponse } from "../../../lib/apiResponse";
+
+export const config = { runtime: "edge" };
+
+const GITHUB_API = "https://api.github.com";
 
 function hasGithubReadConfig() {
   return Boolean(process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
@@ -47,7 +51,7 @@ async function fetchPostExcerpt(owner, repo, branch, path) {
 
   if (!res.ok) return "";
   const file = await res.json();
-  const content = Buffer.from(file.content || "", "base64").toString("utf8");
+  const content = decodeBase64Utf8(file.content || "");
   return toExcerpt(content);
 }
 
@@ -64,9 +68,9 @@ async function fetchLastUpdatedAt(owner, repo, branch, filePath) {
 }
 
 async function listDirectory(path, type) {
-  const localItems = await listDirectoryFromLocalFs(path, type);
-  if (localItems.length > 0 || !hasGithubReadConfig()) {
-    return localItems;
+  const indexedItems = listDirectoryFromIndex(path, type);
+  if (indexedItems.length > 0 || !hasGithubReadConfig()) {
+    return indexedItems;
   }
 
   const owner = process.env.GITHUB_REPO_OWNER;
@@ -126,7 +130,7 @@ async function listDirectory(path, type) {
   return projects.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
 }
 
-async function listDirectoryFromLocalFs(dirPath, type) {
+function listDirectoryFromIndex(dirPath, type) {
   if (type === "project") {
     return projectsIndex.map((name) => ({
       name: `${name}.html`,
@@ -138,55 +142,30 @@ async function listDirectoryFromLocalFs(dirPath, type) {
     }));
   }
 
-  const absoluteDir = path.join(process.cwd(), dirPath);
-
-  let entries = [];
-  try {
-    entries = await fs.readdir(absoluteDir, { withFileTypes: true });
-  } catch (error) {
-    if (error?.code === "ENOENT") return [];
-    throw error;
-  }
-
-  const htmlFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".html"));
-
-  const posts = await Promise.all(
-    htmlFiles.map(async (entry) => {
-      const base = entry.name.replace(/\.html$/i, "");
-      const htmlPath = path.join(absoluteDir, entry.name);
-      const markdownPath = path.join(process.cwd(), "public", "posts", `${base}.md`);
-      const [htmlStat, markdownContent] = await Promise.all([
-        fs.stat(htmlPath),
-        fs.readFile(markdownPath, "utf8").catch(() => ""),
-      ]);
-
-      return {
-        name: entry.name,
-        title: toDisplayTitle(base),
-        slug: base,
-        path: `${dirPath}/${entry.name}`,
-        download_url: `/api/content/file?path=${encodeURIComponent(`${dirPath}/${entry.name}`)}`,
-        excerpt: toExcerpt(markdownContent),
-        updated_at: htmlStat.mtime.toISOString(),
-      };
-    })
-  );
-
-  return posts.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+  return postsIndex.map((post) => ({
+    name: `${post.slug}.html`,
+    title: post.title || toDisplayTitle(post.slug),
+    slug: post.slug,
+    path: `${dirPath}/${post.slug}.html`,
+    download_url: `/api/content/file?path=${encodeURIComponent(`${dirPath}/${post.slug}.html`)}`,
+    excerpt: post.excerpt || "",
+    updated_at: null,
+  }));
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req) {
+  if (req.method !== "GET") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { type } = req.query;
-    if (!["project", "post"].includes(type)) return res.status(400).json({ error: "Invalid type" });
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get("type");
+    if (!["project", "post"].includes(type)) return jsonResponse({ error: "Invalid type" }, 400);
 
     const items = await listDirectory(type === "project" ? "public/projects" : "public/posts", type);
-    const limit = Number(req.query.limit || 0);
+    const limit = Number(searchParams.get("limit") || 0);
     const limitedItems = Number.isFinite(limit) && limit > 0 ? items.slice(0, limit) : items;
-    return res.status(200).json({ items: limitedItems });
+    return jsonResponse({ items: limitedItems });
   } catch (error) {
-    return res.status(500).json({ error: error.message || "List failed" });
+    return jsonResponse({ error: error.message || "List failed" }, 500);
   }
 }

@@ -1,3 +1,7 @@
+import { decodeBase64Utf8 } from "../../lib/base64";
+
+export const config = { runtime: "experimental-edge" };
+
 function authHeaders() {
   const headers = {
     Accept: "application/vnd.github+json",
@@ -63,7 +67,7 @@ export async function getServerSideProps({ params }) {
   }
 
   const data = await res.json();
-  const html = Buffer.from(data.content || "", "base64").toString("utf8");
+  const html = decodeBase64Utf8(data.content || "");
 
   return {
     props: {

@@ -1,6 +1,9 @@
 import { upsertRepoFile } from "../../../lib/githubContent";
+import { jsonResponse } from "../../../lib/apiResponse";
 import postsIndex from "../../../data/posts-index.json";
 import projectsIndex from "../../../data/projects-index.json";
+
+export const config = { runtime: "edge" };
 
 function slugify(input) {
   return input
@@ -11,13 +14,13 @@ function slugify(input) {
     .replace(/-+/g, "-");
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req) {
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { type, title, html, markdown } = req.body || {};
-    if (!["project", "post"].includes(type)) return res.status(400).json({ error: "Invalid type" });
-    if (!title || !html) return res.status(400).json({ error: "title and html are required" });
+    const { type, title, html, markdown } = (await req.json().catch(() => null)) || {};
+    if (!["project", "post"].includes(type)) return jsonResponse({ error: "Invalid type" }, 400);
+    if (!title || !html) return jsonResponse({ error: "title and html are required" }, 400);
 
     const slug = slugify(title) || `${type}-${Date.now()}`;
     const dir = type === "project" ? "public/projects" : "public/posts";
@@ -58,8 +61,8 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({ ok: true, slug, htmlPath });
+    return jsonResponse({ ok: true, slug, htmlPath });
   } catch (error) {
-    return res.status(500).json({ error: error.message || "Publish failed" });
+    return jsonResponse({ error: error.message || "Publish failed" }, 500);
   }
 }
