@@ -1,5 +1,6 @@
 import { decodeBase64Utf8 } from "../../../lib/base64";
 import { jsonResponse } from "../../../lib/apiResponse";
+import { fetchR2File, isGitLfsPointer } from "../../../lib/r2Content";
 
 export const config = { runtime: "edge" };
 
@@ -20,15 +21,6 @@ function optionalGithubHeaders() {
 
 function hasGithubReadConfig() {
   return Boolean(process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
-}
-
-function isGitLfsPointer(content) {
-  return (
-    typeof content === "string" &&
-    content.startsWith("version https://git-lfs.github.com/spec/v1") &&
-    content.includes("\noid sha256:") &&
-    content.includes("\nsize ")
-  );
 }
 
 async function readGithubRawFile(downloadUrl) {
@@ -70,7 +62,9 @@ async function readGithubFile(filePath) {
 
   const content = decodeBase64Utf8(file.content || "");
   if (isGitLfsPointer(content)) {
-    throw new Error("Git LFS content is unavailable. Configure GitHub repository environment variables so the app can fetch the real project file.");
+    throw new Error(
+      "This file is stored in Git LFS and only its pointer is on GitHub. Upload the real file to the Cloudflare R2 bucket and set R2_PUBLIC_BASE_URL (see docs/CLOUDFLARE_R2_SETUP.md)."
+    );
   }
 
   return content;
@@ -84,6 +78,19 @@ export default async function handler(req) {
     const filePath = String(searchParams.get("path") || "").trim();
     if (!filePath.startsWith("public/projects/") && !filePath.startsWith("public/posts/")) {
       return jsonResponse({ error: "Invalid path" }, 400);
+    }
+
+    // Serve from the Cloudflare R2 bucket first (free egress, no LFS
+    // bandwidth). GitHub stays as a fallback for files not uploaded to R2.
+    const r2Res = await fetchR2File(filePath).catch(() => null);
+    if (r2Res) {
+      return new Response(r2Res.body, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
     }
 
     const content = await readGithubFile(filePath);

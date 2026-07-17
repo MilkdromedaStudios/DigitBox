@@ -2,6 +2,14 @@
 
 This project uses **Next.js (Pages Router)** with **Supabase** for authentication and data storage.
 
+## Game files (Cloudflare R2)
+
+The game HTML files are too large for Git LFS bandwidth limits, so they are
+served from the Cloudflare R2 bucket `digitbox-games` (free egress). Builds
+and deploys no longer pull anything from Git LFS. See
+[docs/CLOUDFLARE_R2_SETUP.md](docs/CLOUDFLARE_R2_SETUP.md) for the one-time
+setup: upload the files, enable public access, and set `R2_PUBLIC_BASE_URL`.
+
 ## Option A Auth Setup (Supabase only, no Google)
 
 This repo is configured for **email + password** auth only.
