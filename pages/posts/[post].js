@@ -1,4 +1,5 @@
 import { decodeBase64Utf8 } from "../../lib/base64";
+import { fetchR2File, isGitLfsPointer } from "../../lib/r2Content";
 
 export const config = { runtime: "experimental-edge" };
 
@@ -39,6 +40,20 @@ export async function getServerSideProps({ params }) {
   const repo = process.env.GITHUB_REPO_NAME;
   const branch = process.env.GITHUB_REPO_BRANCH || "main";
 
+  const rawSlug = Array.isArray(params.post) ? params.post[0] : params.post;
+
+  // Try the Cloudflare R2 bucket first so posts load without touching
+  // GitHub or Git LFS. GitHub stays as a fallback.
+  const r2Res = await fetchR2File(`public/posts/${rawSlug}.html`).catch(() => null);
+  if (r2Res) {
+    return {
+      props: {
+        title: toDisplayTitle(rawSlug),
+        html: await r2Res.text(),
+      },
+    };
+  }
+
   if (!owner || !repo) {
     return {
       props: {
@@ -47,7 +62,7 @@ export async function getServerSideProps({ params }) {
       },
     };
   }
-  const slug = Array.isArray(params.post) ? params.post[0] : params.post;
+  const slug = rawSlug;
   const filename = `${slug}.html`;
 
   const res = await fetch(
@@ -68,6 +83,15 @@ export async function getServerSideProps({ params }) {
 
   const data = await res.json();
   const html = decodeBase64Utf8(data.content || "");
+
+  if (isGitLfsPointer(html)) {
+    return {
+      props: {
+        title: toDisplayTitle(slug),
+        html: "<p>This post is stored in Git LFS and has not been uploaded to the R2 bucket yet.</p>",
+      },
+    };
+  }
 
   return {
     props: {
