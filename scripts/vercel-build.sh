@@ -24,9 +24,10 @@ fi
 # pull Git LFS objects — LFS bandwidth is limited and the files are huge.
 export GIT_LFS_SKIP_SMUDGE=1
 
-# On machines that keep the real game files in public/projects (they are not
-# in git), Next.js would copy them into the build output and blow past deploy
-# size limits. Move them aside for the duration of the build.
+# public/projects holds the games as Git LFS pointers (real files on dev
+# machines that ran `git lfs pull`). Either way Next.js would copy the
+# directory into the build output — pointer text at best, 100 MB games at
+# worst — so move it aside for the duration of the build.
 EXCLUDED_GAMES_DIR=".build-excluded-projects"
 restore_excluded_games() {
   if [ -d "${EXCLUDED_GAMES_DIR}" ]; then
