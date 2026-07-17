@@ -2,14 +2,11 @@ import postsIndex from "../../../data/posts-index.json";
 import projectsIndex from "../../../data/projects-index.json";
 import { decodeBase64Utf8 } from "../../../lib/base64";
 import { jsonResponse } from "../../../lib/apiResponse";
+import { getGithubRepo } from "../../../lib/githubRepo";
 
 export const config = { runtime: "edge" };
 
 const GITHUB_API = "https://api.github.com";
-
-function hasGithubReadConfig() {
-  return Boolean(process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
-}
 
 function githubReadHeaders() {
   const headers = {
@@ -69,13 +66,11 @@ async function fetchLastUpdatedAt(owner, repo, branch, filePath) {
 
 async function listDirectory(path, type) {
   const indexedItems = listDirectoryFromIndex(path, type);
-  if (indexedItems.length > 0 || !hasGithubReadConfig()) {
+  if (indexedItems.length > 0) {
     return indexedItems;
   }
 
-  const owner = process.env.GITHUB_REPO_OWNER;
-  const repo = process.env.GITHUB_REPO_NAME;
-  const branch = process.env.GITHUB_REPO_BRANCH || "main";
+  const { owner, repo, branch } = getGithubRepo();
 
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${branch}`,

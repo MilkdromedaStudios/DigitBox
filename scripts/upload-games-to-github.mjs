@@ -44,8 +44,8 @@ function required(name) {
 }
 
 const token = required("GITHUB_TOKEN");
-const owner = required("GITHUB_REPO_OWNER");
-const repo = required("GITHUB_REPO_NAME");
+const owner = process.env.GITHUB_REPO_OWNER || "MilkdromedaStudios";
+const repo = process.env.GITHUB_REPO_NAME || "DigitBox";
 const tag = process.env.GITHUB_ASSETS_TAG || "game-assets";
 
 function apiHeaders(extra) {

@@ -1,5 +1,6 @@
 import { decodeBase64Utf8 } from "../../lib/base64";
 import { fetchR2File, isGitLfsPointer } from "../../lib/r2Content";
+import { getGithubRepo } from "../../lib/githubRepo";
 
 export const config = { runtime: "experimental-edge" };
 
@@ -36,9 +37,7 @@ export default function PostPage({ title, html }) {
 }
 
 export async function getServerSideProps({ params }) {
-  const owner = process.env.GITHUB_REPO_OWNER;
-  const repo = process.env.GITHUB_REPO_NAME;
-  const branch = process.env.GITHUB_REPO_BRANCH || "main";
+  const { owner, repo, branch } = getGithubRepo();
 
   const rawSlug = Array.isArray(params.post) ? params.post[0] : params.post;
 
@@ -54,14 +53,6 @@ export async function getServerSideProps({ params }) {
     };
   }
 
-  if (!owner || !repo) {
-    return {
-      props: {
-        title: "Post Unavailable",
-        html: "<p>Posts are not configured yet. Set the GitHub repository environment variables to enable them.</p>",
-      },
-    };
-  }
   const slug = rawSlug;
   const filename = `${slug}.html`;
 
