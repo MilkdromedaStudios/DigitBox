@@ -1,9 +1,26 @@
 import { upsertRepoFile } from "../../../lib/githubContent";
 import { jsonResponse } from "../../../lib/apiResponse";
+import { getContentBucket, toR2Key } from "../../../lib/r2";
 import postsIndex from "../../../data/posts-index.json";
 import projectsIndex from "../../../data/projects-index.json";
 
 export const config = { runtime: "edge" };
+
+// Content HTML (games especially) is too large for the git repo — store it in
+// the R2 bucket when the binding is available; otherwise fall back to
+// committing it to the repo as before. The small JSON indexes always live in
+// the repo.
+async function storeContentFile({ path, content, contentType, message }) {
+  const bucket = getContentBucket();
+  if (bucket) {
+    await bucket.put(toR2Key(path), content, {
+      httpMetadata: { contentType },
+    });
+    return;
+  }
+
+  await upsertRepoFile({ path, content, message });
+}
 
 function slugify(input) {
   return input
@@ -26,12 +43,18 @@ export default async function handler(req) {
     const dir = type === "project" ? "public/projects" : "public/posts";
     const htmlPath = `${dir}/${slug}.html`;
 
-    await upsertRepoFile({ path: htmlPath, content: html, message: `Publish ${type}: ${title}` });
+    await storeContentFile({
+      path: htmlPath,
+      content: html,
+      contentType: "text/html; charset=utf-8",
+      message: `Publish ${type}: ${title}`,
+    });
 
     if (markdown && type === "post") {
-      await upsertRepoFile({
+      await storeContentFile({
         path: `public/posts/${slug}.md`,
         content: markdown,
+        contentType: "text/markdown; charset=utf-8",
         message: `Store markdown source for post: ${title}`,
       });
     }
