@@ -1,10 +1,46 @@
 import { decodeBase64Utf8 } from "../../../lib/base64";
 import { jsonResponse } from "../../../lib/apiResponse";
+import { getContentBucket, toR2Key, r2PublicUrlForKey } from "../../../lib/r2";
 import { fetchR2File, isGitLfsPointer } from "../../../lib/r2Content";
 
 export const config = { runtime: "edge" };
 
 const GITHUB_API = "https://api.github.com";
+
+function htmlResponse(body, contentType) {
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType || "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=300",
+    },
+  });
+}
+
+async function readFromR2(filePath) {
+  const key = toR2Key(filePath);
+
+  const bucket = getContentBucket();
+  if (bucket) {
+    const object = await bucket.get(key);
+    if (object) {
+      return htmlResponse(object.body, object.httpMetadata?.contentType);
+    }
+  }
+
+  const publicUrl = r2PublicUrlForKey(key);
+  if (publicUrl) {
+    const res = await fetch(publicUrl);
+    if (res.ok) {
+      return htmlResponse(res.body, res.headers.get("Content-Type"));
+    }
+    if (res.status !== 404) {
+      throw new Error(`R2 public read failed (${res.status})`);
+    }
+  }
+
+  return null;
+}
 
 function optionalGithubHeaders() {
   const headers = {
@@ -96,10 +132,7 @@ export default async function handler(req) {
     const content = await readGithubFile(filePath);
     if (content == null) return jsonResponse({ error: "File not found" }, 404);
 
-    return new Response(content, {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+    return htmlResponse(content);
   } catch (error) {
     return jsonResponse({ error: error.message || "Read failed" }, 500);
   }
