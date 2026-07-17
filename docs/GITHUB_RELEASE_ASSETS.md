@@ -1,50 +1,64 @@
-# Serving game files from a GitHub Release
+# Game files: stored in the repo (Git LFS), served from a GitHub Release
 
-The game HTML files are never part of the build or the git repo — several are
-25–100+ MB, which blows past deploy limits (Cloudflare Pages caps static
-assets at 25 MB) and GitHub's 100 MB file limit, and Git LFS bandwidth runs
-out. Instead, the real files live as **assets on a GitHub Release** (up to
-2 GB per file, free downloads), and the deployed app fetches them from GitHub
-at runtime when someone opens a game.
+The game HTML files live in the repo under `public/projects/` as **Git LFS**
+files — several are 25–100+ MB, and Crystal Seeker 3D (101 MB) is over
+GitHub's 100 MB limit for regular files, so LFS pointers are the only way to
+keep the folder in git. Builds never include them, and the deployed site
+fetches them from GitHub at runtime.
+
+Serving games straight from LFS would burn through the free LFS bandwidth
+(1 GB/month), so a GitHub Action mirrors the files onto the `game-assets`
+**GitHub Release** (up to 2 GB per file, free unlimited downloads), and the
+site reads from the release first. Everything runs on GitHub — no local
+machine is needed.
 
 ## How it works
 
-- **Build**: `scripts/vercel-build.sh` never pulls the game files. If a local
-  `public/projects/` directory exists (only on machines that keep the real
-  files), it is moved aside during `next build` so nothing big lands in the
-  build output. `public/projects/` is also git-ignored.
-- **Runtime**: `/api/content/file` looks for content in this order:
+- **Repo**: `public/projects/*.html` are LFS pointer files (a few lines of
+  text each). The real content sits in GitHub's LFS storage.
+- **Sync**: `.github/workflows/sync-games-to-release.yml` runs whenever
+  `public/projects` changes on `main` (or manually from the Actions tab). It
+  compares each pointer's size against the release assets and uploads only
+  what changed, so re-runs cost almost no LFS bandwidth.
+- **Build**: the repo `.lfsconfig` sets `fetchexclude = *`, so clones and
+  checkouts (Vercel, Cloudflare Pages, CI) only ever see the tiny pointer
+  files. `scripts/vercel-build.sh` additionally moves `public/projects/` out
+  of the tree during CI builds, so neither pointers nor real files land in
+  the build output. Keep the hosting platform's own Git LFS option
+  **disabled** too (Vercel: Project Settings → Git → Git LFS).
+- **Runtime**: `/api/content/file` looks for content in this order and
+  streams it back to the game iframe:
   1. Cloudflare R2 bucket (only if configured — optional)
-  2. **GitHub release assets** (the game files)
-  3. The GitHub repo itself (small files like posts)
-  The matching asset is streamed back to the browser as HTML and rendered in
-  the game iframe.
+  2. **GitHub release assets** (free bandwidth — the normal path)
+  3. The repo itself — small files come via the API, and LFS files are
+     served through `media.githubusercontent.com`, which does use LFS
+     bandwidth; it is the fallback while the release is not synced yet.
 - **Delete**: `/api/content/delete` also removes the matching release asset.
 
-## One-time setup
+GitHub renames uploaded assets ("Appel 3D.html" becomes "Appel.3D.html") —
+that is expected; the app and the workflow both account for it.
 
-### 1. Upload the game files to the release
+## Adding or updating a game
 
-On a machine that has the real game files (not git-lfs pointers):
+1. Commit the new `public/projects/<Game Name>.html` (with git-lfs installed
+   locally, the `.gitattributes` rule stores it in LFS automatically) and add
+   the title to `data/projects-index.json`.
+2. Push to `main` — the sync workflow uploads it to the release by itself.
+
+To force a re-sync at any time: Actions tab → **Sync games to release** →
+Run workflow. `scripts/upload-games-to-github.mjs` still exists as a manual
+alternative that uploads files from a local directory.
+
+To get the real game files on your own machine (the `.lfsconfig` blocks the
+download by default):
 
 ```bash
-GITHUB_TOKEN=<token with repo write access> \
-node scripts/upload-games-to-github.mjs "/path/to/games directory"
+git lfs pull --include="public/projects/*" --exclude=""
 ```
 
-`GITHUB_REPO_OWNER`, `GITHUB_REPO_NAME` and (optionally) `GITHUB_TOKEN` are
-read from `.env.local` if present. The script creates the release with tag
-`game-assets` (override with `GITHUB_ASSETS_TAG`) if it does not exist, and
-replaces assets that are already there, so re-running it is safe.
+## Environment variables on the deployment
 
-You can also upload through the GitHub web UI: Releases → `game-assets` →
-Edit → attach files. Keep each file named `<Game Name>.html` exactly as it
-appears in `data/projects-index.json` (GitHub replaces spaces with dots in
-asset names — that is expected, the app accounts for it).
-
-### 2. Environment variables on the deployment
-
-The deployment only needs the variables it already uses for publishing:
+Only what publishing already uses:
 
 ```
 GITHUB_REPO_OWNER=MilkdromedaStudios
@@ -52,15 +66,3 @@ GITHUB_REPO_NAME=DigitBox
 GITHUB_TOKEN=<optional for a public repo, but recommended for rate limits>
 GITHUB_ASSETS_TAG=game-assets   # optional, this is the default
 ```
-
-With a public repo the assets can be read without a token, but unauthenticated
-GitHub API calls are rate-limited to 60/hour per IP, so setting `GITHUB_TOKEN`
-is recommended. Responses are cached for an hour (`Cache-Control`), which
-keeps the number of GitHub API calls low.
-
-## Publishing new games
-
-`/api/content/publish` still writes new content to the R2 bucket when the
-binding exists, otherwise it commits to the repo. Games that are too big to
-commit should be uploaded to the release with the script above, and their
-title added to `data/projects-index.json`.

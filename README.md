@@ -4,12 +4,13 @@ This project uses **Next.js (Pages Router)** with **Supabase** for authenticatio
 
 ## Game files (fetched from GitHub at runtime)
 
-The game HTML files are too large to bundle into the build (several are
-25–100+ MB), so builds never include them. Instead they are stored as assets
-on the `game-assets` GitHub Release and fetched from GitHub at runtime when a
-game is opened, then rendered in the game iframe. See
-[docs/GITHUB_RELEASE_ASSETS.md](docs/GITHUB_RELEASE_ASSETS.md) for the
-one-time upload: `node scripts/upload-games-to-github.mjs <games directory>`.
+The game HTML files live in `public/projects/` as **Git LFS** files, but they
+are too large to bundle into the build (several are 25–100+ MB), so builds
+never include them. A GitHub Action mirrors them onto the `game-assets`
+GitHub Release automatically, and the deployed site fetches them from GitHub
+at runtime when a game is opened, then renders them in the game iframe.
+Everything runs on GitHub — no local uploads needed. See
+[docs/GITHUB_RELEASE_ASSETS.md](docs/GITHUB_RELEASE_ASSETS.md).
 
 A Cloudflare R2 bucket can optionally serve the same files (checked before
 GitHub) — see [docs/CLOUDFLARE_R2_SETUP.md](docs/CLOUDFLARE_R2_SETUP.md).

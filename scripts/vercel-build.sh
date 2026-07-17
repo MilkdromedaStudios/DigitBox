@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Detect CI before the .env files are loaded — the committed .env.local
+# contains captured VERCEL_* variables that would make local builds look
+# like CI.
+IS_CI_BUILD=""
+if [ -n "${VERCEL:-}" ] || [ -n "${CF_PAGES:-}" ] || [ -n "${CI:-}" ]; then
+  IS_CI_BUILD=1
+fi
+
 load_env_file() {
   local env_file="$1"
   if [ -f "${env_file}" ]; then
@@ -24,9 +32,12 @@ fi
 # pull Git LFS objects — LFS bandwidth is limited and the files are huge.
 export GIT_LFS_SKIP_SMUDGE=1
 
-# On machines that keep the real game files in public/projects (they are not
-# in git), Next.js would copy them into the build output and blow past deploy
-# size limits. Move them aside for the duration of the build.
+# public/projects holds the games as Git LFS pointers (real files on dev
+# machines that pulled them). Either way the directory must not be in
+# public/ when the build output is packaged: Cloudflare Pages rejects static
+# files over 25 MB, and even pointer text should not be deployed. Move it
+# aside; on CI (ephemeral checkout) it stays out so the packaging steps that
+# run after this script cannot pick it up, locally it is restored on exit.
 EXCLUDED_GAMES_DIR=".build-excluded-projects"
 restore_excluded_games() {
   if [ -d "${EXCLUDED_GAMES_DIR}" ]; then
@@ -36,10 +47,14 @@ restore_excluded_games() {
 }
 
 if [ -d "public/projects" ]; then
-  echo "[build] Excluding public/projects from the build (game files are fetched from GitHub at runtime)"
   rm -rf "${EXCLUDED_GAMES_DIR}"
   mv public/projects "${EXCLUDED_GAMES_DIR}"
-  trap restore_excluded_games EXIT
+  if [ -n "${IS_CI_BUILD}" ]; then
+    echo "[build] CI build: leaving public/projects out of the tree (game files are fetched from GitHub at runtime)"
+  else
+    echo "[build] Excluding public/projects for the duration of the build (moved to ${EXCLUDED_GAMES_DIR})"
+    trap restore_excluded_games EXIT
+  fi
 fi
 
 echo "[build] Running next build..."
