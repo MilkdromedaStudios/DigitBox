@@ -1,7 +1,8 @@
 import { decodeBase64Utf8 } from "../../../lib/base64";
 import { jsonResponse } from "../../../lib/apiResponse";
 import { getContentBucket, toR2Key, r2PublicUrlForKey } from "../../../lib/r2";
-import { fetchR2File, isGitLfsPointer } from "../../../lib/r2Content";
+import { isGitLfsPointer } from "../../../lib/r2Content";
+import { fetchGithubReleaseAsset } from "../../../lib/githubAssets";
 
 export const config = { runtime: "edge" };
 
@@ -15,6 +16,10 @@ function htmlResponse(body, contentType) {
       "Cache-Control": "public, max-age=300",
     },
   });
+}
+
+function contentTypeForPath(filePath) {
+  return /\.md$/i.test(filePath) ? "text/markdown; charset=utf-8" : "text/html; charset=utf-8";
 }
 
 async function readFromR2(filePath) {
@@ -99,7 +104,7 @@ async function readGithubFile(filePath) {
   const content = decodeBase64Utf8(file.content || "");
   if (isGitLfsPointer(content)) {
     throw new Error(
-      "This file is stored in Git LFS and only its pointer is on GitHub. Upload the real file to the Cloudflare R2 bucket and set R2_PUBLIC_BASE_URL (see docs/CLOUDFLARE_R2_SETUP.md)."
+      "This file is stored in Git LFS and only its pointer is on GitHub. Upload the real file to the game-assets release with scripts/upload-games-to-github.mjs (see docs/GITHUB_RELEASE_ASSETS.md)."
     );
   }
 
@@ -116,14 +121,18 @@ export default async function handler(req) {
       return jsonResponse({ error: "Invalid path" }, 400);
     }
 
-    // Serve from the Cloudflare R2 bucket first (free egress, no LFS
-    // bandwidth). GitHub stays as a fallback for files not uploaded to R2.
-    const r2Res = await fetchR2File(filePath).catch(() => null);
-    if (r2Res) {
-      return new Response(r2Res.body, {
+    // Serve from the Cloudflare R2 bucket first when it is configured (free
+    // egress, no LFS bandwidth), then from the GitHub release that holds the
+    // big game files, and finally from the repo itself for small files.
+    const r2Res = await readFromR2(filePath).catch(() => null);
+    if (r2Res) return r2Res;
+
+    const releaseRes = await fetchGithubReleaseAsset(filePath).catch(() => null);
+    if (releaseRes) {
+      return new Response(releaseRes.body, {
         status: 200,
         headers: {
-          "Content-Type": "text/html; charset=utf-8",
+          "Content-Type": contentTypeForPath(filePath),
           "Cache-Control": "public, max-age=3600",
         },
       });

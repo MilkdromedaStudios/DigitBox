@@ -18,10 +18,29 @@ elif [ -f ".env" ]; then
   load_env_file ".env"
 fi
 
-# Game and post HTML files are served from the Cloudflare R2 bucket at
-# runtime (see docs/CLOUDFLARE_R2_SETUP.md), so the build must NOT pull
-# Git LFS objects — LFS bandwidth is limited and the files are huge.
-# Only the tiny LFS pointer files stay in the repo.
+# The game HTML files are never part of the build: they are fetched at
+# runtime from the GitHub release (see docs/GITHUB_RELEASE_ASSETS.md) or the
+# Cloudflare R2 bucket (see docs/CLOUDFLARE_R2_SETUP.md). The build must NOT
+# pull Git LFS objects — LFS bandwidth is limited and the files are huge.
+export GIT_LFS_SKIP_SMUDGE=1
+
+# On machines that keep the real game files in public/projects (they are not
+# in git), Next.js would copy them into the build output and blow past deploy
+# size limits. Move them aside for the duration of the build.
+EXCLUDED_GAMES_DIR=".build-excluded-projects"
+restore_excluded_games() {
+  if [ -d "${EXCLUDED_GAMES_DIR}" ]; then
+    rm -rf public/projects
+    mv "${EXCLUDED_GAMES_DIR}" public/projects
+  fi
+}
+
+if [ -d "public/projects" ]; then
+  echo "[build] Excluding public/projects from the build (game files are fetched from GitHub at runtime)"
+  rm -rf "${EXCLUDED_GAMES_DIR}"
+  mv public/projects "${EXCLUDED_GAMES_DIR}"
+  trap restore_excluded_games EXIT
+fi
 
 echo "[build] Running next build..."
 next build

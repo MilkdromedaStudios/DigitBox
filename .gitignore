@@ -17,6 +17,10 @@
 /.next/
 /out/
 
+# real game HTML files (too big for git — they live on the GitHub release,
+# see docs/GITHUB_RELEASE_ASSETS.md)
+/public/projects/
+
 # production
 /build
 
