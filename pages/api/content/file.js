@@ -3,6 +3,7 @@ import { jsonResponse } from "../../../lib/apiResponse";
 import { getContentBucket, toR2Key, r2PublicUrlForKey } from "../../../lib/r2";
 import { isGitLfsPointer } from "../../../lib/r2Content";
 import { fetchGithubReleaseAsset } from "../../../lib/githubAssets";
+import { getGithubRepo } from "../../../lib/githubRepo";
 
 export const config = { runtime: "edge" };
 
@@ -60,21 +61,13 @@ function optionalGithubHeaders() {
   return headers;
 }
 
-function hasGithubReadConfig() {
-  return Boolean(process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
-}
-
 // Reads the file from the repo itself and returns a Response, or null when
 // it does not exist. For Git LFS files in a public repo, download_url points
 // at media.githubusercontent.com, which serves the real bytes (this spends
 // LFS bandwidth, which is why the release is checked first). Games are up to
 // ~100 MB, so the body is streamed rather than buffered in the edge runtime.
 async function readGithubFile(filePath) {
-  if (!hasGithubReadConfig()) return null;
-
-  const owner = process.env.GITHUB_REPO_OWNER;
-  const repo = process.env.GITHUB_REPO_NAME;
-  const branch = process.env.GITHUB_REPO_BRANCH || "main";
+  const { owner, repo, branch } = getGithubRepo();
 
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/contents/${filePath.split("/").map(encodeURIComponent).join("/")}?ref=${branch}`,

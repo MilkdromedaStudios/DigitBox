@@ -58,11 +58,12 @@ git lfs pull --include="public/projects/*" --exclude=""
 
 ## Environment variables on the deployment
 
-Only what publishing already uses:
+None are required for serving games and posts: reads default to the public
+`MilkdromedaStudios/DigitBox` repo (see `lib/githubRepo.js`). Optional:
 
 ```
-GITHUB_REPO_OWNER=MilkdromedaStudios
-GITHUB_REPO_NAME=DigitBox
-GITHUB_TOKEN=<optional for a public repo, but recommended for rate limits>
+GITHUB_TOKEN=<recommended: raises GitHub API rate limits; required for publishing>
+GITHUB_REPO_OWNER=<override, defaults to MilkdromedaStudios>
+GITHUB_REPO_NAME=<override, defaults to DigitBox>
 GITHUB_ASSETS_TAG=game-assets   # optional, this is the default
 ```
