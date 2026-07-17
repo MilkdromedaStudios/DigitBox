@@ -59,10 +59,14 @@ git lfs pull --include="public/projects/*" --exclude=""
 ## Environment variables on the deployment
 
 None are required for serving games and posts: reads default to the public
-`MilkdromedaStudios/DigitBox` repo (see `lib/githubRepo.js`). Optional:
+`MilkdromedaStudios/DigitBox` repo (see `lib/githubRepo.js`) and go through
+GitHub's download hosts (`github.com/releases/download`,
+`raw.githubusercontent.com`), which are not rate-limited the way the API is —
+unauthenticated API calls are capped at 60/hour per IP and used to cause
+403s. The API is only touched as a last-resort fallback. Optional:
 
 ```
-GITHUB_TOKEN=<recommended: raises GitHub API rate limits; required for publishing>
+GITHUB_TOKEN=<required for publishing from the admin; also raises API rate limits>
 GITHUB_REPO_OWNER=<override, defaults to MilkdromedaStudios>
 GITHUB_REPO_NAME=<override, defaults to DigitBox>
 GITHUB_ASSETS_TAG=game-assets   # optional, this is the default

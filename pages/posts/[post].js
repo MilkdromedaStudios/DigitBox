@@ -1,21 +1,7 @@
-import { decodeBase64Utf8 } from "../../lib/base64";
 import { fetchR2File, isGitLfsPointer } from "../../lib/r2Content";
 import { getGithubRepo } from "../../lib/githubRepo";
 
 export const config = { runtime: "experimental-edge" };
-
-function authHeaders() {
-  const headers = {
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-  };
-
-  if (process.env.GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  }
-
-  return headers;
-}
 
 function toDisplayTitle(slug) {
   return slug
@@ -56,9 +42,11 @@ export async function getServerSideProps({ params }) {
   const slug = rawSlug;
   const filename = `${slug}.html`;
 
+  // Read straight from raw.githubusercontent.com — the GitHub API's
+  // unauthenticated 60/hour-per-IP rate limit was causing 403s.
   const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/public/posts/${encodeURIComponent(filename)}?ref=${branch}`,
-    { headers: authHeaders() }
+    `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/public/posts/${encodeURIComponent(filename)}`,
+    { headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : undefined }
   );
 
   if (res.status === 404) return { notFound: true };
@@ -72,14 +60,13 @@ export async function getServerSideProps({ params }) {
     };
   }
 
-  const data = await res.json();
-  const html = decodeBase64Utf8(data.content || "");
+  const html = await res.text();
 
   if (isGitLfsPointer(html)) {
     return {
       props: {
         title: toDisplayTitle(slug),
-        html: "<p>This post is stored in Git LFS and has not been uploaded to the R2 bucket yet.</p>",
+        html: "<p>This post is stored in Git LFS and has not been synced to the game-assets release yet.</p>",
       },
     };
   }

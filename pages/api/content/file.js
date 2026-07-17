@@ -1,4 +1,3 @@
-import { decodeBase64Utf8 } from "../../../lib/base64";
 import { jsonResponse } from "../../../lib/apiResponse";
 import { getContentBucket, toR2Key, r2PublicUrlForKey } from "../../../lib/r2";
 import { isGitLfsPointer } from "../../../lib/r2Content";
@@ -6,8 +5,6 @@ import { fetchGithubReleaseAsset } from "../../../lib/githubAssets";
 import { getGithubRepo } from "../../../lib/githubRepo";
 
 export const config = { runtime: "edge" };
-
-const GITHUB_API = "https://api.github.com";
 
 function htmlResponse(body, contentType) {
   return new Response(body, {
@@ -48,69 +45,45 @@ async function readFromR2(filePath) {
   return null;
 }
 
-function optionalGithubHeaders() {
-  const headers = {
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-  };
-
-  if (process.env.GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  }
-
-  return headers;
-}
-
-// Reads the file from the repo itself and returns a Response, or null when
-// it does not exist. For Git LFS files in a public repo, download_url points
-// at media.githubusercontent.com, which serves the real bytes (this spends
-// LFS bandwidth, which is why the release is checked first). Games are up to
+// Reads the file straight from raw.githubusercontent.com and returns a
+// Response, or null when it does not exist. Raw reads skip the GitHub API,
+// whose unauthenticated 60/hour-per-IP limit was causing 403s. For Git LFS
+// files in a public repo the raw host serves the real bytes (this spends LFS
+// bandwidth, which is why the release is checked first). Games are up to
 // ~100 MB, so the body is streamed rather than buffered in the edge runtime.
 async function readGithubFile(filePath) {
   const { owner, repo, branch } = getGithubRepo();
 
   const res = await fetch(
-    `${GITHUB_API}/repos/${owner}/${repo}/contents/${filePath.split("/").map(encodeURIComponent).join("/")}?ref=${branch}`,
-    { headers: optionalGithubHeaders() }
+    `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${filePath.split("/").map(encodeURIComponent).join("/")}`,
+    { headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : undefined }
   );
 
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GitHub file read failed (${res.status})`);
+  if (!res.ok) {
+    throw new Error(
+      `GitHub read failed (${res.status}). If this is a game, the monthly Git LFS bandwidth may be used up — run the "Sync games to release" GitHub Action so it is served from the game-assets release instead (see docs/GITHUB_RELEASE_ASSETS.md).`
+    );
+  }
 
-  const file = await res.json();
-  if (file.download_url) {
-    const rawRes = await fetch(file.download_url, {
-      headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : undefined,
+  const length = Number(res.headers.get("Content-Length") || "0");
+  // A Git LFS pointer is ~130 bytes, so only a tiny response can be one.
+  if (!length || length >= 512) {
+    return new Response(res.body, {
+      status: 200,
+      headers: {
+        "Content-Type": contentTypeForPath(filePath),
+        // Long CDN cache to keep repeat plays off the LFS bandwidth.
+        "Cache-Control": "public, max-age=3600, s-maxage=86400",
+      },
     });
-
-    // A non-OK response (media reads fail when LFS bandwidth is used up)
-    // falls through to the base64 path, which still covers small files.
-    if (rawRes.ok) {
-      const length = Number(rawRes.headers.get("Content-Length") || "0");
-      // A Git LFS pointer is ~130 bytes, so only a tiny response can be one.
-      if (!length || length >= 512) {
-        return new Response(rawRes.body, {
-          status: 200,
-          headers: {
-            "Content-Type": contentTypeForPath(filePath),
-            // Long CDN cache to keep repeat plays off the LFS bandwidth.
-            "Cache-Control": "public, max-age=3600, s-maxage=86400",
-          },
-        });
-      }
-
-      const text = await rawRes.text();
-      if (!isGitLfsPointer(text)) return htmlResponse(text, contentTypeForPath(filePath));
-    }
   }
 
-  if (file.encoding === "base64") {
-    const content = decodeBase64Utf8(file.content || "");
-    if (!isGitLfsPointer(content)) return htmlResponse(content, contentTypeForPath(filePath));
-  }
+  const text = await res.text();
+  if (!isGitLfsPointer(text)) return htmlResponse(text, contentTypeForPath(filePath));
 
   throw new Error(
-    'This game is stored in Git LFS and GitHub would not serve it right now (the monthly LFS bandwidth may be used up). Run the "Sync games to release" GitHub Action so it is served from the game-assets release instead (see docs/GITHUB_RELEASE_ASSETS.md).'
+    'This game is stored in Git LFS and GitHub served only its pointer. Run the "Sync games to release" GitHub Action so it is served from the game-assets release instead (see docs/GITHUB_RELEASE_ASSETS.md).'
   );
 }
 
@@ -136,7 +109,7 @@ export default async function handler(req) {
         status: 200,
         headers: {
           "Content-Type": contentTypeForPath(filePath),
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "public, max-age=3600, s-maxage=86400",
         },
       });
     }
