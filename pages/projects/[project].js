@@ -1,3 +1,5 @@
+export const config = { runtime: "experimental-edge" };
+
 export default function ProjectRunner({ src, title }) {
   return (
     <iframe

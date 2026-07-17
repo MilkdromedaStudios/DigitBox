@@ -1,11 +1,9 @@
-import fs from "fs/promises";
-import path from "path";
+import { decodeBase64Utf8 } from "../../../lib/base64";
+import { jsonResponse } from "../../../lib/apiResponse";
+
+export const config = { runtime: "edge" };
 
 const GITHUB_API = "https://api.github.com";
-
-function hasGithubConfig() {
-  return Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO_OWNER && process.env.GITHUB_REPO_NAME);
-}
 
 function optionalGithubHeaders() {
   const headers = {
@@ -70,7 +68,7 @@ async function readGithubFile(filePath) {
     throw new Error("Unsupported GitHub content encoding");
   }
 
-  const content = Buffer.from(file.content || "", "base64").toString("utf8");
+  const content = decodeBase64Utf8(file.content || "");
   if (isGitLfsPointer(content)) {
     throw new Error("Git LFS content is unavailable. Configure GitHub repository environment variables so the app can fetch the real project file.");
   }
@@ -78,40 +76,24 @@ async function readGithubFile(filePath) {
   return content;
 }
 
-async function readLocalFile(filePath) {
-  const absolutePath = path.join(process.cwd(), filePath);
-  try {
-    const content = await fs.readFile(absolutePath, "utf8");
-    if (isGitLfsPointer(content) && hasGithubConfig()) {
-      return readGithubFile(filePath);
-    }
-
-    if (isGitLfsPointer(content)) {
-      throw new Error("Git LFS pointer found instead of the real project file. Run git lfs pull or configure GitHub repository environment variables in production.");
-    }
-
-    return content;
-  } catch (error) {
-    if (error?.code === "ENOENT") return readGithubFile(filePath);
-    throw error;
-  }
-}
-
-export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req) {
+  if (req.method !== "GET") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const filePath = String(req.query.path || "").trim();
+    const { searchParams } = new URL(req.url);
+    const filePath = String(searchParams.get("path") || "").trim();
     if (!filePath.startsWith("public/projects/") && !filePath.startsWith("public/posts/")) {
-      return res.status(400).json({ error: "Invalid path" });
+      return jsonResponse({ error: "Invalid path" }, 400);
     }
 
-    const content = await readLocalFile(filePath);
-    if (content == null) return res.status(404).json({ error: "File not found" });
+    const content = await readGithubFile(filePath);
+    if (content == null) return jsonResponse({ error: "File not found" }, 404);
 
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    return res.status(200).send(content);
+    return new Response(content, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   } catch (error) {
-    return res.status(500).json({ error: error.message || "Read failed" });
+    return jsonResponse({ error: error.message || "Read failed" }, 500);
   }
 }
