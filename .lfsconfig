@@ -1,0 +1,8 @@
+# Never auto-download LFS content (the 25-100 MB game files) on clone or
+# checkout — build platforms must only ever see the tiny pointer files. The
+# games are fetched from GitHub at runtime instead, and the
+# sync-games-to-release workflow overrides this with --exclude="" when it
+# deliberately pulls them. To get the real files locally:
+#   git lfs pull --include="public/projects/*" --exclude=""
+[lfs]
+	fetchexclude = *

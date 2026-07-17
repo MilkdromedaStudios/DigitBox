@@ -75,7 +75,9 @@ jobs:
             fi
 
             echo "SYNC $name (release has: ${have_size:-nothing}, want: $want_size bytes)"
-            if ! git lfs pull --include="$file"; then
+            # --exclude="" overrides the repo .lfsconfig, which blocks LFS
+            # downloads everywhere else (build platforms must see pointers).
+            if ! git lfs pull --include="$file" --exclude=""; then
               echo "::error::git lfs pull failed for $name — the monthly LFS bandwidth quota may be used up. Re-run this workflow after the quota resets."
               failures=$((failures + 1))
               continue

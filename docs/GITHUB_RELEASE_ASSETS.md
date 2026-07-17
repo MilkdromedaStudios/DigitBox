@@ -20,11 +20,12 @@ machine is needed.
   `public/projects` changes on `main` (or manually from the Actions tab). It
   compares each pointer's size against the release assets and uploads only
   what changed, so re-runs cost almost no LFS bandwidth.
-- **Build**: `scripts/vercel-build.sh` moves `public/projects/` aside during
-  `next build`, so neither pointers nor real files land in the build output,
-  and sets `GIT_LFS_SKIP_SMUDGE` so nothing is pulled from LFS. Keep the
-  hosting platform's own Git LFS option **disabled** (Vercel: Project
-  Settings → Git → Git LFS) or every deploy will download all the games.
+- **Build**: the repo `.lfsconfig` sets `fetchexclude = *`, so clones and
+  checkouts (Vercel, Cloudflare Pages, CI) only ever see the tiny pointer
+  files. `scripts/vercel-build.sh` additionally moves `public/projects/` out
+  of the tree during CI builds, so neither pointers nor real files land in
+  the build output. Keep the hosting platform's own Git LFS option
+  **disabled** too (Vercel: Project Settings → Git → Git LFS).
 - **Runtime**: `/api/content/file` looks for content in this order and
   streams it back to the game iframe:
   1. Cloudflare R2 bucket (only if configured — optional)
@@ -47,6 +48,13 @@ that is expected; the app and the workflow both account for it.
 To force a re-sync at any time: Actions tab → **Sync games to release** →
 Run workflow. `scripts/upload-games-to-github.mjs` still exists as a manual
 alternative that uploads files from a local directory.
+
+To get the real game files on your own machine (the `.lfsconfig` blocks the
+download by default):
+
+```bash
+git lfs pull --include="public/projects/*" --exclude=""
+```
 
 ## Environment variables on the deployment
 
