@@ -203,10 +203,12 @@ public final class ModrinthClient {
         return send(req);
     }
 
-    /** Sends with up to three attempts: rate limits and transient 5xx are retried with backoff. */
+    private static final long[] RETRY_DELAYS_MS = {2000L, 5000L, 10000L};
+
+    /** Sends with up to four attempts: rate limits and transient 5xx are retried with backoff. */
     private Object send(HttpRequest req) throws IOException {
         IOException last = null;
-        for (int attempt = 1; attempt <= 3; attempt++) {
+        for (int attempt = 1; attempt <= RETRY_DELAYS_MS.length + 1; attempt++) {
             try {
                 HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
                 int code = resp.statusCode();
@@ -227,9 +229,9 @@ public final class ModrinthClient {
             } catch (IOException e) {
                 last = e;
             }
-            if (attempt < 3) {
+            if (attempt <= RETRY_DELAYS_MS.length) {
                 try {
-                    Thread.sleep(attempt * 2000L);
+                    Thread.sleep(RETRY_DELAYS_MS[attempt - 1]);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Request interrupted", e);

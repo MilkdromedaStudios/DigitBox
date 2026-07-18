@@ -71,6 +71,6 @@ jobs:
         with:
           name: smoke-test-output
           path: |
-            /tmp/**/instance/server.log
-            /tmp/**/instance/octoloader/octo-report.*
+            ${{ runner.temp }}/octo-smoke/instance/server.log
+            ${{ runner.temp }}/octo-smoke/instance/octoloader/octo-report.*
           if-no-files-found: ignore

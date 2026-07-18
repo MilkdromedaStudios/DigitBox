@@ -19,7 +19,7 @@ LOADER_VERSION="${3:-0.19.3}"
 INSTALLER_VERSION="${4:-1.1.1}"
 UA='octo-loader-ci (github.com/MilkdromedaStudios/DigitBox)'
 
-WORK=$(mktemp -d)
+WORK="${RUNNER_TEMP:-$(mktemp -d)}/octo-smoke"
 SRV="$WORK/instance"
 mkdir -p "$SRV/mods" "$SRV/octoloader"
 echo "==> Test instance: $SRV"
@@ -49,11 +49,8 @@ fetch_modrinth lithium '["fabric"]' '["1.21.1"]' "$SRV/octoloader"
 fetch_modrinth worldedit '["bukkit"]' '' "$SRV/octoloader"
 cp "$OCTO_JAR" "$SRV/mods/"
 
-echo "==> Running Octo Loader CLI resolution"
-java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION"
-
-echo "==> Asserting resolution outcomes"
-python3 - "$SRV" <<'EOF'
+assert_outcomes() {
+    python3 - "$SRV" <<'EOF'
 import json, pathlib, sys
 srv = pathlib.Path(sys.argv[1])
 report = json.loads((srv / 'octoloader' / 'octo-report.json').read_text())
@@ -80,6 +77,43 @@ print('      lithium   ->', lithium['status'], '->', lithium['staged'])
 print('      worldedit ->', worldedit['status'], '->', worldedit['staged'])
 print('      create    ->', create['status'], '(honest verdict, no fake staging)')
 EOF
+}
+
+# Remove everything a previous phase staged so each phase starts clean.
+reset_instance() {
+    find "$SRV/mods" -name '*.jar' ! -name 'fabric-api-*' ! -name 'octo-loader-*' -delete
+    rm -rf "$SRV/plugins"
+    rm -f "$SRV/octoloader/.octo-state.json"
+}
+
+# Runs a resolution phase, retrying when the report shows transient network errors
+# (Modrinth has intermittent 5xx weather; the mod degrades gracefully, but this test
+# demands the real bridged outcomes).
+run_resolution() { # $1 = 1 to disable the hash-lookup endpoint (fallback path)
+    for attempt in 1 2 3; do
+        if [ "${1:-0}" = "1" ]; then
+            OCTO_DISABLE_HASH_LOOKUP=1 java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION" --force
+        else
+            java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION" --force
+        fi
+        if ! grep -q '"status": "error"' "$SRV/octoloader/octo-report.json"; then
+            return 0
+        fi
+        echo "    transient Modrinth errors in report (attempt $attempt) — retrying in 45s"
+        sleep 45
+    done
+    echo "Modrinth stayed unavailable across retries"
+    return 1
+}
+
+echo "==> Phase 1: resolution via hash identification"
+run_resolution 0
+assert_outcomes
+
+echo "==> Phase 2: resolution with the hash-lookup endpoint disabled (metadata fallback)"
+reset_instance
+run_resolution 1
+assert_outcomes
 
 echo "==> Booting a real Fabric $GAME_VERSION dedicated server with the staged mods"
 cd "$SRV"

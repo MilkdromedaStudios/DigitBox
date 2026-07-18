@@ -97,15 +97,30 @@ public final class ResolutionEngine {
     private record Identity(ModrinthClient.Version version, String slug, String title) {
     }
 
-    private Optional<Identity> identify(String sha1) throws IOException {
-        Optional<ModrinthClient.Version> v = modrinth.versionByHash(sha1);
-        if (v.isEmpty()) {
+    /**
+     * Never throws: when the hash-lookup endpoint is down (it fails independently of
+     * the rest of the Modrinth API), resolution falls back to metadata matching
+     * instead of giving up on the jar. OCTO_DISABLE_HASH_LOOKUP=1 forces the
+     * fallback path, which is how the smoke test exercises it deterministically.
+     */
+    private Optional<Identity> identify(String sha1) {
+        if ("1".equals(System.getenv("OCTO_DISABLE_HASH_LOOKUP"))) {
             return Optional.empty();
         }
-        Optional<ModrinthClient.Project> p = modrinth.project(v.get().projectId());
-        String slug = p.map(ModrinthClient.Project::slug).orElse(v.get().projectId());
-        String title = p.map(ModrinthClient.Project::title).orElse(slug);
-        return Optional.of(new Identity(v.get(), slug, title));
+        try {
+            Optional<ModrinthClient.Version> v = modrinth.versionByHash(sha1);
+            if (v.isEmpty()) {
+                return Optional.empty();
+            }
+            Optional<ModrinthClient.Project> p = modrinth.project(v.get().projectId());
+            String slug = p.map(ModrinthClient.Project::slug).orElse(v.get().projectId());
+            String title = p.map(ModrinthClient.Project::title).orElse(slug);
+            return Optional.of(new Identity(v.get(), slug, title));
+        } catch (IOException e) {
+            log.accept("  ! hash lookup unavailable (" + e.getMessage()
+                    + ") — falling back to metadata matching.");
+            return Optional.empty();
+        }
     }
 
     private static String describe(Identity id) {
@@ -118,17 +133,21 @@ public final class ResolutionEngine {
      * (e.g. downloaded from CurseForge or built locally): search by the mod id and
      * display name from the jar's own metadata, accepting only exact matches.
      */
-    private Optional<String> slugByMetadata(ModJarInfo jar) throws IOException {
+    private Optional<String> slugByMetadata(ModJarInfo jar) {
         for (String query : new String[]{jar.modId(), jar.name()}) {
             if (query == null || query.isBlank()) {
                 continue;
             }
-            for (ModrinthClient.SearchHit hit : modrinth.search(query, null, null, 8)) {
-                boolean slugMatch = jar.modId() != null && jar.modId().equalsIgnoreCase(hit.slug());
-                boolean titleMatch = jar.name() != null && jar.name().equalsIgnoreCase(hit.title());
-                if (slugMatch || titleMatch) {
-                    return Optional.ofNullable(hit.slug());
+            try {
+                for (ModrinthClient.SearchHit hit : modrinth.search(query, null, null, 8)) {
+                    boolean slugMatch = jar.modId() != null && jar.modId().equalsIgnoreCase(hit.slug());
+                    boolean titleMatch = jar.name() != null && jar.name().equalsIgnoreCase(hit.title());
+                    if (slugMatch || titleMatch) {
+                        return Optional.ofNullable(hit.slug());
+                    }
                 }
+            } catch (IOException e) {
+                log.accept("  ! metadata search unavailable (" + e.getMessage() + ")");
             }
         }
         return Optional.empty();
@@ -209,15 +228,24 @@ public final class ResolutionEngine {
         }
         ModJarInfo jar = r.jar;
         Optional<Identity> idOpt = identify(jar.sha1());
+        String slug = idOpt.map(Identity::slug).orElse(null);
+        String base = idOpt.map(ResolutionEngine::describe).orElse("");
+        if (slug == null) {
+            Optional<String> metaSlug = slugByMetadata(jar);
+            if (metaSlug.isPresent()) {
+                slug = metaSlug.get();
+                base = "Matched by jar metadata to '" + slug + "' on Modrinth. ";
+            }
+        }
 
         // Best case: the same project ships a native Fabric build (WorldEdit, Chunky, ...).
-        if (idOpt.isPresent()) {
-            r.resolvedProject = idOpt.get().slug();
+        if (slug != null) {
+            r.resolvedProject = slug;
             Optional<ModrinthClient.Version> best =
-                    pickBest(modrinth.projectVersions(idOpt.get().slug(), "fabric", gameVersion));
+                    pickBest(modrinth.projectVersions(slug, "fabric", gameVersion));
             if (best.isPresent()) {
                 stageVersion(r, best.get(), Resolution.Status.BRIDGED_LOADER,
-                        describe(idOpt.get()) + "The project publishes a native Fabric build — fetched "
+                        base + "The project publishes a native Fabric build — fetched "
                                 + best.get().versionNumber() + " for " + gameVersion
                                 + " instead of running the plugin through a bridge.");
                 return;
@@ -237,13 +265,12 @@ public final class ResolutionEngine {
                 resolveDependencies(bridge.get(), r, 1);
             }
             r.set(Resolution.Status.PLUGIN_BRIDGED,
-                    (idOpt.isPresent() ? describe(idOpt.get()) : "")
-                            + "Staged into plugins/ with the '" + BUKKIT_BRIDGE_SLUG
+                    base + "Staged into plugins/ with the '" + BUKKIT_BRIDGE_SLUG
                             + "' Bukkit-on-Fabric bridge (" + bridge.get().versionNumber() + ").");
             return;
         }
 
-        StringBuilder detail = new StringBuilder(idOpt.isPresent() ? describe(idOpt.get())
+        StringBuilder detail = new StringBuilder(!base.isEmpty() ? base
                 : "Plugin is not known to Modrinth. ");
         detail.append("No native Fabric build of this project for ").append(gameVersion)
                 .append(", and the Bukkit bridge mod ('").append(BUKKIT_BRIDGE_SLUG)
