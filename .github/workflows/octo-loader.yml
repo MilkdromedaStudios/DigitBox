@@ -1,0 +1,76 @@
+name: Octo Loader
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'octo-loader/**'
+      - '.github/workflows/octo-loader.yml'
+  pull_request:
+    paths:
+      - 'octo-loader/**'
+      - '.github/workflows/octo-loader.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (MC 26.2, Java 25)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: octo-loader
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        run: ./gradlew build --stacktrace
+
+      - name: Upload mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: octo-loader
+          path: octo-loader/build/libs/*.jar
+          if-no-files-found: error
+
+  prove-it-works:
+    name: Smoke test with real mods (Create, Lithium, WorldEdit)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Download built mod
+        uses: actions/download-artifact@v4
+        with:
+          name: octo-loader
+          path: dist
+
+      - name: Run end-to-end smoke test
+        run: |
+          JAR=$(ls dist/octo-loader-*.jar | grep -v sources | head -1)
+          bash octo-loader/scripts/ci-smoke-test.sh "$JAR" 26.2
+
+      - name: Upload server log and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-output
+          path: |
+            ${{ runner.temp }}/octo-smoke/instance/server.log
+            ${{ runner.temp }}/octo-smoke/instance/octoloader/octo-report.*
+          if-no-files-found: ignore

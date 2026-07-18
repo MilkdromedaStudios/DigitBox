@@ -70,6 +70,7 @@ export default function Layout({ children }) {
           <Link href="/">Home</Link>
           <Link href="/gallery">Gallery</Link>
           <Link href="/posts">Posts</Link>
+          <Link href="/octoloader">Octo Loader</Link>
           {isAdmin && <Link href="/admin">Admin</Link>}
           {!isAuthLoading && !user && <Link href="/login">Login</Link>}
 
