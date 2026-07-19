@@ -166,6 +166,36 @@ java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION" --export ci-pa
 ls "$SRV"/octoloader/export/ci-pack/mods/*.jar >/dev/null || { echo 'export produced no mods'; exit 1; }
 test -f "$SRV"/octoloader/export/ci-pack/README.txt || { echo 'export README missing'; exit 1; }
 
+echo "==> Phase 5: API migration rewrites an abandoned mod's old class refs to the new API AND it runs"
+MIG=$(mktemp -d)
+# an 'old API' class the abandoned mod was built against, absent at runtime
+mkdir -p "$MIG/oldsrc/net/minecraft/oldpkg" "$MIG/newsrc/net/minecraft/newpkg" "$MIG/modsrc/com/demo"
+printf 'package net.minecraft.oldpkg;\npublic class OldThing { public String hello(){ return "OLD"; } }\n' > "$MIG/oldsrc/net/minecraft/oldpkg/OldThing.java"
+printf 'package net.minecraft.newpkg;\npublic class NewThing { public String hello(){ return "NEW-API-RUNS"; } }\n' > "$MIG/newsrc/net/minecraft/newpkg/NewThing.java"
+printf 'package com.demo;\nimport net.minecraft.oldpkg.OldThing;\npublic class Mod { public String go(){ return new OldThing().hello(); } }\n' > "$MIG/modsrc/com/demo/Mod.java"
+javac -d "$MIG/oldbuild" "$MIG/oldsrc/net/minecraft/oldpkg/OldThing.java"
+javac -d "$MIG/newbuild" "$MIG/newsrc/net/minecraft/newpkg/NewThing.java"
+javac -cp "$MIG/oldbuild" -d "$MIG/modbuild" "$MIG/modsrc/com/demo/Mod.java"
+printf '{"schemaVersion":1,"id":"abandoned","version":"1.0.0","name":"Abandoned","environment":"*","depends":{"fabricloader":"*","minecraft":"1.21.1"}}\n' > "$MIG/modbuild/fabric.mod.json"
+( cd "$MIG/modbuild" && jar cf "$SRV/octoloader/abandoned-1.0.0.jar" com/demo/Mod.class fabric.mod.json )
+mkdir -p "$SRV/octoloader/migrations"
+printf '{"classRenames":{"net/minecraft/oldpkg/OldThing":"net/minecraft/newpkg/NewThing"}}\n' > "$SRV/octoloader/migrations/1.21.1-to-$GAME_VERSION.json"
+rm -f "$SRV/octoloader/.octo-state.json"
+java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION" --force > "$MIG/resolve.log" 2>&1 || true
+grep -q '"status": "api-migrated"' "$SRV/octoloader/octo-report.json" || { echo 'migration status missing'; cat "$MIG/resolve.log"; exit 1; }
+MIGJAR=$(ls "$SRV"/mods/abandoned-*octo-migrated.jar)
+# the old class ref must be gone, the new one present
+unzip -p "$MIGJAR" com/demo/Mod.class | strings | grep -q 'net/minecraft/newpkg/NewThing' || { echo 'new ref missing'; exit 1; }
+unzip -p "$MIGJAR" com/demo/Mod.class | strings | grep -q 'net/minecraft/oldpkg/OldThing' && { echo 'old ref still present'; exit 1; }
+# and the migrated class must actually RUN against the new API (old class absent from classpath)
+printf 'public class Run { public static void main(String[] a) throws Exception {\n  Object m = Class.forName("com.demo.Mod").getDeclaredConstructor().newInstance();\n  System.out.println(m.getClass().getMethod("go").invoke(m)); } }\n' > "$MIG/Run.java"
+javac -d "$MIG/runbuild" "$MIG/Run.java"
+RESULT=$(java -cp "$MIGJAR:$MIG/newbuild:$MIG/runbuild" Run)
+echo "    migrated mod ran and returned: $RESULT"
+[ "$RESULT" = "NEW-API-RUNS" ] || { echo "migrated mod did not run against new API (got: $RESULT)"; exit 1; }
+rm -f "$SRV/mods/abandoned-"*.jar "$SRV/octoloader/abandoned-1.0.0.jar"; rm -rf "$SRV/octoloader/migrations" "$MIG"
+rm -f "$SRV/octoloader/.octo-state.json"
+
 echo "==> Booting a real Fabric $GAME_VERSION dedicated server with the staged mods"
 cd "$SRV"
 curl -sSL -o fabric-server.jar \

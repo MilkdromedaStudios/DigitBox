@@ -25,6 +25,8 @@ public final class OctoConfig {
     public boolean forceLoadSameMajor = true;
     /** The big red switch: force-load Fabric/Quilt jars from ANY Minecraft version when nothing better exists. Old jars may crash — the connector tries anyway. */
     public boolean forceLoadAnyVersion = false;
+    /** Rewrite an abandoned jar's old/renamed class references to the current API using a community migration map in octoloader/migrations/. */
+    public boolean attemptApiMigration = true;
     /** Extra cross-loader equivalences: Modrinth slug of what you have -> slug of the Fabric port. */
     public Map<String, String> extraEquivalents = new LinkedHashMap<>();
 
@@ -42,6 +44,7 @@ public final class OctoConfig {
                 cfg.installAlternatives = Json.bool(root, "installAlternatives", cfg.installAlternatives);
                 cfg.forceLoadSameMajor = Json.bool(root, "forceLoadSameMajor", cfg.forceLoadSameMajor);
                 cfg.forceLoadAnyVersion = Json.bool(root, "forceLoadAnyVersion", cfg.forceLoadAnyVersion);
+                cfg.attemptApiMigration = Json.bool(root, "attemptApiMigration", cfg.attemptApiMigration);
                 for (Map.Entry<String, Object> e : Json.obj(root, "extraEquivalents").entrySet()) {
                     if (e.getValue() instanceof String s) {
                         cfg.extraEquivalents.put(e.getKey(), s);
@@ -67,6 +70,7 @@ public final class OctoConfig {
         root.put("installAlternatives", installAlternatives);
         root.put("forceLoadSameMajor", forceLoadSameMajor);
         root.put("forceLoadAnyVersion", forceLoadAnyVersion);
+        root.put("attemptApiMigration", attemptApiMigration);
         root.put("extraEquivalents", extraEquivalents);
         Files.writeString(configDir.resolve("octoloader.json"), Json.write(root) + "\n", StandardCharsets.UTF_8);
     }

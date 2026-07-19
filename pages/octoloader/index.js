@@ -28,6 +28,11 @@ const FEATURES = [
     text: "Quilt-only mods get a Fabric-loadable jar synthesized from their own metadata; same-family Fabric jars (a 26.1 build on 26.2) are force-loaded with their constraint relaxed; and Forge/NeoForge jars run through a translation layer the moment one supports your version — the real jar, in your game.",
   },
   {
+    icon: "🔧",
+    title: "Revives abandoned mods (API migration)",
+    text: "When a mod's author is gone and it has no build for your version, Octo Loader rewrites the old, renamed class references in the jar's bytecode to the current API using a community migration map — so the actual jar links and loads again. Honest about its limits: it fixes renamed/relocated classes, not deleted APIs or redesigned subsystems.",
+  },
+  {
     icon: "⬆️",
     title: "Built-in mod updater",
     text: "/octo update checks every mod in mods/ against Modrinth and swaps in the newest build for your game version — with the old jar backed up so it's always reversible.",

@@ -24,7 +24,7 @@ import java.util.zip.ZipFile;
  */
 public final class OctoCore {
 
-    public static final String OCTO_VERSION = "1.1.0";
+    public static final String OCTO_VERSION = "1.2.0";
 
     public record Summary(List<Resolution> results, Path reportMd, Path reportJson, int stagedCount) {
     }
@@ -47,6 +47,7 @@ public final class OctoCore {
         Files.createDirectories(inbox);
         Files.createDirectories(modsDir);
         writeInboxReadme(inbox);
+        writeMigrationScaffold(inbox.resolve("migrations"));
 
         if (gameVersion == null && config.targetGameVersion != null) {
             gameVersion = config.targetGameVersion;
@@ -226,6 +227,31 @@ public final class OctoCore {
         return dest;
     }
 
+    /**
+     * Manually migrates a single jar's old class references to the current API using the
+     * community map for {@code gameVersion}, writing the repaired jar into {@code mods/}.
+     */
+    public static Path runMigrate(Path gameDir, String gameVersion, Path jar, Consumer<String> log)
+            throws IOException {
+        Path migrationsDir = gameDir.resolve("octoloader").resolve("migrations");
+        Map<String, String> renames = ApiMigrator.mergedRenamesForTarget(migrationsDir, gameVersion);
+        if (renames.isEmpty()) {
+            log.accept("No migration map targeting " + gameVersion + " found in " + migrationsDir
+                    + " — add a <from>-to-" + gameVersion + ".json file (see HOW-MIGRATIONS-WORK.txt).");
+            return null;
+        }
+        ApiMigrator.Result mig = ApiMigrator.migrateJar(jar, renames, gameDir.resolve("mods"));
+        log.accept("Migrated " + jar.getFileName() + ": rewrote " + mig.referencesRemapped()
+                + " class reference(s) across " + mig.classesTouched() + " class(es) → "
+                + mig.migratedJar().getFileName());
+        if (!mig.unmappedMinecraftRefs().isEmpty()) {
+            log.accept("  " + mig.unmappedMinecraftRefs().size()
+                    + " Minecraft reference(s) had no mapping and may still break: "
+                    + mig.unmappedMinecraftRefs().stream().limit(5).toList());
+        }
+        return mig.migratedJar();
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     private static List<ModJarInfo> classifyDir(Path dir, Consumer<String> log) throws IOException {
@@ -350,5 +376,56 @@ public final class OctoCore {
                 and stages it into mods/ (or plugins/). Check octo-report.md here for
                 a full explanation of what happened to every file.
                 """, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Creates the {@code octoloader/migrations/} folder with a format guide the first time.
+     * Community-supplied maps named {@code <from>-to-<gameVersion>.json} are applied
+     * automatically to abandoned jars that have no build for the running version.
+     */
+    private static void writeMigrationScaffold(Path migrationsDir) throws IOException {
+        Files.createDirectories(migrationsDir);
+        Path guide = migrationsDir.resolve("HOW-MIGRATIONS-WORK.txt");
+        if (!Files.exists(guide)) {
+            Files.writeString(guide, """
+                    API migration maps
+                    ==================
+
+                    When an abandoned mod has no build for your Minecraft version, Octo Loader
+                    can rewrite its OLD class references to the CURRENT API — so the actual jar
+                    loads — using a community map you drop in this folder.
+
+                    Name a map for the version pair it targets, ending in `-to-<yourVersion>.json`,
+                    for example `1.21.1-to-26.2.json`. Every map ending in `-to-<yourVersion>.json`
+                    is merged and applied automatically.
+
+                    Format (internal names use '/' , not '.'):
+
+                        {
+                          "classRenames": {
+                            "net/minecraft/old/pkg/SomeClass": "net/minecraft/new/pkg/SomeClass",
+                            "net/minecraft/removed/Thing":     "net/minecraft/replacement/Thing"
+                          }
+                        }
+
+                    What this CAN fix: classes that were renamed or relocated between versions
+                    (the most common breakage). What it CANNOT fix: deleted APIs with no
+                    replacement, changed method signatures, or redesigned subsystems — those
+                    need a human port. The report lists any Minecraft references left unmapped
+                    so nothing breaks silently.
+
+                    Files here named `EXAMPLE-*.json` are ignored (they don't target a version).
+                    """, StandardCharsets.UTF_8);
+        }
+        Path example = migrationsDir.resolve("EXAMPLE-format.json");
+        if (!Files.exists(example)) {
+            Files.writeString(example, """
+                    {
+                      "classRenames": {
+                        "net/minecraft/example/OldClassName": "net/minecraft/example/NewClassName"
+                      }
+                    }
+                    """, StandardCharsets.UTF_8);
+        }
     }
 }

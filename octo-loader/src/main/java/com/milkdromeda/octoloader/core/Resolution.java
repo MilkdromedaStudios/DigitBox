@@ -24,6 +24,8 @@ public final class Resolution {
         ALTERNATIVE_INSTALLED("alternative-installed", "Replaced with Fabric equivalents"),
         /** Fabric jar for a neighbouring version, force-loaded with its constraint relaxed. */
         FORCE_LOADED("force-loaded", "Force-loaded (version constraint relaxed)"),
+        /** Abandoned jar whose old class references were rewritten to the current API. */
+        API_MIGRATED("api-migrated", "API-migrated (old classes rewritten to new)"),
         /** Paper plugin staged into plugins/ together with a Bukkit-on-Fabric bridge mod. */
         PLUGIN_BRIDGED("plugin-bridged", "Plugin staged with Bukkit bridge"),
         /** Already installed/staged — nothing to do. */

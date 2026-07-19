@@ -101,6 +101,7 @@ public final class CompatReport {
         return switch (status) {
             case NATIVE_OK, BRIDGED_VERSION, BRIDGED_LOADER, BRIDGED_EQUIVALENT,
                  LOADER_CONVERTED, LOADER_TRANSLATED, PLUGIN_BRIDGED -> "✅";
+            case API_MIGRATED -> "🔧";
             case ALTERNATIVE_INSTALLED -> "♻️";
             case FORCE_LOADED -> "⚠️";
             case ALREADY_PRESENT -> "☑️";
