@@ -1,3 +1,5 @@
+import projectsIndex from "../../data/projects-index.json";
+
 export const config = { runtime: "experimental-edge" };
 
 export default function ProjectRunner({ src, title }) {
@@ -12,9 +14,27 @@ export default function ProjectRunner({ src, title }) {
   );
 }
 
+function projectMetadataForSlug(slug) {
+  return projectsIndex.find((project) => {
+    if (typeof project === "string") return project === slug;
+    return project.slug === slug || project.title === slug;
+  });
+}
+
 export async function getServerSideProps({ params }) {
   const rawSlug = Array.isArray(params.project) ? params.project[0] : params.project;
   const slug = decodeURIComponent(rawSlug || "");
+  const metadata = projectMetadataForSlug(slug);
+
+  if (metadata && typeof metadata !== "string") {
+    return {
+      props: {
+        src: metadata.url || `/api/content/file?path=${encodeURIComponent(metadata.path)}`,
+        title: metadata.title || slug,
+      },
+    };
+  }
+
   const filePath = `public/projects/${slug}.html`;
 
   return {

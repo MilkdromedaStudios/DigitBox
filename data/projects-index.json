@@ -1,4 +1,11 @@
 [
+  {
+    "title": "Eaglercraft Launcher",
+    "slug": "eaglercraft-launcher",
+    "path": "public/projects/Eaglercraft-Launcher-main/index.html",
+    "url": "/api/projects/Eaglercraft-Launcher-main/index.html",
+    "excerpt": "Manual launcher project with the bundled Eaglercraft clients, packs, settings, and supporting assets."
+  },
   "Crystal Seeker 3D",
   "IGE Editor",
   "Appel 3D",
