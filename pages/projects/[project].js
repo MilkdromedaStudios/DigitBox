@@ -15,6 +15,16 @@ export default function ProjectRunner({ src, title }) {
 export async function getServerSideProps({ params }) {
   const rawSlug = Array.isArray(params.project) ? params.project[0] : params.project;
   const slug = decodeURIComponent(rawSlug || "");
+
+  if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
+    return {
+      props: {
+        src: "https://irv77.github.io/AmplerLauncher/index.html",
+        title: "Eaglercraft Launcher",
+      },
+    };
+  }
+
   const filePath = `public/projects/${slug}.html`;
 
   return {
