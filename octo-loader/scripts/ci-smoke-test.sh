@@ -161,6 +161,11 @@ java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION" --update | tee
 grep -q '1 mod(s) updated' /tmp/octo-update.log || { echo 'updater did not update'; exit 1; }
 ls "$SRV"/octoloader/backup/lithium-fabric-*.jar >/dev/null || { echo 'no backup written'; exit 1; }
 
+echo "==> Phase 4: export command packs the mod set into a folder"
+java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION" --export ci-pack
+ls "$SRV"/octoloader/export/ci-pack/mods/*.jar >/dev/null || { echo 'export produced no mods'; exit 1; }
+test -f "$SRV"/octoloader/export/ci-pack/README.txt || { echo 'export README missing'; exit 1; }
+
 echo "==> Booting a real Fabric $GAME_VERSION dedicated server with the staged mods"
 cd "$SRV"
 curl -sSL -o fabric-server.jar \

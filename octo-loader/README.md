@@ -86,6 +86,7 @@ Works on clients and dedicated servers.
 | `/octo scan` | Classify the inbox without touching the network |
 | `/octo fetch <slug>` | Fetch any Modrinth project by slug for your MC version (e.g. `/octo fetch sodium`) |
 | `/octo update` | Update every mod in `mods/` to its newest build for your MC version (old jars → `octoloader/backup/`) |
+| `/octo export [name]` | Pack the whole resolved mod set (`mods/`, `plugins/`, report) into `octoloader/export/<name>/` — drop it into any instance |
 | `/octo status` | Show version + where the latest report is |
 
 ### CLI mode (no game needed)
@@ -97,7 +98,8 @@ java -jar octo-loader-1.0.0.jar --dir /path/to/instance --game-version 26.2
 ```
 
 Options: `--offline` (classify only), `--force` (ignore cache), `--update` (update
-everything in `mods/` instead of resolving the inbox).
+everything in `mods/` instead of resolving the inbox), `--export [name]` (pack the
+resolved mod set into a shareable folder).
 
 ### Config (`config/octoloader.json`)
 

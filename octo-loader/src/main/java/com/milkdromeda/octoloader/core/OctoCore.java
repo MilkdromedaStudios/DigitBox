@@ -184,6 +184,48 @@ public final class OctoCore {
         return updated;
     }
 
+    /**
+     * Copies the fully-resolved mod set (mods/, plugins/, and the latest compatibility
+     * report) into a single self-contained folder under {@code octoloader/export/},
+     * ready to drop into any other Fabric instance or share with friends.
+     */
+    public static Path runExport(Path gameDir, String gameVersion, String name,
+                                 Consumer<String> log) throws IOException {
+        String folderName = (name == null || name.isBlank())
+                ? "octo-pack-" + java.time.LocalDate.now()
+                : name.replaceAll("[^A-Za-z0-9._-]", "_");
+        Path dest = gameDir.resolve("octoloader").resolve("export").resolve(folderName);
+        int copied = 0;
+        for (String sub : new String[]{"mods", "plugins"}) {
+            Path src = gameDir.resolve(sub);
+            if (!Files.isDirectory(src)) {
+                continue;
+            }
+            Path out = dest.resolve(sub);
+            Files.createDirectories(out);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(src, "*.jar")) {
+                for (Path jar : stream) {
+                    Files.copy(jar, out.resolve(jar.getFileName().toString()),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    copied++;
+                }
+            }
+        }
+        Path report = gameDir.resolve("octoloader").resolve("octo-report.md");
+        if (Files.exists(report)) {
+            Files.createDirectories(dest);
+            Files.copy(report, dest.resolve("octo-report.md"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        Files.createDirectories(dest);
+        Files.writeString(dest.resolve("README.txt"),
+                "Octo Loader export — Minecraft " + gameVersion + " (Fabric)\n\n"
+                        + "Drop the mods/ (and plugins/, if present) folder into any Fabric "
+                        + gameVersion + " instance.\nSee octo-report.md for what's inside and why.\n",
+                StandardCharsets.UTF_8);
+        log.accept("Octo Loader export: " + copied + " jar(s) packed into " + dest);
+        return dest;
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     private static List<ModJarInfo> classifyDir(Path dir, Consumer<String> log) throws IOException {

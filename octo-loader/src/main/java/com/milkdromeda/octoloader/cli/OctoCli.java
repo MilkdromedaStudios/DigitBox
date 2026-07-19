@@ -27,6 +27,8 @@ public final class OctoCli {
         boolean offline = false;
         boolean force = false;
         boolean update = false;
+        String exportName = null;
+        boolean export = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -35,6 +37,12 @@ public final class OctoCli {
                 case "--offline" -> offline = true;
                 case "--force" -> force = true;
                 case "--update", "-u" -> update = true;
+                case "--export", "-e" -> {
+                    export = true;
+                    if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+                        exportName = args[++i];
+                    }
+                }
                 case "--help", "-h" -> {
                     usage();
                     return;
@@ -57,6 +65,11 @@ public final class OctoCli {
 
         if (update) {
             OctoCore.runUpdate(dir.toAbsolutePath().normalize(), gameVersion, config,
+                    line -> System.out.println("[octo] " + line));
+            return;
+        }
+        if (export) {
+            OctoCore.runExport(dir.toAbsolutePath().normalize(), gameVersion, exportName,
                     line -> System.out.println("[octo] " + line));
             return;
         }
@@ -84,6 +97,7 @@ public final class OctoCli {
                   --offline                  Classify only, never touch the network
                   --force                    Ignore the resolution cache and re-resolve
                   --update, -u               Update every Fabric mod in mods/ to its newest build
+                  --export, -e [name]        Pack mods/, plugins/ and the report into octoloader/export/<name>/
                 """);
     }
 }

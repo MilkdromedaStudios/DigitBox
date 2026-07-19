@@ -76,6 +76,7 @@ export default function OctoLoaderGuidePage() {
               <tr><td><code>/octo scan</code></td><td>Classify the inbox without touching the network</td></tr>
               <tr><td><code>/octo fetch &lt;slug&gt;</code></td><td>Fetch any Modrinth project for your MC version, e.g. <code>/octo fetch sodium</code></td></tr>
               <tr><td><code>/octo update</code></td><td>Update every mod in <code>mods/</code> to its newest build (old jars are backed up)</td></tr>
+              <tr><td><code>/octo export [name]</code></td><td>Pack the whole mod set into <code>octoloader/export/&lt;name&gt;/</code> — a folder you can drop into any instance</td></tr>
               <tr><td><code>/octo status</code></td><td>Show version and where the latest report is</td></tr>
             </tbody>
           </table>
