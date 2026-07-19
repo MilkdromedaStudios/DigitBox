@@ -43,6 +43,12 @@ export default function OctoLoaderWikiPage() {
             their closest Fabric equivalents installed instead.
           </li>
           <li>
+            <strong>Revive</strong> — for an abandoned mod whose author is gone and which
+            has no build for your version, Octo Loader can rewrite the old, renamed class
+            references in its bytecode to the current API using a community migration map,
+            so the actual jar links and loads again (see below).
+          </li>
+          <li>
             <strong>Dependencies</strong> — required dependencies of everything fetched
             are resolved recursively (depth-limited, deduplicated against what you
             already have).
@@ -55,6 +61,36 @@ export default function OctoLoaderWikiPage() {
         <p className="post-meta">
           Fabric fixes the mod set at launch (every loader does), so staged files load on
           the next restart — Octo Loader tells you when a restart is worth it.
+        </p>
+      </div>
+
+      <div className="section">
+        <h2>API migration — reviving abandoned mods</h2>
+        <p>
+          When a mod&apos;s author is gone and the mod has no build for your Minecraft
+          version, Octo Loader can <strong>rewrite the old, broken class references in the
+          jar&apos;s bytecode to the current API</strong> so the actual jar loads again. Drop a
+          community migration map into <code>octoloader/migrations/</code>, named for the
+          version pair it targets — <code>&lt;from&gt;-to-&lt;yourVersion&gt;.json</code>:
+        </p>
+        <pre className="octo-code">{`{
+  "classRenames": {
+    "net/minecraft/old/pkg/SomeClass": "net/minecraft/new/pkg/SomeClass"
+  }
+}`}</pre>
+        <p>
+          Every map ending in <code>-to-&lt;yourVersion&gt;.json</code> is merged and applied
+          automatically during resolution (or run one jar on demand with the CLI&apos;s{" "}
+          <code>--migrate</code>). The report lists any Minecraft references it could not map
+          so nothing breaks silently.
+        </p>
+        <p className="post-meta">
+          <strong>Honest ceiling:</strong> mechanical rewriting fixes renamed and relocated
+          classes — a large share of what breaks on many version bumps. It cannot invent a
+          deleted API, change method signatures or argument counts, or rewrite logic for a
+          redesigned subsystem; those need a human port. Simple abandoned mods can be revived
+          automatically, deeply-integrated ones (Create-scale) cannot — and Octo Loader tells
+          you which references it couldn&apos;t map rather than pretending.
         </p>
       </div>
 
@@ -73,6 +109,7 @@ export default function OctoLoaderWikiPage() {
               <tr><td>✅ Converted</td><td>Quilt-only jar rewritten with synthesized Fabric metadata — the actual jar loads</td></tr>
               <tr><td>✅ Translation layer</td><td>Forge/NeoForge jar staged as-is with a layer that executes it on Fabric</td></tr>
               <tr><td>♻️ Replaced with equivalents</td><td>No Fabric edition exists — closest equivalents installed (OptiFine → Sodium + Iris)</td></tr>
+              <tr><td>🔧 API-migrated</td><td>Abandoned jar's old/renamed class references rewritten to the current API via a migration map</td></tr>
               <tr><td>⚠️ Force-loaded</td><td>Same-family jar (26.1 on 26.2) loaded with its version constraint relaxed</td></tr>
               <tr><td>✅ Plugin staged with bridge</td><td>Plugin put in <code>plugins/</code> next to the Cardboard Bukkit-on-Fabric bridge</td></tr>
               <tr><td>☑️ Already installed</td><td>You already have this mod — nothing to do</td></tr>
@@ -126,6 +163,7 @@ export default function OctoLoaderWikiPage() {
               <tr><td><code>installAlternatives</code></td><td><code>true</code></td><td>Install equivalent Fabric mods when the original has no Fabric edition</td></tr>
               <tr><td><code>forceLoadSameMajor</code></td><td><code>true</code></td><td>Force-load same-family Fabric jars that Modrinth has no proper build for</td></tr>
               <tr><td><code>forceLoadAnyVersion</code></td><td><code>false</code></td><td>The big red switch: force-load Fabric/Quilt jars from <em>any</em> version when nothing better exists</td></tr>
+              <tr><td><code>attemptApiMigration</code></td><td><code>true</code></td><td>Rewrite an abandoned jar's old/renamed class refs to the current API using a map in <code>octoloader/migrations/</code></td></tr>
               <tr><td><code>extraEquivalents</code></td><td><code>{"{}"}</code></td><td>Your own port mappings, e.g. <code>{"{\"some-forge-mod\": \"its-fabric-port\"}"}</code></td></tr>
             </tbody>
           </table>

@@ -29,6 +29,7 @@ public final class OctoCli {
         boolean update = false;
         String exportName = null;
         boolean export = false;
+        Path migrateJar = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -37,6 +38,7 @@ public final class OctoCli {
                 case "--offline" -> offline = true;
                 case "--force" -> force = true;
                 case "--update", "-u" -> update = true;
+                case "--migrate", "-m" -> migrateJar = Path.of(args[++i]);
                 case "--export", "-e" -> {
                     export = true;
                     if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
@@ -73,6 +75,11 @@ public final class OctoCli {
                     line -> System.out.println("[octo] " + line));
             return;
         }
+        if (migrateJar != null) {
+            OctoCore.runMigrate(dir.toAbsolutePath().normalize(), gameVersion, migrateJar,
+                    line -> System.out.println("[octo] " + line));
+            return;
+        }
 
         OctoCore.Summary summary = OctoCore.run(
                 dir.toAbsolutePath().normalize(),
@@ -98,6 +105,7 @@ public final class OctoCli {
                   --force                    Ignore the resolution cache and re-resolve
                   --update, -u               Update every Fabric mod in mods/ to its newest build
                   --export, -e [name]        Pack mods/, plugins/ and the report into octoloader/export/<name>/
+                  --migrate, -m <jar>        Rewrite a jar's old class refs to the current API (uses octoloader/migrations/)
                 """);
     }
 }

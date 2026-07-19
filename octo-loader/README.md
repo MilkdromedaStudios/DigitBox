@@ -44,6 +44,10 @@ can do is make sure the right build gets into your game with zero effort:
      checked dynamically on every run.
    - Mods with no Fabric edition at all get their closest Fabric **equivalents**
      installed instead (OptiFine → Sodium + Iris), always labeled as replacements.
+   - Abandoned mods whose only breakage is *renamed or relocated classes* are
+     **API-migrated**: Octo Loader rewrites the old class references in the jar's
+     bytecode to the current API using a community migration map, so the actual jar
+     links against the new version. (See "API migration" below — and its honest limits.)
 5. **Dependencies** – required dependencies of everything fetched are resolved
    recursively and staged too.
 6. **Update** – `/octo update` checks every mod in `mods/` against Modrinth and swaps in
@@ -99,7 +103,35 @@ java -jar octo-loader-1.0.0.jar --dir /path/to/instance --game-version 26.2
 
 Options: `--offline` (classify only), `--force` (ignore cache), `--update` (update
 everything in `mods/` instead of resolving the inbox), `--export [name]` (pack the
-resolved mod set into a shareable folder).
+resolved mod set into a shareable folder), `--migrate <jar>` (rewrite one jar's old
+class references to the current API using `octoloader/migrations/`).
+
+## API migration — reviving abandoned mods
+
+When a mod's author is gone and the mod has no build for your Minecraft version, Octo
+Loader can **rewrite the old, broken class references in the jar's bytecode to the
+current API**, so the actual jar loads again. Drop a community migration map into
+`octoloader/migrations/`, named for the version pair it targets
+(`<from>-to-<yourVersion>.json`, e.g. `1.21.1-to-26.2.json`):
+
+```json
+{
+  "classRenames": {
+    "net/minecraft/old/pkg/SomeClass": "net/minecraft/new/pkg/SomeClass"
+  }
+}
+```
+
+Every map ending in `-to-<yourVersion>.json` is merged and applied automatically during
+resolution (and `--migrate <jar>` does one jar on demand). The report lists any Minecraft
+references left unmapped so nothing breaks silently.
+
+**Be clear about the ceiling — this is not magic.** Mechanical rewriting fixes *renamed
+and relocated classes* (a large share of what breaks on many version bumps). It **cannot**
+invent an API that was deleted, change method signatures or argument counts, or rewrite
+logic for a redesigned subsystem — those require a human port. So simple abandoned mods can
+be revived automatically; deeply-integrated mods (Create-scale) still need a real port, and
+Octo Loader tells you honestly which references it couldn't map.
 
 ### Config (`config/octoloader.json`)
 
@@ -113,6 +145,7 @@ resolved mod set into a shareable folder).
 | `installAlternatives` | `true` | Install equivalent Fabric mods when the original has no Fabric edition (OptiFine → Sodium + Iris) |
 | `forceLoadSameMajor` | `true` | Force-load same-family Fabric jars that Modrinth has no proper build for |
 | `forceLoadAnyVersion` | `false` | The big red switch: force-load Fabric/Quilt jars from **any** Minecraft version when nothing better exists (old jars may crash — the connector tries anyway) |
+| `attemptApiMigration` | `true` | Rewrite an abandoned jar's old/renamed class references to the current API using a community map in `octoloader/migrations/` |
 | `extraEquivalents` | `{}` | Your own cross-loader port mappings, e.g. `{"some-forge-mod": "its-fabric-port"}` |
 
 ## What can and cannot load — honest compatibility matrix
@@ -123,6 +156,8 @@ resolved mod set into a shareable folder).
 | Fabric/Quilt mod for another MC version | ✅ Matching build fetched from Modrinth — if the project ships one for your version |
 | Fabric mod, same version family (26.1 jar on 26.2), not on Modrinth | ⚠️ The actual jar is force-loaded with its constraint relaxed |
 | Quilt-only mod without QSL dependencies | ✅ The actual jar is converted (Fabric metadata synthesized) and loads natively |
+| Abandoned mod broken only by renamed/relocated classes (+ a migration map) | 🔧 Old class references rewritten to the current API — the actual jar loads |
+| Abandoned mod needing deleted APIs, changed signatures, or a redesigned subsystem | ❌ Reported honestly with the unmapped references — needs a human port |
 | Forge/NeoForge mod whose project also ships Fabric builds (Sodium, Lithium, JEI…) | ✅ Fabric build fetched automatically |
 | Forge/NeoForge mod with a known community Fabric port (Create → Create Fabric…) | ✅ Port fetched automatically — when the port supports your version |
 | Forge/NeoForge mod when a translation layer supports your version | ✅ The actual jar staged with Sinytra Connector — checked dynamically every run |

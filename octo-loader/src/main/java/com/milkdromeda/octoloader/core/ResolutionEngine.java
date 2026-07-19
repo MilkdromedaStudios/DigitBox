@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -45,6 +46,8 @@ public final class ResolutionEngine {
     private final Equivalents equivalents;
     private final Path modsDir;
     private final Path pluginsDir;
+    private final Path migrationsDir;
+    private final Path workDir;
     private final String gameVersion;
     private final Consumer<String> log;
     private final Set<String> presentModIds;
@@ -59,6 +62,8 @@ public final class ResolutionEngine {
         this.equivalents = new Equivalents(config.extraEquivalents);
         this.modsDir = gameDir.resolve("mods");
         this.pluginsDir = gameDir.resolve("plugins");
+        this.migrationsDir = gameDir.resolve("octoloader").resolve("migrations");
+        this.workDir = gameDir.resolve("octoloader").resolve(".work");
         this.gameVersion = gameVersion;
         this.presentModIds = presentModIds;
         this.log = log;
@@ -102,14 +107,24 @@ public final class ResolutionEngine {
         }
         // Built for another Minecraft version: fetch the matching build.
         bridgeViaModrinth(r);
+        if (r.status != Resolution.Status.INCOMPATIBLE) {
+            return;
+        }
 
-        // Last resort: a same-major-line jar (e.g. built for 26.1, running 26.2) that
-        // exists nowhere on Modrinth can usually run anyway — relax its constraint and
-        // load the actual jar.
+        // Best real fix for an abandoned mod: rewrite its old/renamed class references to
+        // the current API using a community migration map, then relax the constraint so
+        // the repaired jar loads.
+        if (config.attemptApiMigration && attemptMigration(r)) {
+            return;
+        }
+
+        // Fallback: a same-major-line jar (e.g. built for 26.1, running 26.2) — or, with
+        // the big switch on, any-version jar — can often run as-is; relax its constraint
+        // and load the actual jar.
         boolean sameFamily = constraintMentionsMajor(jar.declaredMcVersion(), gameVersion);
         boolean allowForce = (config.forceLoadSameMajor && sameFamily) || config.forceLoadAnyVersion;
-        if (r.status == Resolution.Status.INCOMPATIBLE && allowForce) {
-            Optional<java.nio.file.Path> forced = JarSurgeon.relaxMinecraftConstraint(jar.path(), modsDir);
+        if (allowForce) {
+            Optional<Path> forced = JarSurgeon.relaxMinecraftConstraint(jar.path(), modsDir);
             if (forced.isPresent()) {
                 r.stagedFile = forced.get();
                 if (jar.modId() != null) {
@@ -124,6 +139,40 @@ public final class ResolutionEngine {
                                 + forced.get().getFileName() + ". Remove it if anything misbehaves.");
             }
         }
+    }
+
+    /**
+     * Rewrites an abandoned Fabric jar's old/renamed class references to the current API
+     * using the community migration map for this game version, relaxes the version
+     * constraint, and stages the repaired jar. Returns true when a migration was applied.
+     */
+    private boolean attemptMigration(Resolution r) throws IOException {
+        Map<String, String> renames = ApiMigrator.mergedRenamesForTarget(migrationsDir, gameVersion);
+        if (renames.isEmpty()) {
+            return false;
+        }
+        // First relax the Minecraft version constraint (fabric.mod.json), then rewrite the
+        // bytecode class references — the final staged jar carries both fixes.
+        Path base = JarSurgeon.relaxMinecraftConstraint(r.jar.path(), workDir).orElse(r.jar.path());
+        ApiMigrator.Result mig = ApiMigrator.migrateJar(base, renames, modsDir);
+        if (!base.equals(r.jar.path())) {
+            Files.deleteIfExists(base); // remove the intermediate constraint-relaxed jar
+        }
+        r.stagedFile = mig.migratedJar();
+        if (r.jar.modId() != null) {
+            presentModIds.add(r.jar.modId());
+        }
+        String warn = mig.unmappedMinecraftRefs().isEmpty()
+                ? "All Minecraft class references were covered by the map."
+                : mig.unmappedMinecraftRefs().size() + " Minecraft class reference(s) had no mapping and "
+                        + "may still break (e.g. " + mig.unmappedMinecraftRefs().get(0)
+                        + ") — extend the migration map to cover them.";
+        r.set(Resolution.Status.API_MIGRATED,
+                "Built for MC " + orAny(r.jar.declaredMcVersion()) + " with no " + gameVersion
+                        + " build on Modrinth. Rewrote " + mig.referencesRemapped() + " old class reference(s) "
+                        + "across " + mig.classesTouched() + " class(es) to the current API and staged "
+                        + mig.migratedJar().getFileName() + ". " + warn);
+        return true;
     }
 
     /** Quilt-only jars: prefer a proper Fabric build; otherwise convert the jar itself. */
