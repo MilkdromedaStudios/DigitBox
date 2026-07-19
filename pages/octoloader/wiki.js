@@ -125,6 +125,7 @@ export default function OctoLoaderWikiPage() {
               <tr><td><code>maxDependencyDepth</code></td><td><code>3</code></td><td>How deep to chase required dependencies</td></tr>
               <tr><td><code>installAlternatives</code></td><td><code>true</code></td><td>Install equivalent Fabric mods when the original has no Fabric edition</td></tr>
               <tr><td><code>forceLoadSameMajor</code></td><td><code>true</code></td><td>Force-load same-family Fabric jars that Modrinth has no proper build for</td></tr>
+              <tr><td><code>forceLoadAnyVersion</code></td><td><code>false</code></td><td>The big red switch: force-load Fabric/Quilt jars from <em>any</em> version when nothing better exists</td></tr>
               <tr><td><code>extraEquivalents</code></td><td><code>{"{}"}</code></td><td>Your own port mappings, e.g. <code>{"{\"some-forge-mod\": \"its-fabric-port\"}"}</code></td></tr>
             </tbody>
           </table>

@@ -112,6 +112,7 @@ resolved mod set into a shareable folder).
 | `maxDependencyDepth` | `3` | How deep to chase required dependencies |
 | `installAlternatives` | `true` | Install equivalent Fabric mods when the original has no Fabric edition (OptiFine → Sodium + Iris) |
 | `forceLoadSameMajor` | `true` | Force-load same-family Fabric jars that Modrinth has no proper build for |
+| `forceLoadAnyVersion` | `false` | The big red switch: force-load Fabric/Quilt jars from **any** Minecraft version when nothing better exists (old jars may crash — the connector tries anyway) |
 | `extraEquivalents` | `{}` | Your own cross-loader port mappings, e.g. `{"some-forge-mod": "its-fabric-port"}` |
 
 ## What can and cannot load — honest compatibility matrix

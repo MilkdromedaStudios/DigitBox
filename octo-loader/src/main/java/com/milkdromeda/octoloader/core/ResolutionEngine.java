@@ -106,8 +106,9 @@ public final class ResolutionEngine {
         // Last resort: a same-major-line jar (e.g. built for 26.1, running 26.2) that
         // exists nowhere on Modrinth can usually run anyway — relax its constraint and
         // load the actual jar.
-        if (r.status == Resolution.Status.INCOMPATIBLE && config.forceLoadSameMajor
-                && constraintMentionsMajor(jar.declaredMcVersion(), gameVersion)) {
+        boolean sameFamily = constraintMentionsMajor(jar.declaredMcVersion(), gameVersion);
+        boolean allowForce = (config.forceLoadSameMajor && sameFamily) || config.forceLoadAnyVersion;
+        if (r.status == Resolution.Status.INCOMPATIBLE && allowForce) {
             Optional<java.nio.file.Path> forced = JarSurgeon.relaxMinecraftConstraint(jar.path(), modsDir);
             if (forced.isPresent()) {
                 r.stagedFile = forced.get();
@@ -115,10 +116,12 @@ public final class ResolutionEngine {
                     presentModIds.add(jar.modId());
                 }
                 r.set(Resolution.Status.FORCE_LOADED,
-                        "Built for MC " + jar.declaredMcVersion() + " with no " + gameVersion
-                                + " build on Modrinth. Same version family — constraint relaxed and the "
-                                + "actual jar force-loaded as " + forced.get().getFileName()
-                                + ". Remove it if anything misbehaves.");
+                        "Built for MC " + orAny(jar.declaredMcVersion()) + " with no " + gameVersion
+                                + " build on Modrinth. " + (sameFamily
+                                        ? "Same version family — "
+                                        : "forceLoadAnyVersion is on — ")
+                                + "constraint relaxed and the actual jar force-loaded as "
+                                + forced.get().getFileName() + ". Remove it if anything misbehaves.");
             }
         }
     }
@@ -135,7 +138,8 @@ public final class ResolutionEngine {
             return;
         }
         boolean versionOk = SimpleVersions.matches(jar.declaredMcVersion(), gameVersion)
-                || constraintMentionsMajor(jar.declaredMcVersion(), gameVersion);
+                || constraintMentionsMajor(jar.declaredMcVersion(), gameVersion)
+                || config.forceLoadAnyVersion;
         if (!versionOk) {
             return;
         }
