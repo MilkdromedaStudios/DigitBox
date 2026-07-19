@@ -1,0 +1,20 @@
+[
+    {
+        "title": "TuffClient",
+        "version": "1.12.2",
+        "description": "TuffClient Added",
+        "date": "Tuesday, September 30th, 2025",
+        "icon": "mc-icons/tuff.png",
+        "type": "game",
+        "notes": []
+    },
+    {
+        "title": "Eaglercraft Launcher Release",
+        "version": "v1.0.00",
+        "description": "Boom Realeased",
+        "date": "Tuesday, September 30th, 2025",
+        "icon": "logo.png",
+        "type": "site",
+        "notes": []
+    }
+]

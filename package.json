@@ -1,0 +1,32 @@
+{
+  "name": "digitbox",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "bash scripts/vercel-build.sh",
+    "start": "next start",
+    "lint": "npm run typecheck",
+    "typecheck": "tsc --noEmit",
+    "vercel-build": "bash scripts/vercel-build.sh"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.1",
+    "autoprefixer": "^10.4.21",
+    "next": "13.4.0",
+    "postcss": "^8.4.49",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwindcss": "3.4.19"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.7",
+    "typescript": "5.9.3", 
+    "@cloudflare/workers-types": "5.20260710.1"
+  }
+  
+}

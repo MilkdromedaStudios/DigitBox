@@ -1,0 +1,94 @@
+name: Sync games to release
+
+# Copies the real game HTML files (stored in Git LFS under public/projects)
+# onto the "game-assets" GitHub release, where the site fetches them at
+# runtime with no LFS bandwidth cost. Runs entirely on GitHub — no local
+# machine needed. Only files whose size differs from the release asset are
+# pulled from LFS, so re-runs cost almost no LFS bandwidth.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/projects/**"
+      - ".github/workflows/sync-games-to-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-games-to-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: game-assets
+    steps:
+      # No lfs:true here — the tiny pointer files are enough to decide which
+      # games actually need uploading before spending LFS bandwidth.
+      - uses: actions/checkout@v4
+
+      - name: Ensure the release exists
+        run: |
+          gh release view "$TAG" --json id >/dev/null 2>&1 || \
+            gh release create "$TAG" --prerelease --title "Game assets" \
+              --notes "Game HTML files served to the site at runtime. Managed by the sync-games-to-release workflow — do not delete."
+
+      - name: Upload changed games
+        run: |
+          # GitHub sanitizes uploaded asset names ("Appel 3D.html" is stored
+          # as "Appel.3D.html"); mirror that to compare against existing
+          # assets. Must match normalizeAssetName in lib/githubAssets.js.
+          normalize() {
+            printf '%s' "$1" | sed -E 's/[^0-9A-Za-z_.-]/./g; s/\.\.+/./g' | tr '[:upper:]' '[:lower:]'
+          }
+
+          gh release view "$TAG" --json assets \
+            --jq '.assets[] | "\(.name)\t\(.size)"' > /tmp/release-assets.tsv || true
+
+          failures=0
+          uploaded=0
+          shopt -s nullglob
+          for file in public/projects/*.html; do
+            name=$(basename "$file")
+            if grep -q '^version https://git-lfs' "$file"; then
+              want_size=$(awk '/^size /{print $2}' "$file")
+            else
+              want_size=$(stat -c%s "$file")
+            fi
+
+            norm=$(normalize "$name")
+            have_size=""
+            while IFS=$'\t' read -r asset_name asset_size; do
+              if [ "$(normalize "$asset_name")" = "$norm" ]; then
+                have_size=$asset_size
+              fi
+            done < /tmp/release-assets.tsv
+
+            if [ "$have_size" = "$want_size" ]; then
+              echo "SKIP $name (release asset is up to date)"
+              continue
+            fi
+
+            echo "SYNC $name (release has: ${have_size:-nothing}, want: $want_size bytes)"
+            # --exclude="" overrides the repo .lfsconfig, which blocks LFS
+            # downloads everywhere else (build platforms must see pointers).
+            if ! git lfs pull --include="$file" --exclude=""; then
+              echo "::error::git lfs pull failed for $name — the monthly LFS bandwidth quota may be used up. Re-run this workflow after the quota resets."
+              failures=$((failures + 1))
+              continue
+            fi
+            if ! gh release upload "$TAG" "$file" --clobber; then
+              echo "::error::upload failed for $name"
+              failures=$((failures + 1))
+              continue
+            fi
+            uploaded=$((uploaded + 1))
+          done
+
+          echo "Done: $uploaded uploaded, $failures failed."
+          exit "$failures"

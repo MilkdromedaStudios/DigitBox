@@ -1,0 +1,18 @@
+[
+   
+    {
+       "title": "Jappabp 1.12 (Update Textures)",
+       "version": "1.12",
+       "icon": "./assets/images/icons/jappabp.png",
+       "link": "./packs/jappabp1.12.zip",
+       "active": true
+    }, 
+    {
+       "title": "Jappabp 1.8 (Update Textures)",
+       "version": "1.8",
+       "icon": "./assets/images/icons/jappabp.png",
+       "link": "./packs/jappabp1.8.zip",
+       "active": true
+    }
+   
+ ]
