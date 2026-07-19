@@ -1,3 +1,5 @@
+import projectsIndex from "../../data/projects-index.json";
+
 export const config = { runtime: "experimental-edge" };
 
 export default function ProjectRunner({ src, title }) {
@@ -10,6 +12,13 @@ export default function ProjectRunner({ src, title }) {
       style={{ width: "100%", height: "100vh", border: "none", display: "block", background: "#000" }}
     />
   );
+}
+
+function projectMetadataForSlug(slug) {
+  return projectsIndex.find((project) => {
+    if (typeof project === "string") return project === slug;
+    return project.slug === slug || project.title === slug;
+  });
 }
 
 export async function getServerSideProps({ params }) {
