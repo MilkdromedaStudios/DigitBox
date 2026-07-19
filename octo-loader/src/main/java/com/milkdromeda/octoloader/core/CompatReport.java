@@ -99,7 +99,10 @@ public final class CompatReport {
 
     private static String statusEmoji(Resolution.Status status) {
         return switch (status) {
-            case NATIVE_OK, BRIDGED_VERSION, BRIDGED_LOADER, BRIDGED_EQUIVALENT, PLUGIN_BRIDGED -> "✅";
+            case NATIVE_OK, BRIDGED_VERSION, BRIDGED_LOADER, BRIDGED_EQUIVALENT,
+                 LOADER_CONVERTED, LOADER_TRANSLATED, PLUGIN_BRIDGED -> "✅";
+            case ALTERNATIVE_INSTALLED -> "♻️";
+            case FORCE_LOADED -> "⚠️";
             case ALREADY_PRESENT -> "☑️";
             case SKIPPED_OFFLINE -> "💤";
             case INCOMPATIBLE -> "❌";

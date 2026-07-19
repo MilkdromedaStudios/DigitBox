@@ -20,12 +20,7 @@ export default function OctoLoaderNav() {
           {tab.label}
         </Link>
       ))}
-      <a
-        className="octo-tab"
-        href="https://github.com/MilkdromedaStudios/DigitBox/actions/workflows/octo-loader.yml"
-        target="_blank"
-        rel="noreferrer"
-      >
+      <a className="octo-tab" href="/downloads/octo-loader.jar" download>
         Download ⬇
       </a>
       <a

@@ -54,3 +54,13 @@ jar {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
 }
+
+// The finished mod jar also lands in a plain mods/ folder, ready to drop into a game.
+tasks.register('copyToModsFolder', Copy) {
+    from tasks.named('jar')
+    into layout.projectDirectory.dir('mods')
+}
+
+tasks.named('build') {
+    finalizedBy 'copyToModsFolder'
+}

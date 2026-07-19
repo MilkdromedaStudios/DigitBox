@@ -16,6 +16,14 @@ public final class Resolution {
         BRIDGED_LOADER("bridged-loader", "Loader-bridged via Modrinth"),
         /** Different project entirely — a known Fabric port was fetched instead. */
         BRIDGED_EQUIVALENT("bridged-equivalent", "Swapped for its Fabric port"),
+        /** Quilt jar rewritten with synthesized Fabric metadata — the actual jar loads. */
+        LOADER_CONVERTED("loader-converted", "Converted — the jar itself loads on Fabric"),
+        /** Foreign jar staged as-is together with a translation-layer mod that executes it. */
+        LOADER_TRANSLATED("loader-translated", "Loads through a translation layer"),
+        /** No build of the original exists — closest Fabric equivalents installed instead. */
+        ALTERNATIVE_INSTALLED("alternative-installed", "Replaced with Fabric equivalents"),
+        /** Fabric jar for a neighbouring version, force-loaded with its constraint relaxed. */
+        FORCE_LOADED("force-loaded", "Force-loaded (version constraint relaxed)"),
         /** Paper plugin staged into plugins/ together with a Bukkit-on-Fabric bridge mod. */
         PLUGIN_BRIDGED("plugin-bridged", "Plugin staged with Bukkit bridge"),
         /** Already installed/staged — nothing to do. */

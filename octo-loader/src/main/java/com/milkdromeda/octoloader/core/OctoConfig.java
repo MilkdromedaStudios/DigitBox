@@ -19,6 +19,10 @@ public final class OctoConfig {
     public String targetGameVersion = null;
     /** How deep to chase required dependencies of fetched mods. */
     public int maxDependencyDepth = 3;
+    /** Install functionally-equivalent Fabric mods for mods that have no Fabric edition (e.g. OptiFine -> Sodium+Iris). */
+    public boolean installAlternatives = true;
+    /** Force-load Fabric jars built for a neighbouring version in the same major (e.g. a 26.1 jar on 26.2) when Modrinth has no proper build. */
+    public boolean forceLoadSameMajor = true;
     /** Extra cross-loader equivalences: Modrinth slug of what you have -> slug of the Fabric port. */
     public Map<String, String> extraEquivalents = new LinkedHashMap<>();
 
@@ -33,6 +37,8 @@ public final class OctoConfig {
                 cfg.includeBetaBuilds = Json.bool(root, "includeBetaBuilds", cfg.includeBetaBuilds);
                 cfg.targetGameVersion = Json.str(root, "targetGameVersion", null);
                 cfg.maxDependencyDepth = (int) Json.integer(root, "maxDependencyDepth", cfg.maxDependencyDepth);
+                cfg.installAlternatives = Json.bool(root, "installAlternatives", cfg.installAlternatives);
+                cfg.forceLoadSameMajor = Json.bool(root, "forceLoadSameMajor", cfg.forceLoadSameMajor);
                 for (Map.Entry<String, Object> e : Json.obj(root, "extraEquivalents").entrySet()) {
                     if (e.getValue() instanceof String s) {
                         cfg.extraEquivalents.put(e.getKey(), s);
@@ -55,6 +61,8 @@ public final class OctoConfig {
         root.put("includeBetaBuilds", includeBetaBuilds);
         root.put("targetGameVersion", targetGameVersion);
         root.put("maxDependencyDepth", maxDependencyDepth);
+        root.put("installAlternatives", installAlternatives);
+        root.put("forceLoadSameMajor", forceLoadSameMajor);
         root.put("extraEquivalents", extraEquivalents);
         Files.writeString(configDir.resolve("octoloader.json"), Json.write(root) + "\n", StandardCharsets.UTF_8);
     }

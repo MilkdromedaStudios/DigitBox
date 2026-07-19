@@ -49,6 +49,30 @@ fetch_modrinth lithium '["fabric"]' '["1.21.1"]' "$SRV/octoloader"
 fetch_modrinth worldedit '["bukkit"]' '' "$SRV/octoloader"
 cp "$OCTO_JAR" "$SRV/mods/"
 
+echo "==> Writing synthetic test jars (Quilt-only mod, OptiFine, near-version Fabric mod)"
+python3 - "$SRV" "$GAME_VERSION" <<'EOF'
+import json, sys, zipfile
+srv, gv = sys.argv[1], sys.argv[2]
+major = gv.split('.')[0]
+# Quilt-only mod -> the converter must make the actual jar load on Fabric.
+q = {"schema_version": 1, "quilt_loader": {
+    "group": "test", "id": "quiltdemo", "version": "1.2.3",
+    "metadata": {"name": "Quilt Demo"},
+    "depends": [{"id": "quilt_loader", "versions": "*"},
+                {"id": "minecraft", "versions": f">={major}.1"}]}}
+with zipfile.ZipFile(srv + "/octoloader/quiltdemo-1.2.3.jar", "w") as z:
+    z.writestr("quilt.mod.json", json.dumps(q))
+# OptiFine lookalike -> the alternatives tier must install Sodium + Iris.
+with zipfile.ZipFile(srv + "/octoloader/OptiFine_TEST.jar", "w") as z:
+    z.writestr("optifine/Installer.class", b"\x00")
+# Fabric mod pinned to a neighbouring same-major version -> force-load path.
+f = {"schemaVersion": 1, "id": "fabricdemo", "version": "2.0.0", "name": "Fabric Demo",
+     "environment": "*", "depends": {"fabricloader": "*", "minecraft": f"{major}.1"}}
+with zipfile.ZipFile(srv + "/octoloader/fabricdemo-2.0.0.jar", "w") as z:
+    z.writestr("fabric.mod.json", json.dumps(f))
+print("    synthetic jars written")
+EOF
+
 assert_outcomes() {
     python3 - "$SRV" <<'EOF'
 import json, pathlib, sys
@@ -56,7 +80,7 @@ srv = pathlib.Path(sys.argv[1])
 report = json.loads((srv / 'octoloader' / 'octo-report.json').read_text())
 by_prefix = {}
 for item in report['results']:
-    for prefix in ('create-', 'lithium-', 'worldedit-'):
+    for prefix in ('create-', 'lithium-', 'worldedit-', 'quiltdemo', 'OptiFine', 'fabricdemo'):
         if item['file'].startswith(prefix):
             by_prefix[prefix] = item
 
@@ -72,10 +96,26 @@ create = by_prefix['create-']
 assert create['status'] == 'incompatible', create
 assert 'create-fabric' in create['detail'] or 'Fabric' in create['detail'], create
 
+quilt = by_prefix['quiltdemo']
+assert quilt['status'] == 'loader-converted', quilt
+assert quilt['staged'] and (srv / 'mods' / quilt['staged']).exists(), quilt
+
+optifine = by_prefix['OptiFine']
+assert optifine['status'] == 'alternative-installed', optifine
+assert list((srv / 'mods').glob('sodium*')), 'sodium not staged'
+assert list((srv / 'mods').glob('iris*')), 'iris not staged'
+
+fabricdemo = by_prefix['fabricdemo']
+assert fabricdemo['status'] == 'force-loaded', fabricdemo
+assert fabricdemo['staged'] and (srv / 'mods' / fabricdemo['staged']).exists(), fabricdemo
+
 print('    resolution outcomes OK:')
-print('      lithium   ->', lithium['status'], '->', lithium['staged'])
-print('      worldedit ->', worldedit['status'], '->', worldedit['staged'])
-print('      create    ->', create['status'], '(honest verdict, no fake staging)')
+print('      lithium    ->', lithium['status'], '->', lithium['staged'])
+print('      worldedit  ->', worldedit['status'], '->', worldedit['staged'])
+print('      create     ->', create['status'], '(honest verdict, no fake staging)')
+print('      quiltdemo  ->', quilt['status'], '->', quilt['staged'])
+print('      optifine   ->', optifine['status'], '(sodium + iris installed)')
+print('      fabricdemo ->', fabricdemo['status'], '->', fabricdemo['staged'])
 EOF
 }
 
@@ -115,6 +155,12 @@ reset_instance
 run_resolution 1
 assert_outcomes
 
+echo "==> Phase 3: built-in updater (old Lithium jar in mods/ must get upgraded)"
+cp "$SRV"/octoloader/lithium-fabric-*.jar "$SRV/mods/"
+java -jar "$OCTO_JAR" --dir "$SRV" --game-version "$GAME_VERSION" --update | tee /tmp/octo-update.log
+grep -q '1 mod(s) updated' /tmp/octo-update.log || { echo 'updater did not update'; exit 1; }
+ls "$SRV"/octoloader/backup/lithium-fabric-*.jar >/dev/null || { echo 'no backup written'; exit 1; }
+
 echo "==> Booting a real Fabric $GAME_VERSION dedicated server with the staged mods"
 cd "$SRV"
 curl -sSL -o fabric-server.jar \
@@ -133,11 +179,13 @@ wait "$SERVER_PID" 2>/dev/null || true
 
 grep -q 'Done (' server.log || { echo 'Server never reached Done'; tail -50 server.log; exit 1; }
 
-echo "==> Asserting the bridged mods actually loaded in-game"
+echo "==> Asserting the bridged, converted, and force-loaded mods actually loaded in-game"
 grep -Eiq 'octoloader.*ready|Octo Loader .* ready' server.log || { grep -i octo server.log; exit 1; }
 grep -Eiq 'lithium' server.log || { echo 'lithium missing from mod list'; exit 1; }
 grep -Eiq 'worldedit' server.log || { echo 'worldedit missing from mod list'; exit 1; }
-echo '    server booted with Octo Loader + bridged Lithium + bridged WorldEdit:'
+grep -Eiq 'quiltdemo' server.log || { echo 'converted quilt mod missing from mod list'; exit 1; }
+grep -Eiq 'fabricdemo' server.log || { echo 'force-loaded fabric mod missing from mod list'; exit 1; }
+echo '    server booted with bridged Lithium + WorldEdit, converted Quilt jar, force-loaded Fabric jar:'
 grep -Ei 'Loading [0-9]+ mods' server.log || true
 grep -Ei 'octo' server.log | head -5
 

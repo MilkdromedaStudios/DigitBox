@@ -21,16 +21,19 @@ export default function OctoLoaderGuidePage() {
         <h2>2. Install</h2>
         <ol className="octo-list">
           <li>
-            Grab <code>octo-loader-&lt;version&gt;.jar</code> from the{" "}
+            <a href="/downloads/octo-loader.jar" download>
+              <strong>Download octo-loader.jar directly from this site</strong>
+            </a>{" "}
+            — no GitHub account needed. (Alternatives: the{" "}
             <a
               href="https://github.com/MilkdromedaStudios/DigitBox/actions/workflows/octo-loader.yml"
               target="_blank"
               rel="noreferrer"
             >
               GitHub Actions build artifacts
-            </a>{" "}
-            (open the latest green run → “Artifacts” → <code>octo-loader</code>), or build it
-            yourself with <code>./gradlew build</code> in <code>octo-loader/</code>.
+            </a>
+            , or build it yourself with <code>./gradlew build</code> in{" "}
+            <code>octo-loader/</code> — the finished jar lands in <code>octo-loader/mods/</code>.)
           </li>
           <li>Put it in your <code>mods/</code> folder next to Fabric API.</li>
           <li>
@@ -72,6 +75,7 @@ export default function OctoLoaderGuidePage() {
               <tr><td><code>/octo resolve force</code></td><td>Same, but ignore the resolution cache</td></tr>
               <tr><td><code>/octo scan</code></td><td>Classify the inbox without touching the network</td></tr>
               <tr><td><code>/octo fetch &lt;slug&gt;</code></td><td>Fetch any Modrinth project for your MC version, e.g. <code>/octo fetch sodium</code></td></tr>
+              <tr><td><code>/octo update</code></td><td>Update every mod in <code>mods/</code> to its newest build (old jars are backed up)</td></tr>
               <tr><td><code>/octo status</code></td><td>Show version and where the latest report is</td></tr>
             </tbody>
           </table>

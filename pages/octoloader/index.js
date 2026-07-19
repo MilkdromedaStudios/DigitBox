@@ -23,6 +23,16 @@ const FEATURES = [
     text: "Plugins prefer their project's native Fabric build; otherwise they're staged into plugins/ together with the Cardboard Bukkit-on-Fabric bridge when it supports your version.",
   },
   {
+    icon: "🧬",
+    title: "Actually loads foreign jars",
+    text: "Quilt-only mods get a Fabric-loadable jar synthesized from their own metadata; same-family Fabric jars (a 26.1 build on 26.2) are force-loaded with their constraint relaxed; and Forge/NeoForge jars run through a translation layer the moment one supports your version — the real jar, in your game.",
+  },
+  {
+    icon: "⬆️",
+    title: "Built-in mod updater",
+    text: "/octo update checks every mod in mods/ against Modrinth and swaps in the newest build for your game version — with the old jar backed up so it's always reversible.",
+  },
+  {
     icon: "🧩",
     title: "Automatic dependencies",
     text: "Everything fetched gets its required dependencies resolved recursively and staged too. No more 'missing dependency' boot screens.",
@@ -60,11 +70,10 @@ export default function OctoLoaderPage() {
           <a
             className="auth-btn action-btn"
             style={{ marginLeft: "10px" }}
-            href="https://github.com/MilkdromedaStudios/DigitBox/actions/workflows/octo-loader.yml"
-            target="_blank"
-            rel="noreferrer"
+            href="/downloads/octo-loader.jar"
+            download
           >
-            Download (CI builds)
+            ⬇ Download the mod
           </a>
         </p>
       </div>

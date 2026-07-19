@@ -46,6 +46,8 @@ public final class OctoCommands {
                                         .executes(ctx -> runResolver(ctx, false, true))))
                         .then(Commands.literal("status")
                                 .executes(OctoCommands::status))
+                        .then(Commands.literal("update")
+                                .executes(OctoCommands::update))
                         .then(Commands.literal("fetch")
                                 .then(Commands.argument("slug", StringArgumentType.word())
                                         .executes(OctoCommands::fetch)))));
@@ -86,6 +88,23 @@ public final class OctoCommands {
             reply(source, "Octo Loader " + OctoCore.OCTO_VERSION + " on Minecraft " + gameVersion
                     + ". No report yet — drop jars into octoloader/ and run /octo resolve.");
         }
+        return 1;
+    }
+
+    private static int update(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        reply(source, "Octo Loader: checking every mod in mods/ for newer " + gameVersion + " builds…");
+        Thread worker = new Thread(() -> {
+            try {
+                OctoCore.runUpdate(gameDir, gameVersion, config, OctoLoaderMod.LOGGER::info);
+            } catch (Exception e) {
+                OctoLoaderMod.LOGGER.error("Octo Loader update failed", e);
+            }
+        }, "octoloader-update");
+        worker.setDaemon(true);
+        worker.start();
+        reply(source, "Octo Loader: updater running in the background — results go to the log. "
+                + "Replaced jars are backed up to octoloader/backup/.");
         return 1;
     }
 

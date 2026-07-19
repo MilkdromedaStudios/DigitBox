@@ -24,7 +24,7 @@ import java.util.zip.ZipFile;
  */
 public final class OctoCore {
 
-    public static final String OCTO_VERSION = "1.0.0";
+    public static final String OCTO_VERSION = "1.1.0";
 
     public record Summary(List<Resolution> results, Path reportMd, Path reportJson, int stagedCount) {
     }
@@ -130,6 +130,58 @@ public final class OctoCore {
             log.accept("Report: " + reportMd);
         }
         return new Summary(results, reportMd, reportJson, staged);
+    }
+
+    /**
+     * Built-in mod updater: checks every Fabric mod in {@code mods/} against Modrinth
+     * and swaps in the newest build for the running game version. Replaced jars are
+     * moved to {@code octoloader/backup/} so an update is always reversible.
+     */
+    public static int runUpdate(Path gameDir, String gameVersion, OctoConfig config,
+                                Consumer<String> log) throws IOException {
+        Path modsDir = gameDir.resolve("mods");
+        Path backupDir = gameDir.resolve("octoloader").resolve("backup");
+        ModrinthClient modrinth = new ModrinthClient(OCTO_VERSION);
+        int updated = 0;
+
+        List<ModJarInfo> jars = classifyDir(modsDir, log);
+        log.accept("Octo Loader updater: checking " + jars.size() + " jar(s) in mods/ for " + gameVersion);
+        for (ModJarInfo jar : jars) {
+            if (jar.loader() != LoaderType.FABRIC || "octoloader".equals(jar.modId())) {
+                continue;
+            }
+            try {
+                var identity = modrinth.versionByHash(jar.sha1());
+                if (identity.isEmpty()) {
+                    continue;
+                }
+                var latest = ModrinthClient.pickBest(
+                        modrinth.projectVersions(identity.get().projectId(), "fabric", gameVersion),
+                        config.includeBetaBuilds);
+                if (latest.isEmpty() || latest.get().id().equals(identity.get().id())) {
+                    continue;
+                }
+                String newFilename = latest.get().primaryFile()
+                        .map(ModrinthClient.ModFile::filename).orElse(null);
+                if (newFilename == null || newFilename.equals(jar.path().getFileName().toString())) {
+                    continue;
+                }
+                Path staged = modrinth.download(latest.get(), modsDir);
+                Files.createDirectories(backupDir);
+                Files.move(jar.path(), backupDir.resolve(jar.path().getFileName().toString()),
+                        StandardCopyOption.REPLACE_EXISTING);
+                updated++;
+                log.accept("  ↑ " + jar.displayName() + ": " + identity.get().versionNumber()
+                        + " → " + latest.get().versionNumber() + " (" + staged.getFileName()
+                        + "; old jar moved to octoloader/backup/)");
+            } catch (IOException e) {
+                log.accept("  ! could not check " + jar.path().getFileName() + ": " + e.getMessage());
+            }
+        }
+        log.accept(updated == 0
+                ? "Octo Loader updater: everything is already current."
+                : "Octo Loader updater: " + updated + " mod(s) updated — restart to load them.");
+        return updated;
     }
 
     // ---- helpers -----------------------------------------------------------
