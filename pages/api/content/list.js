@@ -125,16 +125,25 @@ async function listDirectory(path, type) {
   return projects.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
 }
 
+function listProjectFromIndex(project) {
+  const metadata = typeof project === "string" ? { title: project } : project;
+  const slug = metadata.slug || metadata.title;
+  const path = metadata.path || `public/projects/${slug}.html`;
+
+  return {
+    name: path.split("/").pop(),
+    title: metadata.title || slug,
+    slug,
+    path,
+    download_url: metadata.url || `/api/content/file?path=${encodeURIComponent(path)}`,
+    excerpt: metadata.excerpt || "",
+    updated_at: metadata.updated_at || null,
+  };
+}
+
 function listDirectoryFromIndex(dirPath, type) {
   if (type === "project") {
-    return projectsIndex.map((name) => ({
-      name: `${name}.html`,
-      title: name,
-      slug: name,
-      path: `public/projects/${name}.html`,
-      download_url: `/api/content/file?path=${encodeURIComponent(`public/projects/${name}.html`)}`,
-      updated_at: null,
-    }));
+    return projectsIndex.map(listProjectFromIndex);
   }
 
   return postsIndex.map((post) => ({
