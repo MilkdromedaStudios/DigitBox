@@ -20,7 +20,7 @@ can do is make sure the right build gets into your game with zero effort:
 
 1. **Scan** – every jar in the `octoloader/` inbox is fingerprinted (SHA-1) and its
    embedded metadata read (`fabric.mod.json`, `quilt.mod.json`, `mods.toml`,
-   `neoforge.mods.toml`, `plugin.yml`).
+   `neoforge.mods.toml`, `plugin.yml`). OptiFine is recognized specially.
 2. **Identify** – the fingerprint is looked up on Modrinth, which knows which project and
    version the file belongs to, no matter which loader or MC version it was built for.
    Files Modrinth doesn't know (e.g. CurseForge downloads) are matched by mod id/name.
@@ -34,9 +34,21 @@ can do is make sure the right build gets into your game with zero effort:
    - Paper plugin → the project's native Fabric build if it has one (WorldEdit, Chunky…);
      otherwise the plugin is staged into `plugins/` together with the Cardboard
      Bukkit-on-Fabric bridge when it supports your game version.
-4. **Dependencies** – required dependencies of everything fetched are resolved
+4. **Connect** – when no proper build exists, the *actual jar* is loaded where possible:
+   - Quilt-only mods (no QSL dependency) get a `fabric.mod.json` synthesized from their
+     own metadata — the converted jar loads natively on Fabric Loader.
+   - Same-family Fabric jars (a 26.1 build on 26.2) are **force-loaded** with their
+     version constraint relaxed, as a last resort.
+   - Forge/NeoForge jars are staged as-is together with a **translation layer**
+     (Sinytra Connector) the moment one publishes a build for your game version —
+     checked dynamically on every run.
+   - Mods with no Fabric edition at all get their closest Fabric **equivalents**
+     installed instead (OptiFine → Sodium + Iris), always labeled as replacements.
+5. **Dependencies** – required dependencies of everything fetched are resolved
    recursively and staged too.
-5. **Report** – `octoloader/octo-report.md` explains what happened to every single file,
+6. **Update** – `/octo update` checks every mod in `mods/` against Modrinth and swaps in
+   the newest build for your game version, backing the old jar up to `octoloader/backup/`.
+7. **Report** – `octoloader/octo-report.md` explains what happened to every single file,
    including *why* something can't run and what the closest alternatives are.
 
 Like every loader, Fabric fixes the mod set at launch, so staged files load on the next
@@ -73,6 +85,8 @@ Works on clients and dedicated servers.
 | `/octo resolve force` | Same, ignoring the resolution cache |
 | `/octo scan` | Classify the inbox without touching the network |
 | `/octo fetch <slug>` | Fetch any Modrinth project by slug for your MC version (e.g. `/octo fetch sodium`) |
+| `/octo update` | Update every mod in `mods/` to its newest build for your MC version (old jars → `octoloader/backup/`) |
+| `/octo export [name]` | Pack the whole resolved mod set (`mods/`, `plugins/`, report) into `octoloader/export/<name>/` — drop it into any instance |
 | `/octo status` | Show version + where the latest report is |
 
 ### CLI mode (no game needed)
@@ -83,7 +97,9 @@ The same engine runs from a shell — handy for provisioning servers:
 java -jar octo-loader-1.0.0.jar --dir /path/to/instance --game-version 26.2
 ```
 
-Options: `--offline` (classify only), `--force` (ignore cache).
+Options: `--offline` (classify only), `--force` (ignore cache), `--update` (update
+everything in `mods/` instead of resolving the inbox), `--export [name]` (pack the
+resolved mod set into a shareable folder).
 
 ### Config (`config/octoloader.json`)
 
@@ -94,6 +110,9 @@ Options: `--offline` (classify only), `--force` (ignore cache).
 | `includeBetaBuilds` | `true` | Accept alpha/beta builds when no release matches |
 | `targetGameVersion` | `null` | Override the detected game version |
 | `maxDependencyDepth` | `3` | How deep to chase required dependencies |
+| `installAlternatives` | `true` | Install equivalent Fabric mods when the original has no Fabric edition (OptiFine → Sodium + Iris) |
+| `forceLoadSameMajor` | `true` | Force-load same-family Fabric jars that Modrinth has no proper build for |
+| `forceLoadAnyVersion` | `false` | The big red switch: force-load Fabric/Quilt jars from **any** Minecraft version when nothing better exists (old jars may crash — the connector tries anyway) |
 | `extraEquivalents` | `{}` | Your own cross-loader port mappings, e.g. `{"some-forge-mod": "its-fabric-port"}` |
 
 ## What can and cannot load — honest compatibility matrix
@@ -102,8 +121,12 @@ Options: `--offline` (classify only), `--force` (ignore cache).
 |--------------|--------------|
 | Fabric mod for your MC version | ✅ Loads as-is |
 | Fabric/Quilt mod for another MC version | ✅ Matching build fetched from Modrinth — if the project ships one for your version |
+| Fabric mod, same version family (26.1 jar on 26.2), not on Modrinth | ⚠️ The actual jar is force-loaded with its constraint relaxed |
+| Quilt-only mod without QSL dependencies | ✅ The actual jar is converted (Fabric metadata synthesized) and loads natively |
 | Forge/NeoForge mod whose project also ships Fabric builds (Sodium, Lithium, JEI…) | ✅ Fabric build fetched automatically |
 | Forge/NeoForge mod with a known community Fabric port (Create → Create Fabric…) | ✅ Port fetched automatically — when the port supports your version |
+| Forge/NeoForge mod when a translation layer supports your version | ✅ The actual jar staged with Sinytra Connector — checked dynamically every run |
+| Mod with no Fabric edition but known equivalents (OptiFine) | ♻️ Closest Fabric equivalents installed (Sodium + Iris), labeled as replacements |
 | Paper plugin whose project ships Fabric builds (WorldEdit, Chunky…) | ✅ Fabric build fetched automatically |
 | Paper plugin without a Fabric build | ⚙️ Staged with the Cardboard Bukkit-bridge **if** Cardboard supports your MC version; otherwise reported |
 | Mod that exists on no loader for your MC version (e.g. Create on 26.2 today) | ❌ Reported honestly, with the exact reason and the closest alternatives |
@@ -120,8 +143,12 @@ Requires Java 25 (Minecraft 26.x requirement).
 ```bash
 cd octo-loader
 ./gradlew build
-# → build/libs/octo-loader-<version>.jar
+# → the finished jar lands in octo-loader/mods/octo-loader-<version>.jar
 ```
+
+Prefer not to build? **Direct download from the DigitBox site: `/downloads/octo-loader.jar`**
+(no GitHub account needed), or grab the `octo-loader` artifact from the latest green
+GitHub Actions run.
 
 CI builds every push via GitHub Actions (`.github/workflows/octo-loader.yml`) and runs an
 end-to-end smoke test that downloads **real** mods from Modrinth — Create (NeoForge),

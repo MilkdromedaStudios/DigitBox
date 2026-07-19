@@ -26,6 +26,9 @@ public final class OctoCli {
         String gameVersion = null;
         boolean offline = false;
         boolean force = false;
+        boolean update = false;
+        String exportName = null;
+        boolean export = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -33,6 +36,13 @@ public final class OctoCli {
                 case "--game-version", "-g" -> gameVersion = args[++i];
                 case "--offline" -> offline = true;
                 case "--force" -> force = true;
+                case "--update", "-u" -> update = true;
+                case "--export", "-e" -> {
+                    export = true;
+                    if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+                        exportName = args[++i];
+                    }
+                }
                 case "--help", "-h" -> {
                     usage();
                     return;
@@ -52,6 +62,17 @@ public final class OctoCli {
 
         OctoConfig config = OctoConfig.load(dir.resolve("config"));
         config.offline = config.offline || offline;
+
+        if (update) {
+            OctoCore.runUpdate(dir.toAbsolutePath().normalize(), gameVersion, config,
+                    line -> System.out.println("[octo] " + line));
+            return;
+        }
+        if (export) {
+            OctoCore.runExport(dir.toAbsolutePath().normalize(), gameVersion, exportName,
+                    line -> System.out.println("[octo] " + line));
+            return;
+        }
 
         OctoCore.Summary summary = OctoCore.run(
                 dir.toAbsolutePath().normalize(),
@@ -75,6 +96,8 @@ public final class OctoCli {
                   --game-version, -g <ver>   Target Minecraft version, e.g. 26.2 (required)
                   --offline                  Classify only, never touch the network
                   --force                    Ignore the resolution cache and re-resolve
+                  --update, -u               Update every Fabric mod in mods/ to its newest build
+                  --export, -e [name]        Pack mods/, plugins/ and the report into octoloader/export/<name>/
                 """);
     }
 }

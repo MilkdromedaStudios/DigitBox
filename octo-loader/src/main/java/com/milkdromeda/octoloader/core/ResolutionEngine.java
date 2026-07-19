@@ -31,6 +31,15 @@ public final class ResolutionEngine {
     /** Modrinth slug of the Bukkit-API-on-Fabric bridge used for Paper plugins. */
     private static final String BUKKIT_BRIDGE_SLUG = "cardboard";
 
+    /**
+     * Translation layers that execute Forge/NeoForge jars directly on Fabric
+     * (Sinytra Connector + the Forgified Fabric API it requires). Checked dynamically
+     * against the running game version: the moment a layer publishes a build for this
+     * version, foreign jars start loading through it automatically.
+     */
+    private static final String TRANSLATION_LAYER_SLUG = "connector";
+    private static final String TRANSLATION_LAYER_COMPANION_SLUG = "forgified-fabric-api";
+
     private final ModrinthClient modrinth;
     private final OctoConfig config;
     private final Equivalents equivalents;
@@ -41,6 +50,7 @@ public final class ResolutionEngine {
     private final Set<String> presentModIds;
     private final Set<String> stagedProjectIds = new HashSet<>();
     private Optional<ModrinthClient.Version> bukkitBridge;
+    private Optional<ModrinthClient.Version> translationLayer;
 
     public ResolutionEngine(ModrinthClient modrinth, OctoConfig config, Path gameDir,
                             String gameVersion, Set<String> presentModIds, Consumer<String> log) {
@@ -61,7 +71,8 @@ public final class ResolutionEngine {
                 case UNKNOWN -> r.set(Resolution.Status.UNKNOWN_JAR,
                         "No Fabric/Quilt/Forge/NeoForge/plugin metadata found inside the jar.");
                 case FABRIC -> resolveFabric(r);
-                case QUILT, FORGE, NEOFORGE -> bridgeViaModrinth(r);
+                case QUILT -> resolveQuilt(r);
+                case FORGE, NEOFORGE -> resolveForgeLike(r);
                 case PAPER_PLUGIN -> resolvePlugin(r);
             }
         } catch (IOException e) {
@@ -91,6 +102,156 @@ public final class ResolutionEngine {
         }
         // Built for another Minecraft version: fetch the matching build.
         bridgeViaModrinth(r);
+
+        // Last resort: a same-major-line jar (e.g. built for 26.1, running 26.2) that
+        // exists nowhere on Modrinth can usually run anyway — relax its constraint and
+        // load the actual jar.
+        boolean sameFamily = constraintMentionsMajor(jar.declaredMcVersion(), gameVersion);
+        boolean allowForce = (config.forceLoadSameMajor && sameFamily) || config.forceLoadAnyVersion;
+        if (r.status == Resolution.Status.INCOMPATIBLE && allowForce) {
+            Optional<java.nio.file.Path> forced = JarSurgeon.relaxMinecraftConstraint(jar.path(), modsDir);
+            if (forced.isPresent()) {
+                r.stagedFile = forced.get();
+                if (jar.modId() != null) {
+                    presentModIds.add(jar.modId());
+                }
+                r.set(Resolution.Status.FORCE_LOADED,
+                        "Built for MC " + orAny(jar.declaredMcVersion()) + " with no " + gameVersion
+                                + " build on Modrinth. " + (sameFamily
+                                        ? "Same version family — "
+                                        : "forceLoadAnyVersion is on — ")
+                                + "constraint relaxed and the actual jar force-loaded as "
+                                + forced.get().getFileName() + ". Remove it if anything misbehaves.");
+            }
+        }
+    }
+
+    /** Quilt-only jars: prefer a proper Fabric build; otherwise convert the jar itself. */
+    private void resolveQuilt(Resolution r) throws IOException {
+        ModJarInfo jar = r.jar;
+        if (jar.modId() != null && presentModIds.contains(jar.modId())) {
+            r.set(Resolution.Status.ALREADY_PRESENT, "Mod '" + jar.modId() + "' is already installed.");
+            return;
+        }
+        bridgeViaModrinth(r);
+        if (r.status != Resolution.Status.INCOMPATIBLE) {
+            return;
+        }
+        boolean versionOk = SimpleVersions.matches(jar.declaredMcVersion(), gameVersion)
+                || constraintMentionsMajor(jar.declaredMcVersion(), gameVersion)
+                || config.forceLoadAnyVersion;
+        if (!versionOk) {
+            return;
+        }
+        Optional<java.nio.file.Path> converted = JarSurgeon.convertQuiltJar(jar.path(), modsDir);
+        if (converted.isPresent()) {
+            r.stagedFile = converted.get();
+            if (jar.modId() != null) {
+                presentModIds.add(jar.modId());
+            }
+            r.set(Resolution.Status.LOADER_CONVERTED,
+                    "No Fabric build on Modrinth, but the mod only uses quilt_loader metadata — "
+                            + "synthesized fabric.mod.json inside the jar so the actual jar loads natively ("
+                            + converted.get().getFileName() + ").");
+        } else {
+            r.detail = r.detail + " The jar depends on QSL (Quilt's API), so it cannot be "
+                    + "converted to run on Fabric Loader directly.";
+        }
+    }
+
+    /** Forge/NeoForge jars: fabric build → port → translation layer → equivalents. */
+    private void resolveForgeLike(Resolution r) throws IOException {
+        bridgeViaModrinth(r);
+        if (r.status != Resolution.Status.INCOMPATIBLE) {
+            return;
+        }
+        // A translation layer executes the actual foreign jar on Fabric, when one
+        // exists for this game version.
+        Optional<ModrinthClient.Version> layer = translationLayer();
+        if (layer.isPresent()) {
+            java.nio.file.Path stagedForeign = stageCopy(r.jar.path(), modsDir);
+            r.stagedFile = stagedForeign;
+            if (!stagedProjectIds.contains(TRANSLATION_LAYER_SLUG)
+                    && !presentModIds.contains(TRANSLATION_LAYER_SLUG)) {
+                java.nio.file.Path layerJar = modrinth.download(layer.get(), modsDir);
+                r.stagedDependencies.add(layerJar);
+                stagedProjectIds.add(TRANSLATION_LAYER_SLUG);
+                Optional<ModrinthClient.Version> companion =
+                        pickBest(modrinth.projectVersions(TRANSLATION_LAYER_COMPANION_SLUG, "fabric", gameVersion));
+                if (companion.isPresent() && !presentModIds.contains(TRANSLATION_LAYER_COMPANION_SLUG)) {
+                    r.stagedDependencies.add(modrinth.download(companion.get(), modsDir));
+                    stagedProjectIds.add(TRANSLATION_LAYER_COMPANION_SLUG);
+                }
+                resolveDependencies(layer.get(), r, 1);
+            }
+            r.set(Resolution.Status.LOADER_TRANSLATED,
+                    "Staged the actual " + r.jar.loader().label + " jar together with the '"
+                            + TRANSLATION_LAYER_SLUG + "' translation layer ("
+                            + layer.get().versionNumber() + ") — it executes the jar on Fabric.");
+            return;
+        }
+        tryAlternatives(r);
+    }
+
+    /** Installs functionally-equivalent Fabric mods when the original exists nowhere. */
+    private void tryAlternatives(Resolution r) {
+        if (!config.installAlternatives) {
+            return;
+        }
+        java.util.List<String> alternatives = equivalents.alternativesFor(r.resolvedProject);
+        if (alternatives.isEmpty()) {
+            alternatives = equivalents.alternativesFor(r.jar.modId());
+        }
+        if (alternatives.isEmpty()) {
+            return;
+        }
+        java.util.List<String> installed = new java.util.ArrayList<>();
+        for (String alt : alternatives) {
+            if (presentModIds.contains(alt) || stagedProjectIds.contains(alt)) {
+                installed.add(alt + " (already installed)");
+                continue;
+            }
+            try {
+                Optional<ModrinthClient.Version> best = pickBest(modrinth.projectVersions(alt, "fabric", gameVersion));
+                if (best.isPresent()) {
+                    java.nio.file.Path staged = modrinth.download(best.get(), modsDir);
+                    r.stagedDependencies.add(staged);
+                    stagedProjectIds.add(alt);
+                    presentModIds.add(alt);
+                    installed.add(alt + " " + best.get().versionNumber());
+                    resolveDependencies(best.get(), r, 1);
+                }
+            } catch (IOException e) {
+                log.accept("  ! could not fetch alternative '" + alt + "': " + e.getMessage());
+            }
+        }
+        if (!installed.isEmpty()) {
+            r.set(Resolution.Status.ALTERNATIVE_INSTALLED,
+                    r.detail + " Installed the closest Fabric equivalent(s) instead: "
+                            + String.join(", ", installed) + ".");
+        }
+    }
+
+    /** True when the constraint references the same major version line as the game (e.g. "26.1" vs 26.2). */
+    private static boolean constraintMentionsMajor(String constraint, String gameVersion) {
+        if (constraint == null || constraint.isBlank()) {
+            return false;
+        }
+        int dot = gameVersion.indexOf('.');
+        String major = dot < 0 ? gameVersion : gameVersion.substring(0, dot);
+        return constraint.matches(".*(^|[^0-9])" + java.util.regex.Pattern.quote(major) + "\\..*");
+    }
+
+    private Optional<ModrinthClient.Version> translationLayer() {
+        if (translationLayer == null) {
+            try {
+                translationLayer = pickBest(modrinth.projectVersions(TRANSLATION_LAYER_SLUG, "fabric", gameVersion));
+            } catch (IOException e) {
+                log.accept("  ! could not check the translation layer: " + e.getMessage());
+                translationLayer = Optional.empty();
+            }
+        }
+        return translationLayer;
     }
 
     /** Identity of a local file on Modrinth, found via its hash. */
@@ -339,13 +500,7 @@ public final class ResolutionEngine {
     }
 
     private Optional<ModrinthClient.Version> pickBest(List<ModrinthClient.Version> versions) {
-        Optional<ModrinthClient.Version> release = versions.stream()
-                .filter(v -> "release".equals(v.versionType()))
-                .findFirst();
-        if (release.isPresent() || !config.includeBetaBuilds) {
-            return release;
-        }
-        return versions.stream().findFirst();
+        return ModrinthClient.pickBest(versions, config.includeBetaBuilds);
     }
 
     private Optional<ModrinthClient.Version> bukkitBridge() {

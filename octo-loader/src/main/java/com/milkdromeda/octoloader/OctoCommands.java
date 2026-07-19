@@ -46,6 +46,12 @@ public final class OctoCommands {
                                         .executes(ctx -> runResolver(ctx, false, true))))
                         .then(Commands.literal("status")
                                 .executes(OctoCommands::status))
+                        .then(Commands.literal("update")
+                                .executes(OctoCommands::update))
+                        .then(Commands.literal("export")
+                                .executes(ctx -> export(ctx, null))
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(ctx -> export(ctx, StringArgumentType.getString(ctx, "name")))))
                         .then(Commands.literal("fetch")
                                 .then(Commands.argument("slug", StringArgumentType.word())
                                         .executes(OctoCommands::fetch)))));
@@ -85,6 +91,35 @@ public final class OctoCommands {
         } else {
             reply(source, "Octo Loader " + OctoCore.OCTO_VERSION + " on Minecraft " + gameVersion
                     + ". No report yet — drop jars into octoloader/ and run /octo resolve.");
+        }
+        return 1;
+    }
+
+    private static int update(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        reply(source, "Octo Loader: checking every mod in mods/ for newer " + gameVersion + " builds…");
+        Thread worker = new Thread(() -> {
+            try {
+                OctoCore.runUpdate(gameDir, gameVersion, config, OctoLoaderMod.LOGGER::info);
+            } catch (Exception e) {
+                OctoLoaderMod.LOGGER.error("Octo Loader update failed", e);
+            }
+        }, "octoloader-update");
+        worker.setDaemon(true);
+        worker.start();
+        reply(source, "Octo Loader: updater running in the background — results go to the log. "
+                + "Replaced jars are backed up to octoloader/backup/.");
+        return 1;
+    }
+
+    private static int export(CommandContext<CommandSourceStack> ctx, String name) {
+        CommandSourceStack source = ctx.getSource();
+        try {
+            java.nio.file.Path dest = OctoCore.runExport(gameDir, gameVersion, name, OctoLoaderMod.LOGGER::info);
+            reply(source, "Octo Loader: packed the whole mod set into " + dest);
+        } catch (Exception e) {
+            OctoLoaderMod.LOGGER.error("Octo Loader export failed", e);
+            reply(source, "Octo Loader: export failed — " + e.getMessage());
         }
         return 1;
     }

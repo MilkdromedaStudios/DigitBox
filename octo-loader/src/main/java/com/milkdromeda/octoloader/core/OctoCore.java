@@ -24,7 +24,7 @@ import java.util.zip.ZipFile;
  */
 public final class OctoCore {
 
-    public static final String OCTO_VERSION = "1.0.0";
+    public static final String OCTO_VERSION = "1.1.0";
 
     public record Summary(List<Resolution> results, Path reportMd, Path reportJson, int stagedCount) {
     }
@@ -130,6 +130,100 @@ public final class OctoCore {
             log.accept("Report: " + reportMd);
         }
         return new Summary(results, reportMd, reportJson, staged);
+    }
+
+    /**
+     * Built-in mod updater: checks every Fabric mod in {@code mods/} against Modrinth
+     * and swaps in the newest build for the running game version. Replaced jars are
+     * moved to {@code octoloader/backup/} so an update is always reversible.
+     */
+    public static int runUpdate(Path gameDir, String gameVersion, OctoConfig config,
+                                Consumer<String> log) throws IOException {
+        Path modsDir = gameDir.resolve("mods");
+        Path backupDir = gameDir.resolve("octoloader").resolve("backup");
+        ModrinthClient modrinth = new ModrinthClient(OCTO_VERSION);
+        int updated = 0;
+
+        List<ModJarInfo> jars = classifyDir(modsDir, log);
+        log.accept("Octo Loader updater: checking " + jars.size() + " jar(s) in mods/ for " + gameVersion);
+        for (ModJarInfo jar : jars) {
+            if (jar.loader() != LoaderType.FABRIC || "octoloader".equals(jar.modId())) {
+                continue;
+            }
+            try {
+                var identity = modrinth.versionByHash(jar.sha1());
+                if (identity.isEmpty()) {
+                    continue;
+                }
+                var latest = ModrinthClient.pickBest(
+                        modrinth.projectVersions(identity.get().projectId(), "fabric", gameVersion),
+                        config.includeBetaBuilds);
+                if (latest.isEmpty() || latest.get().id().equals(identity.get().id())) {
+                    continue;
+                }
+                String newFilename = latest.get().primaryFile()
+                        .map(ModrinthClient.ModFile::filename).orElse(null);
+                if (newFilename == null || newFilename.equals(jar.path().getFileName().toString())) {
+                    continue;
+                }
+                Path staged = modrinth.download(latest.get(), modsDir);
+                Files.createDirectories(backupDir);
+                Files.move(jar.path(), backupDir.resolve(jar.path().getFileName().toString()),
+                        StandardCopyOption.REPLACE_EXISTING);
+                updated++;
+                log.accept("  ↑ " + jar.displayName() + ": " + identity.get().versionNumber()
+                        + " → " + latest.get().versionNumber() + " (" + staged.getFileName()
+                        + "; old jar moved to octoloader/backup/)");
+            } catch (IOException e) {
+                log.accept("  ! could not check " + jar.path().getFileName() + ": " + e.getMessage());
+            }
+        }
+        log.accept(updated == 0
+                ? "Octo Loader updater: everything is already current."
+                : "Octo Loader updater: " + updated + " mod(s) updated — restart to load them.");
+        return updated;
+    }
+
+    /**
+     * Copies the fully-resolved mod set (mods/, plugins/, and the latest compatibility
+     * report) into a single self-contained folder under {@code octoloader/export/},
+     * ready to drop into any other Fabric instance or share with friends.
+     */
+    public static Path runExport(Path gameDir, String gameVersion, String name,
+                                 Consumer<String> log) throws IOException {
+        String folderName = (name == null || name.isBlank())
+                ? "octo-pack-" + java.time.LocalDate.now()
+                : name.replaceAll("[^A-Za-z0-9._-]", "_");
+        Path dest = gameDir.resolve("octoloader").resolve("export").resolve(folderName);
+        int copied = 0;
+        for (String sub : new String[]{"mods", "plugins"}) {
+            Path src = gameDir.resolve(sub);
+            if (!Files.isDirectory(src)) {
+                continue;
+            }
+            Path out = dest.resolve(sub);
+            Files.createDirectories(out);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(src, "*.jar")) {
+                for (Path jar : stream) {
+                    Files.copy(jar, out.resolve(jar.getFileName().toString()),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    copied++;
+                }
+            }
+        }
+        Path report = gameDir.resolve("octoloader").resolve("octo-report.md");
+        if (Files.exists(report)) {
+            Files.createDirectories(dest);
+            Files.copy(report, dest.resolve("octo-report.md"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        Files.createDirectories(dest);
+        Files.writeString(dest.resolve("README.txt"),
+                "Octo Loader export — Minecraft " + gameVersion + " (Fabric)\n\n"
+                        + "Drop the mods/ (and plugins/, if present) folder into any Fabric "
+                        + gameVersion + " instance.\nSee octo-report.md for what's inside and why.\n",
+                StandardCharsets.UTF_8);
+        log.accept("Octo Loader export: " + copied + " jar(s) packed into " + dest);
+        return dest;
     }
 
     // ---- helpers -----------------------------------------------------------

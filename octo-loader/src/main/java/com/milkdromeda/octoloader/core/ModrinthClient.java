@@ -71,6 +71,17 @@ public final class ModrinthClient {
     public record SearchHit(String projectId, String slug, String title) {
     }
 
+    /** Newest release build from a version list (Modrinth returns newest first), or newest beta when allowed. */
+    public static Optional<Version> pickBest(List<Version> versions, boolean includeBetaBuilds) {
+        Optional<Version> release = versions.stream()
+                .filter(v -> "release".equals(v.versionType()))
+                .findFirst();
+        if (release.isPresent() || !includeBetaBuilds) {
+            return release;
+        }
+        return versions.stream().findFirst();
+    }
+
     // ---- lookups -----------------------------------------------------------
 
     /**

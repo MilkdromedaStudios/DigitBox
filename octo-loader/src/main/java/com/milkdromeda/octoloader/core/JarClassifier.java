@@ -61,6 +61,15 @@ public final class JarClassifier {
             if (pluginYml != null) {
                 return fromPluginYml(jar, pluginYml, sha1, sha512);
             }
+
+            // OptiFine ships with no loader metadata at all, but is instantly
+            // recognizable — and important enough to special-case so the engine can
+            // install its Fabric equivalents (Sodium + Iris).
+            if (zf.getEntry("optifine/Installer.class") != null
+                    || zf.getEntry("optifine/OptiFineForgeTweaker.class") != null
+                    || zf.getEntry("notch/net/optifine/Config.class") != null) {
+                return new ModJarInfo(jar, LoaderType.FORGE, "optifine", "OptiFine", null, null, sha1, sha512);
+            }
         }
 
         return new ModJarInfo(jar, LoaderType.UNKNOWN, null, null, null, null, sha1, sha512);

@@ -34,6 +34,15 @@ export default function OctoLoaderWikiPage() {
             stages a plugin with the Cardboard bridge.
           </li>
           <li>
+            <strong>Connect</strong> — when no proper build exists, Octo Loader loads the{" "}
+            <em>actual jar</em> where that&apos;s possible: Quilt-only mods get a Fabric-loadable
+            jar synthesized from their own metadata, same-family Fabric jars are
+            force-loaded with their version constraint relaxed, Forge/NeoForge jars are
+            staged with a translation layer (Sinytra Connector) the moment one supports
+            your game version, and mods with no Fabric edition at all (OptiFine) get
+            their closest Fabric equivalents installed instead.
+          </li>
+          <li>
             <strong>Dependencies</strong> — required dependencies of everything fetched
             are resolved recursively (depth-limited, deduplicated against what you
             already have).
@@ -61,6 +70,10 @@ export default function OctoLoaderWikiPage() {
               <tr><td>✅ Version-bridged</td><td>Same project, matching build fetched for your MC version</td></tr>
               <tr><td>✅ Loader-bridged</td><td>Same project, its native Fabric build fetched</td></tr>
               <tr><td>✅ Swapped for Fabric port</td><td>Known community port fetched instead (e.g. Create → Create Fabric)</td></tr>
+              <tr><td>✅ Converted</td><td>Quilt-only jar rewritten with synthesized Fabric metadata — the actual jar loads</td></tr>
+              <tr><td>✅ Translation layer</td><td>Forge/NeoForge jar staged as-is with a layer that executes it on Fabric</td></tr>
+              <tr><td>♻️ Replaced with equivalents</td><td>No Fabric edition exists — closest equivalents installed (OptiFine → Sodium + Iris)</td></tr>
+              <tr><td>⚠️ Force-loaded</td><td>Same-family jar (26.1 on 26.2) loaded with its version constraint relaxed</td></tr>
               <tr><td>✅ Plugin staged with bridge</td><td>Plugin put in <code>plugins/</code> next to the Cardboard Bukkit-on-Fabric bridge</td></tr>
               <tr><td>☑️ Already installed</td><td>You already have this mod — nothing to do</td></tr>
               <tr><td>❌ No compatible build</td><td>Exists on no loader for your version — the report explains exactly why</td></tr>
@@ -110,6 +123,9 @@ export default function OctoLoaderWikiPage() {
               <tr><td><code>includeBetaBuilds</code></td><td><code>true</code></td><td>Accept alpha/beta builds when no release matches</td></tr>
               <tr><td><code>targetGameVersion</code></td><td><code>null</code></td><td>Override the detected game version</td></tr>
               <tr><td><code>maxDependencyDepth</code></td><td><code>3</code></td><td>How deep to chase required dependencies</td></tr>
+              <tr><td><code>installAlternatives</code></td><td><code>true</code></td><td>Install equivalent Fabric mods when the original has no Fabric edition</td></tr>
+              <tr><td><code>forceLoadSameMajor</code></td><td><code>true</code></td><td>Force-load same-family Fabric jars that Modrinth has no proper build for</td></tr>
+              <tr><td><code>forceLoadAnyVersion</code></td><td><code>false</code></td><td>The big red switch: force-load Fabric/Quilt jars from <em>any</em> version when nothing better exists</td></tr>
               <tr><td><code>extraEquivalents</code></td><td><code>{"{}"}</code></td><td>Your own port mappings, e.g. <code>{"{\"some-forge-mod\": \"its-fabric-port\"}"}</code></td></tr>
             </tbody>
           </table>
@@ -163,15 +179,16 @@ export default function OctoLoaderWikiPage() {
         </p>
         <h3>Where do I get the mod itself?</h3>
         <p>
-          From the{" "}
+          <a href="/downloads/octo-loader.jar" download><strong>Right here — direct download</strong></a>,
+          no GitHub needed. You can also grab CI builds from{" "}
           <a
             href="https://github.com/MilkdromedaStudios/DigitBox/actions/workflows/octo-loader.yml"
             target="_blank"
             rel="noreferrer"
           >
-            GitHub Actions builds
+            GitHub Actions
           </a>{" "}
-          (latest green run → Artifacts → <code>octo-loader</code>), or build from{" "}
+          or build from{" "}
           <a
             href="https://github.com/MilkdromedaStudios/DigitBox/tree/main/octo-loader"
             target="_blank"
@@ -179,7 +196,14 @@ export default function OctoLoaderWikiPage() {
           >
             source
           </a>{" "}
-          with <code>./gradlew build</code>.
+          with <code>./gradlew build</code> (the finished jar lands in <code>octo-loader/mods/</code>).
+        </p>
+        <h3>Can it run Forge mods directly?</h3>
+        <p>
+          The moment a translation layer (Sinytra Connector) publishes a build for your
+          game version, yes — Octo Loader detects it automatically and stages your actual
+          Forge/NeoForge jars alongside it. Until then it uses the project&apos;s own Fabric
+          build, a known port, or equivalents — whichever exists.
         </p>
       </div>
     </div>
