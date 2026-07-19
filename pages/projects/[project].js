@@ -24,13 +24,12 @@ function projectMetadataForSlug(slug) {
 export async function getServerSideProps({ params }) {
   const rawSlug = Array.isArray(params.project) ? params.project[0] : params.project;
   const slug = decodeURIComponent(rawSlug || "");
-  const metadata = projectMetadataForSlug(slug);
 
-  if (metadata && typeof metadata !== "string") {
+  if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
     return {
       props: {
-        src: metadata.url || `/api/content/file?path=${encodeURIComponent(metadata.path)}`,
-        title: metadata.title || slug,
+        src: "https://irv77.github.io/AmplerLauncher/index.html",
+        title: "Eaglercraft Launcher",
       },
     };
   }
