@@ -31,6 +31,9 @@
 }
 
 * { box-sizing: border-box; }
+/* Base colour behind <body> so the "barrel roll" spin never flashes white
+   corners, and there's no flash before the body background paints. */
+html { background: var(--bg); }
 body {
   margin: 0;
   padding: 0;
@@ -753,24 +756,29 @@ select:focus-visible,
  * ================================================================== */
 
 :root {
-  /* Dark smoked glass — deep navy, translucent (not light frosted). */
-  --lg-tint: color-mix(in srgb, #060a18 62%, transparent);
-  --lg-tint-2: color-mix(in srgb, #060a18 40%, transparent);
-  /* A thin, even hairline — no glossy top bevel (that read as Windows/Aero). */
+  /* Dark liquid glass. Fairly opaque so panels paint instantly (no waiting on
+     the blur), with a bright specular rim + soft top sheen for real depth. */
+  --lg-tint: color-mix(in srgb, #0b1226 78%, transparent);
+  --lg-tint-2: color-mix(in srgb, #141d3c 60%, transparent);
+  --lg-sheen: radial-gradient(135% 95% at 50% -22%, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0) 55%);
   --lg-bevel:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --lg-drop: 0 12px 30px rgba(2, 5, 18, 0.45);
-  --lg-drop-hover: 0 18px 46px rgba(2, 5, 18, 0.6);
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 1px 0 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 -26px 48px -34px rgba(0, 0, 0, 0.55);
+  --lg-drop: 0 14px 34px rgba(2, 5, 18, 0.5);
+  --lg-drop-hover: 0 20px 50px rgba(2, 5, 18, 0.62);
 }
 body[data-theme="light"] {
-  --lg-tint: color-mix(in srgb, #ffffff 62%, transparent);
+  --lg-tint: color-mix(in srgb, #ffffff 78%, transparent);
+  --lg-tint-2: color-mix(in srgb, #ffffff 66%, transparent);
+  --lg-sheen: radial-gradient(135% 95% at 50% -22%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%);
   --lg-bevel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 0 0 1px rgba(255, 255, 255, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  --lg-drop: 0 12px 28px rgba(15, 23, 42, 0.1);
-  --lg-drop-hover: 0 18px 40px rgba(15, 23, 42, 0.16);
-  --lg-tint-2: color-mix(in srgb, #ffffff 52%, transparent);
+    inset 0 -26px 48px -34px rgba(15, 23, 42, 0.12);
+  --lg-drop: 0 12px 28px rgba(15, 23, 42, 0.12);
+  --lg-drop-hover: 0 18px 40px rgba(15, 23, 42, 0.18);
 }
 
 /* Shared interactive glass material */
@@ -800,9 +808,9 @@ body[data-theme="light"] {
 .post-card,
 .support-pill,
 .hero-scroller span {
-  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
-  backdrop-filter: blur(16px) saturate(135%);
-  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  background: var(--lg-sheen), linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
 }
 
 /* Static hover: just a brighter hairline + a touch more shadow. No motion,
@@ -825,15 +833,15 @@ body[data-theme="light"] {
    card hover, so no overflow:hidden here). */
 .section {
   box-shadow: var(--lg-bevel), var(--lg-drop);
-  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
-  backdrop-filter: blur(16px) saturate(135%);
-  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  background: var(--lg-sheen), linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
 }
 
-/* Header glass material — matte frosted, no gloss band */
+/* Header glass material — opaque enough to paint instantly, with a rim */
 .header {
-  background: color-mix(in srgb, var(--bg-elev) 58%, transparent);
-  box-shadow: var(--lg-bevel), 0 10px 30px rgba(3, 8, 28, 0.28);
+  background: var(--lg-sheen), color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  box-shadow: var(--lg-bevel), 0 10px 30px rgba(3, 8, 28, 0.3);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -997,7 +1005,7 @@ body[data-theme="light"] {
   display: flex; flex-direction: column;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  background: var(--lg-sheen), linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
   box-shadow: var(--lg-bevel), var(--lg-drop);
   overflow: hidden;
 }
@@ -1111,3 +1119,25 @@ body[data-theme="light"] {
   .egg-barrel-roll, .egg-rain span, .egg-rainbow { animation: none; }
   .egg-rain, .egg-rainbow { display: none; }
 }
+
+/* Changelog (markdown) */
+.changelog-body h1 { margin: 0 0 .3rem; }
+.changelog-body h2 {
+  margin: 1.5rem 0 .5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--glass-border);
+  background: linear-gradient(100deg, var(--text), color-mix(in srgb, var(--accent-2) 60%, var(--text)));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.changelog-body h2:first-of-type { border-top: none; padding-top: 0; }
+.changelog-body ul { list-style: disc; padding-left: 1.35rem; margin: .4rem 0; }
+.changelog-body li { margin: .3rem 0; }
+.changelog-body p { margin: .5rem 0; }
+.changelog-body code {
+  background: rgba(0, 0, 0, .35);
+  border: 1px solid var(--glass-border);
+  border-radius: .35rem;
+  padding: .05rem .35rem;
+  font-size: .9em;
+}
+.changelog-body a { text-decoration: underline; }

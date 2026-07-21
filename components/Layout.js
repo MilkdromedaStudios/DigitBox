@@ -116,7 +116,9 @@ export default function Layout({ children }) {
         </nav>
       </header>
       <main className="main"><div className="content">{children}</div></main>
-      <footer className="footer" onClick={onFooterTap} title="…">© {new Date().getFullYear()} digitbox.dev</footer>
+      <footer className="footer" onClick={onFooterTap} title="…">
+        © {new Date().getFullYear()} digitbox.dev · <Link href="/changelog">Changelog</Link>
+      </footer>
       <EasterEggs />
     </div>
   );
