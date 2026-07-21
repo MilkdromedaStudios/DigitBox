@@ -8,6 +8,7 @@ import {
   downloadSnapshot,
   formatAgo,
   getForeignSnapshotKeys,
+  hasIndexedDbData,
   hasLiveGameKeys,
   isAutosaveEnabled,
   loadPersisted,
@@ -17,9 +18,14 @@ import {
   restoreIndexedDb,
   restoreSnapshot,
   setAutosaveEnabled,
+  snapshotWeight,
 } from "../lib/gameSaves";
 
-const AUTOSAVE_INTERVAL_MS = 15000;
+const AUTOSAVE_INTERVAL_MS = 20000;
+// After a (re)load, wait before arming autosave so a freshly-booted game can
+// load its own save / finish restoring first — otherwise autosave would
+// capture the blank starting state and overwrite the real backup.
+const ARM_DELAY_MS = 4000;
 
 // Availability of the autosave layer for the current game.
 const AVAIL = {
@@ -39,6 +45,10 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
   const lastSnapshotRef = useRef(null);
   const autosaveOnRef = useRef(true);
   const savingRef = useRef(false);
+  const armedRef = useRef(false); // autosave is allowed to run
+  const armTimerRef = useRef(null);
+  const backupWeightRef = useRef(0); // size of the known-good backup
+  const backupHasIdbRef = useRef(false);
 
   const [availability, setAvailability] = useState(AVAIL.PENDING);
   const [autosaveOn, setAutosaveOn] = useState(true);
@@ -61,43 +71,68 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
     }
   }, []);
 
+  // Arm autosave after a settle delay (idempotent).
+  const armAutosave = useCallback(() => {
+    if (armedRef.current || armTimerRef.current) return;
+    armTimerRef.current = setTimeout(() => {
+      armTimerRef.current = null;
+      armedRef.current = true;
+    }, ARM_DELAY_MS);
+  }, []);
+
   /* --------------------------------------------------------------- *
    *  Save routines.
-   *  - Async (full): web storage + IndexedDB. Used by autosave + manual.
-   *  - Sync (fast): web storage only. Used on page unload where async
-   *    work would not finish.
+   *  Both refuse to shrink an existing backup (regression guard) so a
+   *  freshly-started game can never overwrite real progress.
    * --------------------------------------------------------------- */
-  const performSaveAsync = useCallback(async () => {
-    const win = getGameWindow();
-    if (!win || !canAccessGameStorage(win) || savingRef.current) return null;
-    savingRef.current = true;
-    try {
-      const snapshot = await captureFullSnapshot(win, slug);
-      if (!snapshot) return null;
-      lastSnapshotRef.current = snapshot;
-      await persistSnapshot(snapshot);
-      setLastSavedAt(snapshot.savedAt);
-      return snapshot;
-    } catch {
-      return null;
-    } finally {
-      savingRef.current = false;
-    }
-  }, [getGameWindow, slug]);
+  const performSaveAsync = useCallback(
+    async ({ manual = false } = {}) => {
+      const win = getGameWindow();
+      if (!win || !canAccessGameStorage(win) || savingRef.current) return null;
+      savingRef.current = true;
+      try {
+        const snapshot = await captureFullSnapshot(win, slug);
+        if (!snapshot) return { empty: true };
+        const weight = snapshotWeight(snapshot);
+        if (!manual && weight < backupWeightRef.current) {
+          // Would shrink the backup — protect the existing save.
+          return { skipped: true };
+        }
+        await persistSnapshot(snapshot);
+        lastSnapshotRef.current = snapshot;
+        backupWeightRef.current = weight;
+        backupHasIdbRef.current = Boolean(snapshot.idb);
+        setLastSavedAt(snapshot.savedAt);
+        return snapshot;
+      } catch {
+        return null;
+      } finally {
+        savingRef.current = false;
+      }
+    },
+    [getGameWindow, slug]
+  );
 
+  // Fast, synchronous save for page unload (async work would not finish).
+  // Web storage only; skipped for games whose backup includes IndexedDB, so a
+  // web-only snapshot can't clobber a richer IDB save.
   const performSaveSync = useCallback(() => {
+    if (backupHasIdbRef.current) return null;
     const win = getGameWindow();
     if (!win || !canAccessGameStorage(win)) return null;
     const snapshot = captureSnapshot(win, slug);
     if (!snapshot) return null;
+    if (snapshotWeight(snapshot) < backupWeightRef.current) return null;
     lastSnapshotRef.current = snapshot;
+    backupWeightRef.current = snapshotWeight(snapshot);
     persistSnapshot(snapshot);
     setLastSavedAt(snapshot.savedAt);
     return snapshot;
   }, [getGameWindow, slug]);
 
   /* --------------------------------------------------------------- *
-   *  On (re)load of the iframe: restore backup, then arm autosave.
+   *  On (re)load of the iframe: restore backup (only if the game booted
+   *  empty), then arm autosave.
    * --------------------------------------------------------------- */
   const handleFrameLoad = useCallback(async () => {
     if (isExternal) {
@@ -111,7 +146,11 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
     }
     setAvailability(AVAIL.READY);
 
-    if (restoredRef.current) return; // already handled this mount
+    if (restoredRef.current) {
+      // Second load (e.g. after our restore reload) — just arm autosave.
+      armAutosave();
+      return;
+    }
     restoredRef.current = true;
 
     let snapshot = null;
@@ -120,60 +159,74 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
     } catch {
       snapshot = null;
     }
-    if (!snapshot) return;
 
-    lastSnapshotRef.current = snapshot;
-    setLastSavedAt(snapshot.savedAt || 0);
+    if (snapshot) {
+      lastSnapshotRef.current = snapshot;
+      backupWeightRef.current = snapshotWeight(snapshot);
+      backupHasIdbRef.current = Boolean(snapshot.idb);
+      setLastSavedAt(snapshot.savedAt || 0);
 
-    // Was the game's own web storage empty at boot (a genuine wipe / first run)?
-    const wasEmpty = !hasLiveGameKeys(win);
-    const result = restoreSnapshot(win, snapshot);
-
-    // IndexedDB restore is non-destructive: it only recreates databases the
-    // browser doesn't already have (e.g. a fresh browser / cleared data).
-    let idbCreated = 0;
-    if (snapshot.idb) {
-      try {
-        idbCreated = await restoreIndexedDb(win, snapshot.idb);
-      } catch {
-        idbCreated = 0;
+      // Only restore when the game genuinely booted with no data of its own.
+      // If it already has live storage, it loaded its own save — leave it be.
+      let liveEmpty = !hasLiveGameKeys(win);
+      if (liveEmpty) {
+        try {
+          liveEmpty = !(await hasIndexedDbData(win));
+        } catch {
+          /* keep liveEmpty */
+        }
       }
+
+      if (liveEmpty) {
+        const result = restoreSnapshot(win, snapshot);
+        let idbCreated = 0;
+        if (snapshot.idb) {
+          try {
+            idbCreated = await restoreIndexedDb(win, snapshot.idb);
+          } catch {
+            idbCreated = 0;
+          }
+        }
+        const restoredAnything =
+          result.restoredLocal > 0 || result.sessionTouched || idbCreated > 0;
+        if (restoredAnything && !reloadedRef.current) {
+          reloadedRef.current = true;
+          setStatus("Restoring your save…");
+          try {
+            win.location.reload();
+          } catch {
+            /* ignore */
+          }
+          return; // arming happens on the reload's onLoad
+        }
+      }
+      setStatus(snapshot.savedAt ? "Save loaded" : "");
     }
 
-    // Only force a reload when the game actually needs it, so a returning
-    // player whose save is already live gets no disruptive reload.
-    const needsReload =
-      (wasEmpty && result.restoredLocal > 0) || result.sessionTouched || idbCreated > 0;
-    if (needsReload && !reloadedRef.current) {
-      reloadedRef.current = true;
-      setStatus("Progress restored");
-      try {
-        win.location.reload();
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-    setStatus(snapshot.savedAt ? "Save loaded" : "");
-  }, [getGameWindow, isExternal, slug]);
+    armAutosave();
+  }, [armAutosave, getGameWindow, isExternal, slug]);
 
   /* --------------------------------------------------------------- *
-   *  Autosave timer + save-on-hide/unload.
+   *  Autosave timer + save-on-hide/unload (all gated on `armed`).
    * --------------------------------------------------------------- */
   useEffect(() => {
     if (availability !== AVAIL.READY) return undefined;
 
     const interval = setInterval(() => {
-      if (autosaveOnRef.current) performSaveAsync();
+      if (armedRef.current && autosaveOnRef.current) performSaveAsync();
     }, AUTOSAVE_INTERVAL_MS);
 
     const onVisibility = () => {
-      if (document.visibilityState === "hidden" && autosaveOnRef.current) {
+      if (
+        document.visibilityState === "hidden" &&
+        armedRef.current &&
+        autosaveOnRef.current
+      ) {
         performSaveSync();
       }
     };
     const onPageHide = () => {
-      if (autosaveOnRef.current) performSaveSync();
+      if (armedRef.current && autosaveOnRef.current) performSaveSync();
     };
 
     document.addEventListener("visibilitychange", onVisibility);
@@ -188,6 +241,8 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
     };
   }, [availability, performSaveAsync, performSaveSync]);
 
+  useEffect(() => () => clearTimeout(armTimerRef.current), []);
+
   // Keep the "saved x ago" label fresh while the panel is open.
   useEffect(() => {
     if (!panelOpen || !lastSavedAt) return undefined;
@@ -200,19 +255,38 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
    * --------------------------------------------------------------- */
   const handleManualSave = useCallback(async () => {
     setStatus("Saving…");
-    const snap = await performSaveAsync();
-    setStatus(snap ? "Saved" : "No save data found yet — play a little, then save");
-  }, [performSaveAsync]);
+    const res = await performSaveAsync({ manual: true });
+    if (res && res.slug) {
+      setStatus("Saved");
+      return;
+    }
+    // Nothing capturable — explain honestly.
+    const win = getGameWindow();
+    let idbData = false;
+    try {
+      idbData = win ? await hasIndexedDbData(win) : false;
+    } catch {
+      idbData = false;
+    }
+    setStatus(
+      idbData
+        ? "This game stores its save in a way DigitBox can't copy yet — your browser keeps it automatically"
+        : "No save data found yet — play a little, then save"
+    );
+  }, [getGameWindow, performSaveAsync]);
 
   const handleRestore = useCallback(async () => {
     const win = getGameWindow();
     if (!win) return;
+    setStatus("Loading save…");
     const snapshot = await loadPersisted(slug);
     if (!snapshot) {
       setStatus("No saved progress found");
       return;
     }
     lastSnapshotRef.current = snapshot;
+    backupWeightRef.current = snapshotWeight(snapshot);
+    backupHasIdbRef.current = Boolean(snapshot.idb);
     restoreSnapshot(win, snapshot, { overwrite: true });
     if (snapshot.idb) {
       try {
@@ -222,7 +296,6 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
       }
     }
     setLastSavedAt(snapshot.savedAt || 0);
-    setStatus("Restoring…");
     reloadedRef.current = true;
     try {
       win.location.reload();
@@ -249,6 +322,9 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
       purgeLiveKeys(win, snapshot, { protectedKeys });
     }
     lastSnapshotRef.current = null;
+    backupWeightRef.current = 0;
+    backupHasIdbRef.current = false;
+    armedRef.current = false; // don't immediately re-save the fresh game
     setLastSavedAt(0);
     setStatus("Save cleared");
     reloadedRef.current = true;
@@ -264,17 +340,12 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
     autosaveOnRef.current = next;
     setAutosaveEnabled(next);
     setAutosaveOn(next);
-    if (next) {
-      performSaveAsync();
-      setStatus("Autosave on");
-    } else {
-      setStatus("Autosave off");
-    }
-  }, [performSaveAsync]);
+    setStatus(next ? "Autosave on" : "Autosave off");
+  }, []);
 
   const handleExport = useCallback(async () => {
-    const snapshot = (await performSaveAsync()) || (await loadPersisted(slug));
-    if (!snapshot) {
+    const snapshot = (await performSaveAsync({ manual: true })) || (await loadPersisted(slug));
+    if (!snapshot || !snapshot.slug) {
       setStatus("Nothing to export yet");
       return;
     }
@@ -296,6 +367,8 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
         }
         await persistSnapshot(snapshot);
         lastSnapshotRef.current = snapshot;
+        backupWeightRef.current = snapshotWeight(snapshot);
+        backupHasIdbRef.current = Boolean(snapshot.idb);
         setLastSavedAt(snapshot.savedAt);
         const win = getGameWindow();
         if (win) {
@@ -389,7 +462,7 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
                   <span className="save-toggle-track" aria-hidden="true">
                     <span className="save-toggle-thumb" />
                   </span>
-                  <span>Autosave every 15s</span>
+                  <span>Autosave while you play</span>
                 </label>
 
                 <div className="save-status" data-tick={nowTick}>
@@ -430,8 +503,8 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
                 />
 
                 <p className="save-note">
-                  Beta — progress is saved from the game&apos;s browser storage. Some games
-                  keep saves in a way DigitBox can&apos;t reach yet.
+                  Beta — autosave copies the game&apos;s own browser storage. Some games save
+                  in a way DigitBox can&apos;t reach yet, and restoring reloads the game.
                 </p>
               </>
             ) : (
