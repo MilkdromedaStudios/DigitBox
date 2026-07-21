@@ -1,17 +1,13 @@
 import projectsIndex from "../../data/projects-index.json";
+import GameFrame from "../../components/GameFrame";
 
+// Cloudflare Pages only supports the edge runtime for pages with
+// getServerSideProps; the Node serverless default builds fine on Vercel/local
+// but fails the Cloudflare Pages build.
 export const config = { runtime: "experimental-edge" };
 
-export default function ProjectRunner({ src, title }) {
-  return (
-    <iframe
-      title={title || "Project"}
-      src={src}
-      sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-modals allow-forms allow-downloads"
-      allow="autoplay; fullscreen; gamepad"
-      style={{ width: "100%", height: "100vh", border: "none", display: "block", background: "#000" }}
-    />
-  );
+export default function ProjectRunner({ src, title, slug, isExternal }) {
+  return <GameFrame src={src} title={title} slug={slug} isExternal={isExternal} />;
 }
 
 function projectMetadataForSlug(slug) {
@@ -30,6 +26,8 @@ export async function getServerSideProps({ params }) {
       props: {
         src: "https://irv77.github.io/AmplerLauncher/index.html",
         title: "Eaglercraft Launcher",
+        slug: "eaglercraft-launcher",
+        isExternal: true,
       },
     };
   }
@@ -40,6 +38,8 @@ export async function getServerSideProps({ params }) {
     props: {
       src: `/api/content/file?path=${encodeURIComponent(filePath)}`,
       title: slug,
+      slug,
+      isExternal: false,
     },
   };
 }

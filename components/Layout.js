@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
 const ADMIN_EMAILS = [
@@ -72,7 +72,20 @@ export default function Layout({ children }) {
           <Link href="/posts">Posts</Link>
           <Link href="/octoloader">Octo Loader</Link>
           {isAdmin && <Link href="/admin">Admin</Link>}
-          {!isAuthLoading && !user && <Link href="/login">Login</Link>}
+
+          {!isAuthLoading && !user && (
+            isSupabaseConfigured ? (
+              <Link href="/login">Login</Link>
+            ) : (
+              <span
+                className="nav-link-disabled"
+                aria-disabled="true"
+                title="Login is disabled because Supabase is not configured on this deployment."
+              >
+                Login
+              </span>
+            )
+          )}
 
           {user && (
             <>

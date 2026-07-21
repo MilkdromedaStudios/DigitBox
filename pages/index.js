@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import LiquidGlass from "../components/LiquidGlass";
 
 export default function Home() {
   const [updates, setUpdates] = useState([]);
@@ -56,7 +57,7 @@ export default function Home() {
       <section className="hero">
         <div className="hero-overlay" />
         <div className="hero-content">
-          <div className="hero-box">
+          <div className="hero-box liquidGL">
             <h1>Explore Innovative HTML5 Projects Today!</h1>
             <p>
               Welcome to my portfolio featuring exciting HTML5 projects you can
@@ -72,6 +73,11 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <LiquidGlass
+        target=".hero-box.liquidGL"
+        options={{ snapshot: ".hero", frost: 4, refraction: 0.02, bevelDepth: 0.08 }}
+      />
 
       {/* LATEST UPDATES */}
       <section className="section">

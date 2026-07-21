@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 export default function LoginPage() {
   const [mode, setMode] = useState("login");
@@ -56,6 +56,14 @@ export default function LoginPage() {
     <div className="content">
       <h1>{mode === "login" ? "Login" : "Create Account"}</h1>
 
+      {!isSupabaseConfigured && (
+        <div className="notice notice-warn" role="status">
+          <strong>Login is currently disabled.</strong> This deployment has no
+          Supabase API keys configured, so accounts can&apos;t be created or
+          signed in. You can still play every game and browse the site.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="post-form" style={{ maxWidth: 460 }}>
         <input
           className="auth-input"
@@ -73,7 +81,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <button className="auth-btn" type="submit" disabled={loading}>
+        <button className="auth-btn" type="submit" disabled={loading || !isSupabaseConfigured}>
           {loading
             ? "Please wait..."
             : mode === "login"
