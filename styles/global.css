@@ -545,11 +545,6 @@ select:focus-visible,
   letter-spacing: -0.02em;
   line-height: 1.08;
 }
-.hero::before { animation: auroraShift 16s var(--ease) infinite alternate; }
-@keyframes auroraShift {
-  0% { transform: translate3d(-3%, -2%, 0) rotate(0deg); }
-  100% { transform: translate3d(3%, 2%, 0) rotate(8deg); }
-}
 .hero-box {
   background: var(--glass-bg);
   backdrop-filter: blur(10px);
@@ -751,10 +746,10 @@ select:focus-visible,
 
 
 /* ================================================================== *
- *  Liquid Glass — Apple-style material
- *  Refraction (SVG displacement) + glass bevel + pointer-tracked
- *  specular highlight. The specular vars (--lg-x/--lg-y) are updated by
- *  components/LiquidGlassFX.js; everything degrades to frosted glass.
+ *  Dark glass material — STATIC.
+ *  Frosted backdrop blur + a thin hairline + soft shadow. No WebGL, no
+ *  SVG refraction, no pointer tracking, no motion — so it costs nothing
+ *  once painted (kept light on the CPU/GPU).
  * ================================================================== */
 
 :root {
@@ -792,15 +787,9 @@ body[data-theme="light"] {
 .game-btn,
 .save-act {
   position: relative;
-  isolation: isolate;
   overflow: hidden;
   box-shadow: var(--lg-bevel), var(--lg-drop);
-  transition:
-    transform .28s var(--ease),
-    box-shadow .28s var(--ease),
-    border-color .28s var(--ease),
-    background .28s var(--ease),
-    filter .28s var(--ease);
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 
 /* Frosted neutral surfaces — flat & matte (accent buttons keep their gradient) */
@@ -816,81 +805,20 @@ body[data-theme="light"] {
   -webkit-backdrop-filter: blur(16px) saturate(135%);
 }
 
-/* Pointer-following specular highlight (the "alive" liquid sheen).
-   Sits just behind the element's own text so labels stay crisp. */
-.nav a::before,
-.btn-base::before,
-.auth-btn::before,
-.like-btn::before,
-.exit-btn::before,
-.support-pill::before,
-.hero-scroller span::before,
-.game-btn::before,
-.save-act::before,
-.card::after,
-.gallery-item::after,
-.post-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(240px circle at var(--lg-x, 50%) var(--lg-y, 50%),
-    rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 62%);
-  opacity: 0;
-  transition: opacity .3s var(--ease);
-  pointer-events: none;
-  z-index: -1;
-}
-.nav a:hover::before,
-.btn-base:hover::before,
-.auth-btn:hover::before,
-.like-btn:hover::before,
-.exit-btn:hover::before,
-.support-pill:hover::before,
-.hero-scroller span:hover::before,
-.game-btn:hover::before,
-.save-act:hover::before,
-.card:hover::after,
-.gallery-item:hover::after,
-.post-card:hover::after {
-  opacity: 1;
-}
-
-/* Lift + glow on hover, gentle press on click */
+/* Static hover: just a brighter hairline + a touch more shadow. No motion,
+   no pointer tracking, no per-frame work — keeps CPU/GPU idle. */
 .nav a:hover,
 .btn-base:hover,
 .support-pill:hover,
 .hero-scroller span:hover,
 .game-btn:hover,
-.save-act:hover {
-  transform: translateY(-2px);
-  border-color: var(--ring);
-  box-shadow: var(--lg-bevel), var(--lg-drop-hover), 0 0 22px -6px var(--accent-soft);
-}
+.save-act:hover,
 .card:hover,
 .gallery-item:hover,
-.post-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--ring);
-  box-shadow: var(--lg-bevel), var(--lg-drop-hover), var(--shadow-glow);
-}
+.post-card:hover,
 .auth-btn:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.07) saturate(1.05);
-  box-shadow: var(--lg-bevel), 0 14px 32px var(--accent-soft);
-}
-.nav a:active,
-.btn-base:active,
-.auth-btn:active,
-.like-btn:active,
-.exit-btn:active,
-.support-pill:active,
-.game-btn:active,
-.save-act:active,
-.card:active,
-.gallery-item:active,
-.post-card:active {
-  transform: translateY(0) scale(.98);
+  border-color: var(--ring);
+  box-shadow: var(--lg-bevel), var(--lg-drop-hover);
 }
 
 /* Section container gets the glass material too (no clipping of inner
@@ -908,28 +836,10 @@ body[data-theme="light"] {
   box-shadow: var(--lg-bevel), 0 10px 30px rgba(3, 8, 28, 0.28);
 }
 
-/* --- Real refraction on large surfaces (Chromium; graceful fallback).
-   Kept off tiny buttons and off panels that float over live game frames,
-   so nothing looks warped or weird. --- */
-@supports (backdrop-filter: url("#lg-refraction")) {
-  .header,
-  .hero-box,
-  .card,
-  .gallery-item,
-  .post-card {
-    backdrop-filter: blur(11px) saturate(180%) url("#lg-refraction");
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .nav a, .btn-base, .auth-btn, .card, .gallery-item, .post-card,
   .support-pill, .hero-scroller span, .game-btn, .save-act {
     transition: none;
-  }
-  .nav a:hover, .btn-base:hover, .auth-btn:hover, .card:hover,
-  .gallery-item:hover, .post-card:hover, .support-pill:hover,
-  .game-btn:hover, .save-act:hover, .hero-scroller span:hover {
-    transform: none;
   }
 }
 
@@ -953,4 +863,92 @@ body[data-theme="light"] {
   font-size: .7rem;
   line-height: 1.4;
   color: #9fb0e6;
+}
+
+/* Performance: keep interactive glass STATIC — neutralize every leftover
+   hover/press transform from earlier layers so nothing animates position. */
+.nav a:hover, .nav a:active,
+.btn-base:hover, .btn-base:active,
+.auth-btn:hover, .auth-btn:active,
+.like-btn:hover, .like-btn:active,
+.exit-btn:hover, .exit-btn:active,
+.card:hover, .card:active,
+.gallery-item:hover, .gallery-item:active,
+.post-card:hover, .post-card:active,
+.support-pill:hover,
+.support-grid a:hover .support-pill,
+.hero-scroller span:hover,
+.game-btn:hover, .game-btn:active,
+.save-act:hover, .save-act:active {
+  transform: none;
+}
+
+/* ================================================================== *
+ *  Gallery: search + liked tabs + like button + notes scratchpad
+ * ================================================================== */
+.gallery-toolbar {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 0 1.1rem;
+}
+.gallery-search { flex: 1 1 240px; min-width: 180px; }
+
+.gallery-tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.gallery-tab {
+  padding: .55rem .9rem;
+  min-height: 2.35rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(12px) saturate(135%);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  color: var(--text);
+  font-weight: 700;
+  font-size: .9rem;
+  cursor: pointer;
+  box-shadow: var(--lg-bevel);
+  transition: border-color .15s ease;
+}
+.gallery-tab:hover { border-color: var(--ring); }
+.gallery-tab.is-active {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #fff;
+}
+
+.like-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  min-height: 2.35rem;
+  padding: .5rem .85rem;
+  border-radius: .7rem;
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(12px) saturate(135%);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  color: var(--text);
+  font-weight: 700;
+  font-size: .9rem;
+  cursor: pointer;
+  box-shadow: var(--lg-bevel);
+  transition: border-color .15s ease, color .15s ease;
+}
+.like-toggle span { font-size: 1.05rem; line-height: 1; color: var(--muted); }
+.like-toggle:hover { border-color: var(--ring); }
+.like-toggle.is-liked { border-color: color-mix(in srgb, #f43f5e 55%, var(--glass-border)); color: #ffe4ea; }
+.like-toggle.is-liked span { color: #f43f5e; }
+
+.notes-section { margin-top: 1.5rem; }
+.notes-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.notes-status { font-size: .78rem; }
+.notes-area {
+  margin-top: .7rem;
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  line-height: 1.5;
+  font-family: inherit;
 }
