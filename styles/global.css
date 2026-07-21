@@ -19,7 +19,7 @@
   --accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
   --accent-grad: linear-gradient(120deg, var(--accent), var(--accent-2));
   --glass-bg: color-mix(in srgb, var(--surface) 60%, transparent);
-  --glass-border: color-mix(in srgb, var(--accent) 32%, rgba(255, 255, 255, 0.12));
+  --glass-border: rgba(255, 255, 255, 0.12);
   --glass-highlight: rgba(255, 255, 255, 0.08);
   --ring: color-mix(in srgb, var(--accent) 65%, white);
   --radius: 0.85rem;
@@ -507,7 +507,7 @@ select:focus-visible,
   letter-spacing: -0.02em;
 }
 
-/* ---- Nav pills / buttons: sheen + press ---- */
+/* ---- Nav pills / buttons: base (liquid-glass treatment added below) ---- */
 .nav a, .btn-base {
   position: relative;
   overflow: hidden;
@@ -516,21 +516,6 @@ select:focus-visible,
   border: 1px solid var(--glass-border);
   transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
 }
-.nav a::after, .btn-base::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, transparent 30%, var(--glass-highlight) 50%, transparent 70%);
-  transform: translateX(-120%);
-  transition: transform .5s var(--ease);
-}
-.nav a:hover, .btn-base:hover {
-  transform: translateY(-1px);
-  border-color: var(--ring);
-  box-shadow: var(--shadow-soft), 0 0 0 1px var(--accent-soft);
-}
-.nav a:hover::after, .btn-base:hover::after { transform: translateX(120%); }
-.nav a:active, .btn-base:active { transform: translateY(0) scale(.98); }
 
 /* Disabled login (no Supabase keys) */
 .nav-link-disabled {
@@ -762,4 +747,210 @@ select:focus-visible,
 @media (max-width: 480px) {
   .game-btn-label { display: none; }
   .game-btn { padding: .5rem .6rem; }
+}
+
+
+/* ================================================================== *
+ *  Liquid Glass — Apple-style material
+ *  Refraction (SVG displacement) + glass bevel + pointer-tracked
+ *  specular highlight. The specular vars (--lg-x/--lg-y) are updated by
+ *  components/LiquidGlassFX.js; everything degrades to frosted glass.
+ * ================================================================== */
+
+:root {
+  /* Dark smoked glass — deep navy, translucent (not light frosted). */
+  --lg-tint: color-mix(in srgb, #060a18 62%, transparent);
+  --lg-tint-2: color-mix(in srgb, #060a18 40%, transparent);
+  /* A thin, even hairline — no glossy top bevel (that read as Windows/Aero). */
+  --lg-bevel:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --lg-drop: 0 12px 30px rgba(2, 5, 18, 0.45);
+  --lg-drop-hover: 0 18px 46px rgba(2, 5, 18, 0.6);
+}
+body[data-theme="light"] {
+  --lg-tint: color-mix(in srgb, #ffffff 62%, transparent);
+  --lg-bevel:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --lg-drop: 0 12px 28px rgba(15, 23, 42, 0.1);
+  --lg-drop-hover: 0 18px 40px rgba(15, 23, 42, 0.16);
+  --lg-tint-2: color-mix(in srgb, #ffffff 52%, transparent);
+}
+
+/* Shared interactive glass material */
+.nav a,
+.btn-base,
+.auth-btn,
+.like-btn,
+.exit-btn,
+.card,
+.gallery-item,
+.post-card,
+.support-pill,
+.hero-scroller span,
+.game-btn,
+.save-act {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow: var(--lg-bevel), var(--lg-drop);
+  transition:
+    transform .28s var(--ease),
+    box-shadow .28s var(--ease),
+    border-color .28s var(--ease),
+    background .28s var(--ease),
+    filter .28s var(--ease);
+}
+
+/* Frosted neutral surfaces — flat & matte (accent buttons keep their gradient) */
+.nav a,
+.btn-base,
+.card,
+.gallery-item,
+.post-card,
+.support-pill,
+.hero-scroller span {
+  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(16px) saturate(135%);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+}
+
+/* Pointer-following specular highlight (the "alive" liquid sheen).
+   Sits just behind the element's own text so labels stay crisp. */
+.nav a::before,
+.btn-base::before,
+.auth-btn::before,
+.like-btn::before,
+.exit-btn::before,
+.support-pill::before,
+.hero-scroller span::before,
+.game-btn::before,
+.save-act::before,
+.card::after,
+.gallery-item::after,
+.post-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(240px circle at var(--lg-x, 50%) var(--lg-y, 50%),
+    rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 62%);
+  opacity: 0;
+  transition: opacity .3s var(--ease);
+  pointer-events: none;
+  z-index: -1;
+}
+.nav a:hover::before,
+.btn-base:hover::before,
+.auth-btn:hover::before,
+.like-btn:hover::before,
+.exit-btn:hover::before,
+.support-pill:hover::before,
+.hero-scroller span:hover::before,
+.game-btn:hover::before,
+.save-act:hover::before,
+.card:hover::after,
+.gallery-item:hover::after,
+.post-card:hover::after {
+  opacity: 1;
+}
+
+/* Lift + glow on hover, gentle press on click */
+.nav a:hover,
+.btn-base:hover,
+.support-pill:hover,
+.hero-scroller span:hover,
+.game-btn:hover,
+.save-act:hover {
+  transform: translateY(-2px);
+  border-color: var(--ring);
+  box-shadow: var(--lg-bevel), var(--lg-drop-hover), 0 0 22px -6px var(--accent-soft);
+}
+.card:hover,
+.gallery-item:hover,
+.post-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--ring);
+  box-shadow: var(--lg-bevel), var(--lg-drop-hover), var(--shadow-glow);
+}
+.auth-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07) saturate(1.05);
+  box-shadow: var(--lg-bevel), 0 14px 32px var(--accent-soft);
+}
+.nav a:active,
+.btn-base:active,
+.auth-btn:active,
+.like-btn:active,
+.exit-btn:active,
+.support-pill:active,
+.game-btn:active,
+.save-act:active,
+.card:active,
+.gallery-item:active,
+.post-card:active {
+  transform: translateY(0) scale(.98);
+}
+
+/* Section container gets the glass material too (no clipping of inner
+   card hover, so no overflow:hidden here). */
+.section {
+  box-shadow: var(--lg-bevel), var(--lg-drop);
+  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(16px) saturate(135%);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+}
+
+/* Header glass material — matte frosted, no gloss band */
+.header {
+  background: color-mix(in srgb, var(--bg-elev) 58%, transparent);
+  box-shadow: var(--lg-bevel), 0 10px 30px rgba(3, 8, 28, 0.28);
+}
+
+/* --- Real refraction on large surfaces (Chromium; graceful fallback).
+   Kept off tiny buttons and off panels that float over live game frames,
+   so nothing looks warped or weird. --- */
+@supports (backdrop-filter: url("#lg-refraction")) {
+  .header,
+  .hero-box,
+  .card,
+  .gallery-item,
+  .post-card {
+    backdrop-filter: blur(11px) saturate(180%) url("#lg-refraction");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav a, .btn-base, .auth-btn, .card, .gallery-item, .post-card,
+  .support-pill, .hero-scroller span, .game-btn, .save-act {
+    transition: none;
+  }
+  .nav a:hover, .btn-base:hover, .auth-btn:hover, .card:hover,
+  .gallery-item:hover, .post-card:hover, .support-pill:hover,
+  .game-btn:hover, .save-act:hover, .hero-scroller span:hover {
+    transform: none;
+  }
+}
+
+/* Autosave beta badge + note (game save panel) */
+.save-beta {
+  display: inline-block;
+  margin-left: .45rem;
+  padding: .05rem .4rem;
+  border-radius: 999px;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: #0a1024;
+  background: linear-gradient(120deg, #fbbf24, #f59e0b);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, .35);
+}
+.save-note {
+  margin: .7rem 0 0;
+  font-size: .7rem;
+  line-height: 1.4;
+  color: #9fb0e6;
 }
