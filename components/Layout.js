@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import EasterEggs from "./EasterEggs";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
 const ADMIN_EMAILS = [
@@ -62,6 +63,19 @@ export default function Layout({ children }) {
   const username = profilePrefs?.displayName || user?.user_metadata?.user_name || user?.email?.split("@")[0] || "User";
   const identityLabel = profilePrefs?.identityLabel || (isAdmin ? "Admin" : "");
 
+  // 🥚 Tap the footer 5 times quickly for a surprise.
+  const footerTapRef = useRef({ count: 0, last: 0 });
+  function onFooterTap() {
+    const now = Date.now();
+    const state = footerTapRef.current;
+    state.count = now - state.last < 1500 ? state.count + 1 : 1;
+    state.last = now;
+    if (state.count >= 5) {
+      state.count = 0;
+      window.dispatchEvent(new CustomEvent("digitbox:easteregg", { detail: { type: "party" } }));
+    }
+  }
+
   return (
     <div className="page">
       <header className="header">
@@ -69,6 +83,7 @@ export default function Layout({ children }) {
         <nav className="nav" aria-label="Primary navigation">
           <Link href="/">Home</Link>
           <Link href="/gallery">Gallery</Link>
+          <Link href="/ai" className="nav-ai">Digitbox AI</Link>
           <Link href="/posts">Posts</Link>
           {isAdmin && <Link href="/admin">Admin</Link>}
 
@@ -101,7 +116,10 @@ export default function Layout({ children }) {
         </nav>
       </header>
       <main className="main"><div className="content">{children}</div></main>
-      <footer className="footer">© {new Date().getFullYear()} digitbox.dev</footer>
+      <footer className="footer" onClick={onFooterTap} title="…">
+        © {new Date().getFullYear()} digitbox.dev · <Link href="/changelog">Changelog</Link>
+      </footer>
+      <EasterEggs />
     </div>
   );
 }

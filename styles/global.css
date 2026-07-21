@@ -31,6 +31,9 @@
 }
 
 * { box-sizing: border-box; }
+/* Base colour behind <body> so the "barrel roll" spin never flashes white
+   corners, and there's no flash before the body background paints. */
+html { background: var(--bg); }
 body {
   margin: 0;
   padding: 0;
@@ -753,24 +756,29 @@ select:focus-visible,
  * ================================================================== */
 
 :root {
-  /* Dark smoked glass — deep navy, translucent (not light frosted). */
-  --lg-tint: color-mix(in srgb, #060a18 62%, transparent);
-  --lg-tint-2: color-mix(in srgb, #060a18 40%, transparent);
-  /* A thin, even hairline — no glossy top bevel (that read as Windows/Aero). */
+  /* Dark liquid glass. Fairly opaque so panels paint instantly (no waiting on
+     the blur), with a bright specular rim + soft top sheen for real depth. */
+  --lg-tint: color-mix(in srgb, #0b1226 78%, transparent);
+  --lg-tint-2: color-mix(in srgb, #141d3c 60%, transparent);
+  --lg-sheen: radial-gradient(135% 95% at 50% -22%, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0) 55%);
   --lg-bevel:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --lg-drop: 0 12px 30px rgba(2, 5, 18, 0.45);
-  --lg-drop-hover: 0 18px 46px rgba(2, 5, 18, 0.6);
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 1px 0 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 -26px 48px -34px rgba(0, 0, 0, 0.55);
+  --lg-drop: 0 14px 34px rgba(2, 5, 18, 0.5);
+  --lg-drop-hover: 0 20px 50px rgba(2, 5, 18, 0.62);
 }
 body[data-theme="light"] {
-  --lg-tint: color-mix(in srgb, #ffffff 62%, transparent);
+  --lg-tint: color-mix(in srgb, #ffffff 78%, transparent);
+  --lg-tint-2: color-mix(in srgb, #ffffff 66%, transparent);
+  --lg-sheen: radial-gradient(135% 95% at 50% -22%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%);
   --lg-bevel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 0 0 1px rgba(255, 255, 255, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  --lg-drop: 0 12px 28px rgba(15, 23, 42, 0.1);
-  --lg-drop-hover: 0 18px 40px rgba(15, 23, 42, 0.16);
-  --lg-tint-2: color-mix(in srgb, #ffffff 52%, transparent);
+    inset 0 -26px 48px -34px rgba(15, 23, 42, 0.12);
+  --lg-drop: 0 12px 28px rgba(15, 23, 42, 0.12);
+  --lg-drop-hover: 0 18px 40px rgba(15, 23, 42, 0.18);
 }
 
 /* Shared interactive glass material */
@@ -800,9 +808,9 @@ body[data-theme="light"] {
 .post-card,
 .support-pill,
 .hero-scroller span {
-  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
-  backdrop-filter: blur(16px) saturate(135%);
-  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  background: var(--lg-sheen), linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
 }
 
 /* Static hover: just a brighter hairline + a touch more shadow. No motion,
@@ -825,15 +833,15 @@ body[data-theme="light"] {
    card hover, so no overflow:hidden here). */
 .section {
   box-shadow: var(--lg-bevel), var(--lg-drop);
-  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
-  backdrop-filter: blur(16px) saturate(135%);
-  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  background: var(--lg-sheen), linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
 }
 
-/* Header glass material — matte frosted, no gloss band */
+/* Header glass material — opaque enough to paint instantly, with a rim */
 .header {
-  background: color-mix(in srgb, var(--bg-elev) 58%, transparent);
-  box-shadow: var(--lg-bevel), 0 10px 30px rgba(3, 8, 28, 0.28);
+  background: var(--lg-sheen), color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  box-shadow: var(--lg-bevel), 0 10px 30px rgba(3, 8, 28, 0.3);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -952,3 +960,184 @@ body[data-theme="light"] {
   line-height: 1.5;
   font-family: inherit;
 }
+
+/* ================================================================== *
+ *  Digitbox AI — chat UI + developer API panel
+ * ================================================================== */
+.nav-ai { border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border)) !important; }
+.ai-page { max-width: 1040px; }
+.ai-head h1 { margin-bottom: .2rem; }
+.ai-grad {
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ai-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: start;
+}
+.ai-sidebar { display: flex; flex-direction: column; gap: .6rem; }
+.ai-newchat { width: 100%; }
+.ai-chatlist { display: flex; flex-direction: column; gap: .4rem; max-height: 60vh; overflow-y: auto; }
+.ai-chatitem {
+  display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+  padding: .55rem .7rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-size: .85rem;
+}
+.ai-chatitem:hover { border-color: var(--ring); }
+.ai-chatitem.is-active { border-color: var(--ring); background: color-mix(in srgb, var(--accent) 16%, var(--lg-tint)); }
+.ai-chatitem-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-chatitem-del { color: var(--muted); font-size: .8rem; padding: 0 .2rem; border-radius: .3rem; }
+.ai-chatitem-del:hover { color: #fff; background: rgba(255,255,255,.12); }
+
+.ai-main {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--lg-sheen), linear-gradient(180deg, var(--lg-tint-2), var(--lg-tint));
+  box-shadow: var(--lg-bevel), var(--lg-drop);
+  overflow: hidden;
+}
+.ai-messages {
+  height: min(58vh, 520px);
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex; flex-direction: column; gap: .8rem;
+}
+.ai-empty { margin: auto; text-align: center; padding: 2rem 1rem; }
+.ai-empty-title { font-size: 1.1rem; font-weight: 700; margin-bottom: .3rem; }
+
+.ai-msg { max-width: 88%; display: flex; flex-direction: column; gap: .2rem; }
+.ai-msg-user { align-self: flex-end; align-items: flex-end; }
+.ai-msg-assistant { align-self: flex-start; }
+.ai-msg-role { font-size: .68rem; color: var(--muted); padding: 0 .3rem; }
+.ai-msg-body {
+  padding: .6rem .8rem;
+  border-radius: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--glass-border);
+}
+.ai-msg-user .ai-msg-body { background: var(--accent-grad); color: #fff; border: none; border-bottom-right-radius: .3rem; }
+.ai-msg-assistant .ai-msg-body { background: color-mix(in srgb, var(--surface) 40%, transparent); border-bottom-left-radius: .3rem; }
+
+.ai-typing { display: inline-flex; gap: .3rem; align-items: center; }
+.ai-typing span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted);
+  animation: aiTyping 1s infinite ease-in-out;
+}
+.ai-typing span:nth-child(2) { animation-delay: .15s; }
+.ai-typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes aiTyping { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
+.ai-error {
+  margin: 0; padding: .6rem 1rem;
+  color: #fecaca; font-size: .85rem;
+  background: rgba(127, 29, 29, .3);
+  border-top: 1px solid rgba(248,113,113,.35);
+}
+
+.ai-input-row {
+  display: flex; gap: .5rem; align-items: flex-end;
+  padding: .7rem; border-top: 1px solid var(--glass-border);
+}
+.ai-input { flex: 1; resize: none; min-height: 2.6rem; max-height: 8rem; line-height: 1.4; }
+.ai-send { flex: none; min-width: 4.5rem; }
+
+.ai-api { margin-top: 1.5rem; }
+.ai-api-toggle { background: none; border: none; color: inherit; cursor: pointer; padding: 0; }
+.ai-api-toggle h2 { margin: 0; }
+.ai-api-body { margin-top: .6rem; display: grid; gap: .4rem; }
+.ai-api-body p { margin: .4rem 0 .1rem; }
+
+@media (max-width: 760px) {
+  .ai-shell { grid-template-columns: 1fr; }
+  .ai-chatlist { flex-direction: row; overflow-x: auto; max-height: none; }
+  .ai-chatitem { flex: 0 0 auto; max-width: 60vw; }
+}
+
+/* ================================================================== *
+ *  Easter eggs (trigger-only animations)
+ * ================================================================== */
+.egg-barrel-roll { animation: eggBarrelRoll 1s ease-in-out; }
+@keyframes eggBarrelRoll { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+.egg-rain {
+  position: fixed; inset: 0; z-index: 2147483001;
+  pointer-events: none; overflow: hidden;
+}
+.egg-rain span {
+  position: absolute; top: -12%;
+  animation-name: eggFall; animation-timing-function: linear; animation-fill-mode: forwards;
+  will-change: transform;
+}
+@keyframes eggFall {
+  from { transform: translateY(0) rotate(0); opacity: 1; }
+  to { transform: translateY(120vh) rotate(360deg); opacity: .9; }
+}
+
+.egg-toast {
+  position: fixed; left: 50%; bottom: 2rem; transform: translate(-50%, 20px);
+  z-index: 2147483002; pointer-events: none;
+  padding: .7rem 1.1rem; border-radius: 999px;
+  background: color-mix(in srgb, #0a1024 85%, transparent);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  color: #fff; font-weight: 700; font-size: .9rem;
+  box-shadow: var(--lg-drop);
+  opacity: 0; transition: opacity .3s ease, transform .3s ease;
+}
+.egg-toast.is-in { opacity: 1; transform: translate(-50%, 0); }
+
+.egg-rainbow {
+  position: fixed; inset: 0; z-index: 2147483000; pointer-events: none;
+  background: linear-gradient(120deg, #ff004c, #ff9a00, #ffe600, #37ff00, #00e5ff, #6a00ff, #ff00d4);
+  background-size: 300% 300%;
+  mix-blend-mode: overlay;
+  animation: eggRainbow 1.6s ease forwards;
+}
+@keyframes eggRainbow {
+  0% { opacity: 0; background-position: 0% 50%; }
+  25% { opacity: .55; }
+  100% { opacity: 0; background-position: 100% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .egg-barrel-roll, .egg-rain span, .egg-rainbow { animation: none; }
+  .egg-rain, .egg-rainbow { display: none; }
+}
+
+/* Changelog (markdown) */
+.changelog-body h1 { margin: 0 0 .3rem; }
+.changelog-body h2 {
+  margin: 1.5rem 0 .5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--glass-border);
+  background: linear-gradient(100deg, var(--text), color-mix(in srgb, var(--accent-2) 60%, var(--text)));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.changelog-body h2:first-of-type { border-top: none; padding-top: 0; }
+.changelog-body ul { list-style: disc; padding-left: 1.35rem; margin: .4rem 0; }
+.changelog-body li { margin: .3rem 0; }
+.changelog-body p { margin: .5rem 0; }
+.changelog-body code {
+  background: rgba(0, 0, 0, .35);
+  border: 1px solid var(--glass-border);
+  border-radius: .35rem;
+  padding: .05rem .35rem;
+  font-size: .9em;
+}
+.changelog-body a { text-decoration: underline; }
