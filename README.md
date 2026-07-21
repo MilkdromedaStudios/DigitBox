@@ -2,14 +2,6 @@
 
 This project uses **Next.js (Pages Router)** with **Supabase** for authentication and data storage.
 
-## 🐙 Octo Loader (Minecraft mod)
-
-The repo also hosts **Octo Loader**, a Fabric mod for Minecraft 26.2 that ingests
-Fabric/Quilt/Forge/NeoForge mods and Paper plugins from any Minecraft version and
-bridges them to your game via Modrinth. Full instructions and compatibility matrix:
-[octo-loader/README.md](octo-loader/README.md). Built and smoke-tested by the
-`Octo Loader` GitHub Actions workflow.
-
 ## Game files (fetched from GitHub at runtime)
 
 The game HTML files live in `public/projects/` as **Git LFS** files, but they
