@@ -1,6 +1,11 @@
 import projectsIndex from "../../data/projects-index.json";
 import GameFrame from "../../components/GameFrame";
 
+// Cloudflare Pages only supports the edge runtime for pages with
+// getServerSideProps; the Node serverless default builds fine on Vercel/local
+// but fails the Cloudflare Pages build.
+export const config = { runtime: "experimental-edge" };
+
 export default function ProjectRunner({ src, title, slug, isExternal }) {
   return <GameFrame src={src} title={title} slug={slug} isExternal={isExternal} />;
 }
