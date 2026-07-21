@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import "../styles/global.css";
 import "../styles/login.css";
 import Layout from "../components/Layout";
+import LiquidGlassFX from "../components/LiquidGlassFX";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
 export default function MyApp({ Component, pageProps, router }) {
@@ -24,13 +25,18 @@ export default function MyApp({ Component, pageProps, router }) {
     };
   }, []);
 
-  if (router?.pathname?.startsWith("/projects/")) {
-    return <Component {...pageProps} />;
-  }
+  const isProjectRunner = router?.pathname?.startsWith("/projects/");
 
   return (
-    <Layout>
-      <Component {...pageProps} />
-    </Layout>
+    <>
+      <LiquidGlassFX />
+      {isProjectRunner ? (
+        <Component {...pageProps} />
+      ) : (
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
+      )}
+    </>
   );
 }
