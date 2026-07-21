@@ -6,6 +6,7 @@ import { readNotes, writeNotes } from "../lib/notes";
 export default function GalleryPage() {
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("all"); // "all" | "liked"
   const [likes, setLikes] = useState([]);
@@ -44,10 +45,20 @@ export default function GalleryPage() {
 
   async function loadProjects() {
     setError("");
-    const res = await fetch("/api/content/list?type=project");
-    const payload = await res.json();
-    if (!res.ok) return setError(payload.error || "Failed to load projects");
-    setProjects(payload.items || []);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/content/list?type=project");
+      const payload = await res.json();
+      if (!res.ok) {
+        setError(payload.error || "Failed to load projects");
+        return;
+      }
+      setProjects(payload.items || []);
+    } catch {
+      setError("Failed to load projects");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function onToggleLike(slug) {
@@ -108,11 +119,17 @@ export default function GalleryPage() {
         </div>
       </div>
 
-      {filtered.length === 0 && (
+      {loading && <p className="post-meta">Loading projects…</p>}
+
+      {!loading && !error && projects.length === 0 && (
+        <p className="post-meta">No projects available yet.</p>
+      )}
+
+      {!loading && !error && projects.length > 0 && filtered.length === 0 && (
         <p className="post-meta">
           {tab === "liked"
             ? "No liked projects yet — tap ♥ Like on a project to save it here."
-            : "No projects match your search."}
+            : `No projects match “${query.trim()}”.`}
         </p>
       )}
 
