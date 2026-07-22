@@ -4,32 +4,30 @@ Digitbox AI is the built-in chat assistant (the **Digitbox AI** tab) and a
 public request API. It talks to any **OpenAI-compatible** chat-completions
 provider, so you can run it on a free tier — you just add one API key.
 
-The default provider is **Hugging Face**, so the key is a **Hugging Face
-token**.
+The default provider is **OpenRouter**, so the key is an **OpenRouter API
+key**.
 
 ## 1. Get a free key
 
-### Hugging Face (default) — key is an HF token
+### OpenRouter (default)
 
-1. Go to **https://huggingface.co/settings/tokens** and create a token with
-   **Read** access and permission to **make calls to Inference Providers**
-   (a fine-grained token with the Inference permission works too).
-2. Copy the token — that is your `AI_API_KEY`.
+1. Go to **https://openrouter.ai/keys** and create an API key.
+2. Copy the key — that is your `AI_API_KEY`.
 
-> Some models are **gated** (require accepting a licence on the model page).
-> If you get a 403 / "gated" error, either accept the licence for
-> `meta-llama/Llama-3.1-8B-Instruct` on Hugging Face, or set `AI_MODEL` to a
-> non-gated model such as `Qwen/Qwen2.5-7B-Instruct`.
+OpenRouter exposes many **free** models (their ids end in `:free`). The default
+is `meta-llama/llama-3.1-8b-instruct:free`; pick any other from
+https://openrouter.ai/models and set it as `AI_MODEL`. Free models are
+rate-limited per account.
 
 ### Other providers (optional)
 
 | Provider | Where | `AI_PROVIDER` | Default model |
 | --- | --- | --- | --- |
-| **Hugging Face** (default) | https://huggingface.co/settings/tokens | `huggingface` | `meta-llama/Llama-3.1-8B-Instruct` |
+| **OpenRouter** (default) | https://openrouter.ai/keys | `openrouter` | `meta-llama/llama-3.1-8b-instruct:free` |
+| **Hugging Face** | https://huggingface.co/settings/tokens | `huggingface` | `meta-llama/Llama-3.1-8B-Instruct` |
 | **GitHub Models** | https://github.com/settings/tokens | `github` | `openai/gpt-4o-mini` |
 | **Groq** | https://console.groq.com | `groq` | `llama-3.1-8b-instant` |
 | **Google Gemini** | https://aistudio.google.com/apikey | `gemini` | `gemini-1.5-flash` |
-| **OpenRouter** | https://openrouter.ai/keys | `openrouter` | `meta-llama/llama-3.1-8b-instruct:free` |
 
 ## 2. Where to put the key (important)
 
@@ -50,11 +48,11 @@ must live in the **hosting** environment:
 > encrypted secret store, so your token still isn't in the repo.)
 
 ```
-AI_PROVIDER=huggingface
-AI_API_KEY=your_hugging_face_token_here
-# optional (e.g. if the default model is gated for your token):
-# AI_MODEL=Qwen/Qwen2.5-7B-Instruct
-# AI_BASE_URL=https://router.huggingface.co/v1
+AI_PROVIDER=openrouter
+AI_API_KEY=your_openrouter_key_here
+# optional (any model id from https://openrouter.ai/models):
+# AI_MODEL=meta-llama/llama-3.1-8b-instruct:free
+# AI_BASE_URL=https://openrouter.ai/api/v1
 ```
 
 `AI_API_KEY` is a **server-side secret** — never prefix it with
