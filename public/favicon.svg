@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="DigitBox">
+  <defs>
+    <linearGradient id="dbxg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#4cc9f0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="url(#dbxg)"/>
+  <!-- isometric "box" -->
+  <path d="M32 15 L51 26 L32 37 L13 26 Z" fill="#ffffff"/>
+  <path d="M13 26 L32 37 L32 55 L13 44 Z" fill="#ffffff" opacity="0.60"/>
+  <path d="M51 26 L32 37 L32 55 L51 44 Z" fill="#ffffff" opacity="0.80"/>
+</svg>

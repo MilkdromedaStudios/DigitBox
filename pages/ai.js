@@ -157,8 +157,8 @@ export default function DigitboxAiPage() {
       {configured === false && (
         <div className="notice notice-warn" role="status">
           <strong>Digitbox AI isn&apos;t switched on yet.</strong> This deployment has no
-          <code> AI_API_KEY</code> set. An admin can add a free key — a Hugging Face token
-          (default), or GitHub Models, Groq, Google Gemini, OpenRouter — in the hosting
+          <code> AI_API_KEY</code> set. An admin can add a free key — an OpenRouter key
+          (default), or Hugging Face, GitHub Models, Groq, Google Gemini — in the hosting
           env (Cloudflare Pages); see <code>docs/DIGITBOX_AI_SETUP.md</code>. You can still
           browse the chat and API docs below.
         </div>
