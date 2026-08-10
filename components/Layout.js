@@ -84,7 +84,7 @@ export default function Layout({ children }) {
           <Link href="/">Home</Link>
           <Link href="/gallery">Gallery</Link>
           <Link href="/ai" className="nav-ai">Digitbox AI</Link>
-          <Link href="/posts">Posts</Link>
+          <a href="https://blog.digitbox.dev/">Blogs</a>
           {isAdmin && <Link href="/admin">Admin</Link>}
 
           {!isAuthLoading && !user && (
