@@ -24,7 +24,7 @@ export async function getServerSideProps({ params }) {
   if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
     return {
       props: {
-        src: "https://irv77.github.io/AmplerLauncher/index.html",
+        src: "https://irv77.github.io/FnafLauncher/",
         title: "Eaglercraft Launcher",
         slug: "eaglercraft-launcher",
         isExternal: true,
