@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import "../styles/global.css";
 import "../styles/login.css";
+import "../styles/motion.css";
 import Layout from "../components/Layout";
+import PageTransition from "../components/PageTransition";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
 export default function MyApp({ Component, pageProps, router }) {
@@ -25,12 +27,20 @@ export default function MyApp({ Component, pageProps, router }) {
   }, []);
 
   if (router?.pathname?.startsWith("/projects/")) {
-    return <Component {...pageProps} />;
+    return (
+      <>
+        <Component {...pageProps} />
+        <PageTransition router={router} />
+      </>
+    );
   }
 
   return (
-    <Layout>
-      <Component {...pageProps} />
-    </Layout>
+    <>
+      <Layout>
+        <Component {...pageProps} />
+      </Layout>
+      <PageTransition router={router} />
+    </>
   );
 }
