@@ -1,0 +1,405 @@
+/* DigitBox motion + liquid-glass polish.
+   Imported after global.css so these rules intentionally restore a little
+   motion that the performance guardrails in the base stylesheet disable. */
+
+:root {
+  --motion-spring: cubic-bezier(.2, 1.45, .35, 1);
+  --motion-smooth: cubic-bezier(.22, 1, .36, 1);
+  --glass-rim-strong: rgba(255, 255, 255, .22);
+  --glass-rim-soft: rgba(255, 255, 255, .08);
+  --glass-deep-shadow: 0 22px 60px rgba(2, 5, 18, .48);
+  --glass-hover-glow: 0 24px 70px color-mix(in srgb, var(--accent) 18%, rgba(2, 5, 18, .58));
+}
+
+body[data-theme="light"] {
+  --glass-rim-strong: rgba(255, 255, 255, .92);
+  --glass-rim-soft: rgba(99, 102, 241, .12);
+  --glass-deep-shadow: 0 18px 52px rgba(15, 23, 42, .14);
+  --glass-hover-glow: 0 24px 58px color-mix(in srgb, var(--accent) 13%, rgba(15, 23, 42, .16));
+}
+
+/* Stronger layered glass: bright top rim, darker lower refraction, and more
+   saturation so the background colour visibly shines through the material. */
+.header,
+.section,
+.card,
+.gallery-item,
+.post-card,
+.hero-box,
+.ai-main,
+.admin-hero,
+.admin-setup-card,
+.admin-task-card,
+.admin-kpi-card,
+.admin-post-row {
+  border-color: color-mix(in srgb, var(--glass-rim-strong) 58%, var(--accent) 12%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim-strong),
+    inset 1px 0 0 var(--glass-rim-soft),
+    inset -1px 0 0 rgba(255, 255, 255, .035),
+    inset 0 -24px 54px -38px rgba(0, 0, 0, .7),
+    var(--glass-deep-shadow);
+  backdrop-filter: blur(18px) saturate(175%) contrast(104%);
+  -webkit-backdrop-filter: blur(18px) saturate(175%) contrast(104%);
+}
+
+.section,
+.card,
+.gallery-item,
+.post-card,
+.hero-box,
+.ai-main {
+  background:
+    radial-gradient(120% 85% at 18% -12%, rgba(255, 255, 255, .13), transparent 44%),
+    radial-gradient(90% 100% at 100% 0%, color-mix(in srgb, var(--accent-2) 11%, transparent), transparent 58%),
+    linear-gradient(145deg, color-mix(in srgb, var(--lg-tint-2) 94%, transparent), color-mix(in srgb, var(--lg-tint) 92%, transparent));
+}
+
+.header {
+  backdrop-filter: blur(22px) saturate(185%) contrast(105%);
+  -webkit-backdrop-filter: blur(22px) saturate(185%) contrast(105%);
+}
+
+/* Animated accent line across the glass header. */
+.header::after {
+  background-size: 220% 100%;
+  animation: digitboxGlassLine 6s linear infinite;
+}
+
+@keyframes digitboxGlassLine {
+  from { background-position: 200% 0; }
+  to { background-position: -20% 0; }
+}
+
+/* More life in the hero without moving layout around. */
+.hero::before {
+  animation: digitboxAurora 10s ease-in-out infinite alternate;
+  transform-origin: 50% 20%;
+}
+
+.hero-box {
+  animation: digitboxGlassFloat 6.5s ease-in-out infinite;
+}
+
+@keyframes digitboxAurora {
+  0% { transform: translate3d(-2%, -1%, 0) rotate(-2deg) scale(1.02); opacity: .65; }
+  50% { transform: translate3d(2%, 1%, 0) rotate(2deg) scale(1.08); opacity: .95; }
+  100% { transform: translate3d(-1%, 2%, 0) rotate(-1deg) scale(1.04); opacity: .78; }
+}
+
+@keyframes digitboxGlassFloat {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -4px, 0); }
+}
+
+/* Page content arrives with a gentle glass-panel lift. */
+.content > * {
+  animation: digitboxContentIn .46s var(--motion-smooth) both;
+}
+.content > *:nth-child(2) { animation-delay: .045s; }
+.content > *:nth-child(3) { animation-delay: .08s; }
+.content > *:nth-child(4) { animation-delay: .11s; }
+
+@keyframes digitboxContentIn {
+  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(.992); filter: blur(3px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
+}
+
+/* Card reflections sweep through on hover. */
+.card,
+.gallery-item,
+.post-card,
+.support-pill {
+  transition:
+    transform .34s var(--motion-spring),
+    box-shadow .32s var(--motion-smooth),
+    border-color .25s ease,
+    filter .25s ease;
+}
+
+.card::after,
+.gallery-item::after,
+.post-card::after,
+.support-pill::after {
+  content: "";
+  position: absolute;
+  inset: -45% auto -45% -55%;
+  width: 38%;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-160%, 0, 0) rotate(13deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.19), transparent);
+  filter: blur(1px);
+  transition: transform .72s var(--motion-smooth), opacity .2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover,
+  .gallery-item:hover,
+  .post-card:hover {
+    transform: translate3d(0, -6px, 0) scale(1.012);
+    box-shadow:
+      inset 0 1px 0 var(--glass-rim-strong),
+      inset 0 0 0 1px var(--glass-rim-soft),
+      var(--glass-hover-glow);
+    filter: brightness(1.035);
+  }
+
+  .support-grid a:hover .support-pill,
+  .support-pill:hover {
+    transform: translate3d(0, -4px, 0) scale(1.018);
+    box-shadow: var(--lg-bevel), var(--glass-hover-glow);
+  }
+
+  .card:hover::after,
+  .gallery-item:hover::after,
+  .post-card:hover::after,
+  .support-pill:hover::after,
+  .support-grid a:hover .support-pill::after {
+    opacity: 1;
+    transform: translate3d(470%, 0, 0) rotate(13deg);
+  }
+}
+
+/* Springy buttons and nav pills. This deliberately overrides the old static
+   transform guard at the end of global.css. */
+.nav a,
+.btn-base,
+button:not(:disabled),
+.action-btn,
+.gallery-tab,
+.like-toggle,
+.game-btn,
+.save-act,
+.project-back-btn {
+  transform-origin: 50% 70%;
+  transition:
+    transform .28s var(--motion-spring),
+    box-shadow .24s var(--motion-smooth),
+    border-color .2s ease,
+    filter .2s ease,
+    background .2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav a:hover,
+  .btn-base:hover,
+  button:not(:disabled):hover,
+  .action-btn:hover,
+  .gallery-tab:hover,
+  .like-toggle:hover,
+  .game-btn:hover,
+  .save-act:hover,
+  .project-back-btn:hover {
+    transform: translate3d(0, -3px, 0) scale(1.025);
+    filter: brightness(1.055) saturate(1.08);
+  }
+}
+
+.nav a:active,
+.btn-base:active,
+button:not(:disabled):active,
+.action-btn:active,
+.gallery-tab:active,
+.like-toggle:active,
+.game-btn:active,
+.save-act:active,
+.project-back-btn:active {
+  transform: translate3d(0, 1px, 0) scale(.94);
+  transition-duration: .09s;
+}
+
+/* Give nav/buttons a glassier top reflection. */
+.nav a,
+.btn-base,
+.gallery-tab,
+.like-toggle,
+.game-btn,
+.save-act {
+  background:
+    radial-gradient(120% 90% at 50% -35%, rgba(255,255,255,.17), transparent 52%),
+    linear-gradient(180deg, color-mix(in srgb, var(--lg-tint-2) 92%, transparent), color-mix(in srgb, var(--lg-tint) 94%, transparent));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.2),
+    inset 0 0 0 1px rgba(255,255,255,.035),
+    0 8px 22px rgba(2,5,18,.28);
+  backdrop-filter: blur(16px) saturate(165%);
+  -webkit-backdrop-filter: blur(16px) saturate(165%);
+}
+
+/* Keep gradient/danger buttons recognisable while preserving the bounce. */
+.auth-btn,
+.exit-btn,
+.save-act-primary,
+.gallery-tab.is-active {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ------------------------------------------------------------------
+   Route-loading glass screen
+   ------------------------------------------------------------------ */
+.page-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent-2) 16%, transparent), transparent 34%),
+    radial-gradient(circle at 68% 62%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 38%),
+    rgba(3, 7, 18, .34);
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
+  transition: opacity .25s ease, visibility 0s linear .25s;
+}
+
+.page-transition.is-loading {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity .16s ease;
+}
+
+.page-transition-glass {
+  width: min(88vw, 310px);
+  padding: 1.5rem 1.35rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .8rem;
+  border-radius: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--glass-rim-strong) 70%, var(--accent) 14%);
+  background:
+    radial-gradient(120% 90% at 50% -20%, rgba(255,255,255,.18), transparent 52%),
+    linear-gradient(145deg, color-mix(in srgb, var(--lg-tint-2) 88%, transparent), color-mix(in srgb, var(--lg-tint) 86%, transparent));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.24),
+    inset 0 0 0 1px rgba(255,255,255,.05),
+    0 30px 90px rgba(2,5,18,.62),
+    0 0 60px color-mix(in srgb, var(--accent) 17%, transparent);
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  transform: translate3d(0, 12px, 0) scale(.94);
+  transition: transform .36s var(--motion-spring);
+}
+
+.page-transition.is-loading .page-transition-glass {
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.page-transition-title {
+  font-size: 1rem;
+  font-weight: 850;
+  letter-spacing: -.02em;
+  background: linear-gradient(100deg, #fff, color-mix(in srgb, var(--accent-2) 80%, white), color-mix(in srgb, var(--accent) 82%, white));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.page-transition-orb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--accent), var(--accent-2), rgba(255,255,255,.9), var(--accent));
+  box-shadow: 0 0 34px color-mix(in srgb, var(--accent) 35%, transparent);
+  animation: digitboxOrbSpin 1.25s linear infinite;
+}
+
+.page-transition-orb::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 34% 25%, rgba(255,255,255,.35), transparent 25%),
+    color-mix(in srgb, var(--bg-elev) 72%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.page-transition-orb span {
+  position: absolute;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 14px rgba(255,255,255,.8);
+}
+.page-transition-orb span:nth-child(1) { top: 7px; left: 31px; }
+.page-transition-orb span:nth-child(2) { right: 9px; bottom: 19px; width: 6px; height: 6px; opacity: .75; }
+.page-transition-orb span:nth-child(3) { left: 12px; bottom: 14px; width: 5px; height: 5px; opacity: .55; }
+
+.page-transition-track {
+  width: min(210px, 78%);
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.09);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+
+.page-transition-track span {
+  display: block;
+  width: 44%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2), #fff);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-2) 50%, transparent);
+  animation: digitboxLoadSweep 1s var(--motion-smooth) infinite;
+}
+
+@keyframes digitboxOrbSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes digitboxLoadSweep {
+  0% { transform: translateX(-125%) scaleX(.7); }
+  55% { transform: translateX(105%) scaleX(1.05); }
+  100% { transform: translateX(245%) scaleX(.72); }
+}
+
+/* Accessibility/performance: users who request reduced motion still get the
+   stronger glass material, but not the animated movement. */
+@media (prefers-reduced-motion: reduce) {
+  .header::after,
+  .hero::before,
+  .hero-box,
+  .content > *,
+  .page-transition-orb,
+  .page-transition-track span {
+    animation: none !important;
+  }
+
+  .nav a,
+  .btn-base,
+  button:not(:disabled),
+  .action-btn,
+  .gallery-tab,
+  .like-toggle,
+  .game-btn,
+  .save-act,
+  .project-back-btn,
+  .card,
+  .gallery-item,
+  .post-card,
+  .support-pill,
+  .page-transition-glass {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .card::after,
+  .gallery-item::after,
+  .post-card::after,
+  .support-pill::after {
+    display: none;
+  }
+}
