@@ -1,5 +1,8 @@
 [
-  "Eaglercraft Launcher",
+  {
+    "title": "Five Nights at Freddy's Launcher",
+    "slug": "fnaf-launcher"
+  },
   "Crystal Seeker 3D",
   "IGE Editor",
   "Appel 3D",

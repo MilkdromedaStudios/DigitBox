@@ -21,12 +21,17 @@ export async function getServerSideProps({ params }) {
   const rawSlug = Array.isArray(params.project) ? params.project[0] : params.project;
   const slug = decodeURIComponent(rawSlug || "");
 
-  if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
+  if (
+    slug === "Five Nights at Freddy's Launcher" ||
+    slug === "fnaf-launcher" ||
+    slug === "Eaglercraft Launcher" ||
+    slug === "eaglercraft-launcher"
+  ) {
     return {
       props: {
         src: "https://irv77.github.io/FnafLauncher/",
-        title: "Eaglercraft Launcher",
-        slug: "eaglercraft-launcher",
+        title: "Five Nights at Freddy's Launcher",
+        slug: "fnaf-launcher",
         isExternal: true,
       },
     };
