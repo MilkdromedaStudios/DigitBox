@@ -2,6 +2,18 @@
 
 This project uses **Next.js (Pages Router)** with **Supabase** for authentication and data storage.
 
+## AppGPT
+
+AppGPT now lives inside DigitBox and is served at:
+
+`https://digitbox.dev/appgpt`
+
+The browser runtime is isolated under `public/appgpt/`, while `next.config.js` rewrites the clean `/appgpt` URL directly to the AppGPT HTML shell. This keeps AppGPT as the top-level document, which is important for Telegram Mini App APIs.
+
+AppGPT supports persistent chat-based app creation, one evolving app per chat, versioned `index.html` artifacts, Code / Preview / Debug tabs, AI provider presets, Telegram-native UI hooks, templates, visual edits, debugging, downloading, and GitHub Pages publishing.
+
+The Telegram onboarding bot lives in `appgpt-bot/` and defaults to the DigitBox AppGPT URL. See `appgpt-bot/README.md` for deployment/setup.
+
 ## Game files (fetched from GitHub at runtime)
 
 The game HTML files live in `public/projects/` as **Git LFS** files, but they
