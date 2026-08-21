@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070b14">
+  <title>AppGPT Quick Start</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;--bg:#070b14;--panel:rgba(15,22,39,.78);--line:rgba(255,255,255,.1);--text:#f5f7ff;--muted:#9da8be;--a:#8b7cff;--b:#63d8ff}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);background:radial-gradient(circle at 12% 0%,#192451 0,transparent 35%),radial-gradient(circle at 95% 35%,#123348 0,transparent 34%),var(--bg)}main{width:min(860px,calc(100% - 28px));margin:0 auto;padding:34px 0 60px}.hero,.card{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.03));backdrop-filter:blur(22px);border-radius:24px;box-shadow:0 26px 70px rgba(0,0,0,.28)}.hero{padding:28px}.brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-weight:900;background:linear-gradient(135deg,var(--a),var(--b))}.eyebrow{font-size:11px;letter-spacing:.15em;color:#b5bfd5;font-weight:800;margin:0 0 6px}.hero h1{margin:0;font-size:clamp(30px,6vw,52px);letter-spacing:-.04em}.hero p{color:var(--muted);line-height:1.65;max-width:650px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.actions a{color:white;text-decoration:none;padding:11px 14px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.055);font-weight:700;font-size:13px}.actions a.primary{border:0;background:linear-gradient(135deg,#7567ff,#509bd5)}.steps{display:grid;gap:13px;margin-top:18px}.card{padding:20px;display:grid;grid-template-columns:42px 1fr;gap:14px}.num{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:900;background:rgba(139,124,255,.14);color:#c8c2ff}.card h2{font-size:17px;margin:2px 0 7px}.card p{font-size:13px;line-height:1.6;color:var(--muted);margin:0}.tip{margin-top:18px;padding:16px 18px;border-radius:18px;border:1px solid rgba(99,216,255,.18);background:rgba(99,216,255,.055);color:#cdefff;font-size:13px;line-height:1.6}.providers{margin-top:20px}.providers h2{font-size:18px}.provider-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.provider-grid span{padding:10px;border:1px solid var(--line);border-radius:12px;text-align:center;color:#c6cede;background:rgba(255,255,255,.03);font-size:12px}@media(max-width:650px){main{padding-top:14px}.hero{padding:20px}.provider-grid{grid-template-columns:repeat(2,1fr)}.card{grid-template-columns:36px 1fr;padding:16px}.num{width:34px;height:34px}}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="brand"><div class="logo">A</div><div><p class="eyebrow">APPGPT QUICK START</p><h1>Build your first Telegram Mini App</h1></div></div>
+      <p>AppGPT turns a plain-language idea into one complete Telegram-ready <code>index.html</code>. Your chat is saved before generation begins, so you can return to the session, keep editing, debug it, and publish it.</p>
+      <div class="actions"><a class="primary" href="/appgpt">✦ Open AppGPT</a><a href="/appgpt?view=templates">Browse templates</a><a href="/appgpt?view=settings">Connect an AI provider</a><a href="https://github.com/MilkdromedaStudios/DigitBox">GitHub</a></div>
+    </section>
+    <section class="steps">
+      <article class="card"><div class="num">1</div><div><h2>Connect an AI model</h2><p>Open Provider. Choose Gemini, Hugging Face, OpenAI, Claude, OpenRouter, or another supported provider. Paste your own API key and test the connection.</p></div></article>
+      <article class="card"><div class="num">2</div><div><h2>Start a chat</h2><p>Describe the app you want. The current chat becomes the app, and future messages keep editing that same app instead of creating a separate project.</p></div></article>
+      <article class="card"><div class="num">3</div><div><h2>Create the app</h2><p>Use Create App to confirm the current chat as your app brief. Inside Telegram, AppGPT uses Telegram's native popup when available.</p></div></article>
+      <article class="card"><div class="num">4</div><div><h2>Preview, code, and debug</h2><p>Switch between Content, Code, Preview, and Debug. Code changes can be saved as versions, while normal chat messages update the current app with AI.</p></div></article>
+      <article class="card"><div class="num">5</div><div><h2>Download or publish</h2><p>Download the generated <code>index.html</code> or publish it through AppGPT's GitHub Pages flow, then use the HTTPS result as a Telegram Mini App URL.</p></div></article>
+    </section>
+    <div class="tip"><strong>Tip:</strong> AppGPT defaults to dark mode and includes a light-mode toggle. LiquidGL is used when available, with a normal glass fallback.</div>
+    <section class="providers"><h2>Provider choices</h2><div class="provider-grid"><span>Google Gemini</span><span>Hugging Face</span><span>OpenAI</span><span>Anthropic</span><span>OpenRouter</span><span>Groq</span><span>DeepSeek</span><span>Mistral</span><span>Together / xAI</span></div></section>
+  </main>
+</body>
+</html>
