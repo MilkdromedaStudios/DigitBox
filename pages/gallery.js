@@ -8,7 +8,7 @@ export default function GalleryPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState("all"); // "all" | "liked"
+  const [tab, setTab] = useState("all"); // "all" | "liked" | "appgpt"
   const [likes, setLikes] = useState([]);
   const [notes, setNotes] = useState("");
   const [notesSaved, setNotesSaved] = useState(true);
@@ -19,7 +19,6 @@ export default function GalleryPage() {
     loadProjects();
   }, []);
 
-  // Load per-device likes + notes and keep likes in sync across tabs.
   useEffect(() => {
     setLikes(readLikes());
     setNotes(readNotes());
@@ -33,7 +32,6 @@ export default function GalleryPage() {
     };
   }, []);
 
-  // Debounced autosave for the notes scratchpad.
   useEffect(() => {
     if (!hydratedRef.current) return undefined;
     const id = setTimeout(() => {
@@ -71,6 +69,7 @@ export default function GalleryPage() {
   );
 
   const filtered = useMemo(() => {
+    if (tab === "appgpt") return [];
     const q = query.trim().toLowerCase();
     let list = tab === "liked" ? projects.filter((p) => likes.includes(p.slug)) : projects;
     if (q) {
@@ -86,17 +85,21 @@ export default function GalleryPage() {
   return (
     <div className="content">
       <h1>Projects Gallery</h1>
-      {error && <p className="post-meta">{error}</p>}
+      {error && tab !== "appgpt" && <p className="post-meta">{error}</p>}
 
       <div className="gallery-toolbar">
-        <input
-          type="search"
-          className="auth-input gallery-search"
-          placeholder="Search projects…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search projects"
-        />
+        {tab !== "appgpt" ? (
+          <input
+            type="search"
+            className="auth-input gallery-search"
+            placeholder="Search projects…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search projects"
+          />
+        ) : (
+          <div className="post-meta">Build Telegram Mini Apps with AI.</div>
+        )}
         <div className="gallery-tabs" role="tablist">
           <button
             type="button"
@@ -116,49 +119,78 @@ export default function GalleryPage() {
           >
             ♥ Liked{likedCount ? ` (${likedCount})` : ""}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "appgpt"}
+            className={`gallery-tab${tab === "appgpt" ? " is-active" : ""}`}
+            onClick={() => setTab("appgpt")}
+          >
+            ✦ AppGPT
+          </button>
         </div>
       </div>
 
-      {loading && <p className="post-meta">Loading projects…</p>}
+      {tab === "appgpt" ? (
+        <div className="gallery-grid">
+          <figure className="gallery-item">
+            <h2>AppGPT</h2>
+            <p className="post-meta">Telegram AI App Builder</p>
+            <p>
+              Turn a chat into a working Telegram Mini App, keep editing the same app,
+              inspect the code, preview it, debug it, and publish the generated index.html.
+            </p>
+            <div className="gallery-actions">
+              <Link className="auth-btn action-btn" href="/appgpt">
+                Open AppGPT
+              </Link>
+            </div>
+          </figure>
+        </div>
+      ) : (
+        <>
+          {loading && <p className="post-meta">Loading projects…</p>}
 
-      {!loading && !error && projects.length === 0 && (
-        <p className="post-meta">No projects available yet.</p>
+          {!loading && !error && projects.length === 0 && (
+            <p className="post-meta">No projects available yet.</p>
+          )}
+
+          {!loading && !error && projects.length > 0 && filtered.length === 0 && (
+            <p className="post-meta">
+              {tab === "liked"
+                ? "No liked projects yet — tap ♥ Like on a project to save it here."
+                : `No projects match “${query.trim()}”.`}
+            </p>
+          )}
+
+          <div className="gallery-grid">
+            {filtered.map((project) => {
+              const liked = likes.includes(project.slug);
+              return (
+                <figure key={project.path} className="gallery-item">
+                  <h2>{project.title}</h2>
+                  <p className="post-meta">{project.name}</p>
+                  <div className="gallery-actions">
+                    <Link className="auth-btn action-btn" href={`/projects/${encodeURIComponent(project.slug)}`}>
+                      Open
+                    </Link>
+                    <button
+                      type="button"
+                      className={`like-toggle${liked ? " is-liked" : ""}`}
+                      onClick={() => onToggleLike(project.slug)}
+                      aria-pressed={liked}
+                      title={liked ? "Remove from liked" : "Add to liked"}
+                    >
+                      <span aria-hidden="true">{liked ? "♥" : "♡"}</span>
+                      {liked ? "Liked" : "Like"}
+                    </button>
+                  </div>
+                </figure>
+              );
+            })}
+          </div>
+        </>
       )}
-
-      {!loading && !error && projects.length > 0 && filtered.length === 0 && (
-        <p className="post-meta">
-          {tab === "liked"
-            ? "No liked projects yet — tap ♥ Like on a project to save it here."
-            : `No projects match “${query.trim()}”.`}
-        </p>
-      )}
-
-      <div className="gallery-grid">
-        {filtered.map((project) => {
-          const liked = likes.includes(project.slug);
-          return (
-            <figure key={project.path} className="gallery-item">
-              <h2>{project.title}</h2>
-              <p className="post-meta">{project.name}</p>
-              <div className="gallery-actions">
-                <Link className="auth-btn action-btn" href={`/projects/${encodeURIComponent(project.slug)}`}>
-                  Open
-                </Link>
-                <button
-                  type="button"
-                  className={`like-toggle${liked ? " is-liked" : ""}`}
-                  onClick={() => onToggleLike(project.slug)}
-                  aria-pressed={liked}
-                  title={liked ? "Remove from liked" : "Add to liked"}
-                >
-                  <span aria-hidden="true">{liked ? "♥" : "♡"}</span>
-                  {liked ? "Liked" : "Like"}
-                </button>
-              </div>
-            </figure>
-          );
-        })}
-      </div>
 
       <section className="section notes-section">
         <div className="notes-head">
