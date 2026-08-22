@@ -21,7 +21,8 @@ if (provider) {
 }
 
 migrateSavedFreePreset();
-applyLiveFreePreset();
+syncLivePreset();
+wireFreeLock();
 
 function migrateSavedFreePreset() {
   try {
@@ -34,8 +35,19 @@ function migrateSavedFreePreset() {
   } catch {}
 }
 
-function applyLiveFreePreset() {
-  if (!provider || E.provider?.value !== 'appgptFree') return;
+function wireFreeLock() {
+  E.provider?.addEventListener('change', () => setTimeout(syncLivePreset, 0));
+  E.modelInput?.addEventListener('change', syncLivePreset);
+  E.base?.addEventListener('change', syncLivePreset);
+  setTimeout(syncLivePreset, 120);
+  setTimeout(syncLivePreset, 700);
+}
+
+function syncLivePreset() {
+  const free = Boolean(provider && E.provider?.value === 'appgptFree');
+  if (E.modelInput) E.modelInput.readOnly = free;
+  if (E.base) E.base.readOnly = free;
+  if (!free) return;
   E.modelInput.value = FREE_MODELS[0];
   E.base.value = 'puter://ai';
   if (E.key) E.key.value = '';
