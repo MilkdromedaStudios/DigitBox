@@ -23,8 +23,8 @@ wireFreeLock();
 wireProgress();
 
 function installLocalCompatibilityShim() {
-  // providers.js already knows how to call the old keyless adapter. Keep that
-  // interface stable, but fulfill it locally with WebLLM instead of Puter.
+  // Keep the existing keyless-provider interface stable while fulfilling the
+  // request locally with WebLLM.
   const root = window.puter || {};
   root.ai = {
     ...(root.ai || {}),
@@ -92,6 +92,14 @@ function wireProgress() {
       : `Preparing Local Free AI · ${percent}%${percent < 100 ? ' · first load downloads the model once' : ''}`;
     window.dispatchEvent(new CustomEvent('appgpt-build-note', { detail: { text } }));
     if (value >= 1) toast('Local Free AI ready');
+  });
+
+  window.addEventListener('digitbox-local-ai-retry', event => {
+    if (!isFreeSelected()) return;
+    const reason = String(event.detail?.reason || 'invalid HTML response');
+    window.dispatchEvent(new CustomEvent('appgpt-build-note', {
+      detail: { text: `Local AI response was ${reason}. Retrying automatically with a stricter raw-HTML instruction…` }
+    }));
   });
 }
 
