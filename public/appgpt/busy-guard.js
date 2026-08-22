@@ -1,4 +1,4 @@
-import { S, toast } from './app-state.js';
+import { S, tg, toast } from './app-state.js';
 
 const BLOCKED_WHILE_BUSY = [
   '#buildBtn',
@@ -29,5 +29,15 @@ document.addEventListener('click', event => {
 
 window.addEventListener('appgpt-progress', event => {
   const detail = event.detail || {};
-  document.documentElement.classList.toggle('appgpt-busy', Boolean(S.busy && !detail.done && !detail.error));
+  const busy = Boolean(S.busy && !detail.done && !detail.error);
+  document.documentElement.classList.toggle('appgpt-busy', busy);
+  if (busy) {
+    try {
+      tg?.MainButton?.setParams?.({
+        text: 'BUILDING…',
+        is_active: false,
+        has_shine_effect: false
+      });
+    } catch {}
+  }
 });
