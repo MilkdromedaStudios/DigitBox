@@ -5,6 +5,7 @@ import './telegram-account.js';
 import './telegram-account-security.js';
 import './unsaved-guard.js';
 import './busy-guard.js';
+import './interrupted-build-recovery.js';
 import './free-ai-bootstrap.js';
 import './ai-switcher.js';
 import './ai-switcher-hooks.js';
