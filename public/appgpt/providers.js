@@ -7,12 +7,37 @@ migrateLegacyGeminiDefault();
 export const PROVIDERS = {
   openai: { name: 'OpenAI', kind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-mini', vision: true, hint: 'OpenAI-compatible chat endpoint' },
   openrouter: { name: 'OpenRouter', kind: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-5-mini', vision: true, hint: 'Many models through one API' },
+  openrouterFree: {
+    name: 'OpenRouter Free',
+    kind: 'openai-compatible',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'openrouter/free',
+    vision: true,
+    freeTier: true,
+    freeLabel: '25+ free models · 50 requests/day',
+    freeNote: 'The free router chooses among currently available free models, so output quality and model identity can vary between requests.',
+    hint: 'Free Models Router · availability changes automatically'
+  },
+  cerebras: {
+    name: 'Cerebras Free',
+    kind: 'openai-compatible',
+    baseUrl: 'https://api.cerebras.ai/v1',
+    model: 'gpt-oss-120b',
+    vision: false,
+    freeTier: true,
+    freeLabel: 'Free tier · 64K TPM · 1M tokens/day',
+    freeNote: 'Excellent free throughput for text/code, but no image input in this AppGPT preset.',
+    hint: 'Very fast hosted inference · OpenAI-compatible API'
+  },
   huggingface: {
     name: 'Hugging Face',
     kind: 'openai-compatible',
     baseUrl: 'https://router.huggingface.co/v1',
     model: 'Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest',
     vision: true,
+    freeTier: true,
+    freeLabel: '$0.10 monthly free inference credit',
+    freeNote: 'Useful for experiments, but the free monthly credit is tiny for large full-file app generations.',
     hint: 'Hugging Face Inference Providers router · LLMs and VLMs',
     modelHint: 'Use any chat-capable Hugging Face model ID. Routing suffixes like :fastest, :cheapest, and :preferred are supported.',
     models: [
@@ -27,12 +52,43 @@ export const PROVIDERS = {
       'Qwen/Qwen2.5-VL-3B-Instruct:fastest'
     ]
   },
-  groq: { name: 'Groq', kind: 'openai-compatible', baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', vision: false, hint: 'Fast OpenAI-compatible inference' },
+  groq: {
+    name: 'Groq Free',
+    kind: 'openai-compatible',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    vision: false,
+    freeTier: true,
+    freeLabel: 'Free plan · up to 1,000 requests/day on selected models',
+    freeNote: 'Fast and genuinely useful, but current free token-per-minute limits can reject very large AppGPT edits.',
+    hint: 'Fast OpenAI-compatible inference · free-plan limits'
+  },
+  cloudflare: {
+    name: 'Cloudflare Workers AI',
+    kind: 'openai-compatible',
+    baseUrl: 'https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID/ai/v1',
+    model: '@cf/openai/gpt-oss-120b',
+    vision: false,
+    freeTier: true,
+    freeLabel: '10,000 neurons/day free allocation',
+    freeNote: 'Replace YOUR_ACCOUNT_ID in the Base URL and use a Cloudflare API token with Workers AI Read permission.',
+    hint: 'Workers AI hosted models · OpenAI-compatible endpoint'
+  },
   deepseek: { name: 'DeepSeek', kind: 'openai-compatible', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', vision: false, hint: 'OpenAI-compatible API' },
   mistral: { name: 'Mistral', kind: 'openai-compatible', baseUrl: 'https://api.mistral.ai/v1', model: 'mistral-small-latest', vision: false, hint: 'Mistral chat completions' },
   together: { name: 'Together AI', kind: 'openai-compatible', baseUrl: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', vision: false, hint: 'Open-source model hosting' },
   xai: { name: 'xAI', kind: 'openai-compatible', baseUrl: 'https://api.x.ai/v1', model: 'grok-3-mini', vision: true, hint: 'OpenAI-style chat API' },
-  gemini: { name: 'Google Gemini', kind: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: GEMINI_DEFAULT_MODEL, vision: true, hint: 'Gemini multimodal generateContent API · 3.5 Flash default' },
+  gemini: {
+    name: 'Google Gemini',
+    kind: 'gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    model: GEMINI_DEFAULT_MODEL,
+    vision: true,
+    freeTier: true,
+    freeLabel: '3.5 Flash API Free Tier · input/output free',
+    freeNote: 'Free-tier prompts and responses may be used by Google to improve products. Rate limits still apply.',
+    hint: 'Gemini multimodal generateContent API · 3.5 Flash default'
+  },
   anthropic: { name: 'Anthropic', kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-0', vision: true, hint: 'Claude Messages API' },
   custom: { name: 'Custom OpenAI-compatible', kind: 'openai-compatible', baseUrl: 'https://example.com/v1', model: 'your-model', vision: true, hint: 'Any compatible /chat/completions endpoint' }
 };
@@ -66,7 +122,7 @@ async function callOpenAICompatible(config, messages, { temperature, maxTokens }
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.apiKey}`,
-      ...(config.provider === 'openrouter' ? { 'HTTP-Referer': location.origin, 'X-Title': 'AppGPT' } : {})
+      ...(/^openrouter/i.test(String(config.provider || '')) ? { 'HTTP-Referer': location.origin, 'X-Title': 'AppGPT' } : {})
     },
     body: JSON.stringify({
       model: config.model,
@@ -122,7 +178,7 @@ async function callGemini(config, messages, { temperature, maxTokens, responseMo
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+      ...(system ? { systemInstruction: { parts: [{ text: system }] } : {}),
       contents,
       generationConfig
     })
@@ -148,7 +204,6 @@ function geminiThinkingConfig(model, explicit = {}) {
     return { thinkingLevel: ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'].includes(level) ? level : 'LOW' };
   }
   if (Number.isFinite(explicit.thinkingBudget)) return { thinkingBudget: Math.trunc(explicit.thinkingBudget) };
-  // Keep legacy 2.5 Flash predictable if somebody deliberately switches back.
   if (/^gemini-2\.5-flash(?:-|$)/.test(name)) return { thinkingBudget: 0 };
   return null;
 }
