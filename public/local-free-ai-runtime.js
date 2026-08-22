@@ -5,6 +5,37 @@ export const LOCAL_FREE_MODELS = [
   'SmolLM2-360M-Instruct-q4f16_1-MLC'
 ];
 
+const APP_BUILDER_SYSTEM_PROMPT = `You are AppGPT Local Free AI. Your ONLY job in this mode is to output one complete HTML document for a small Telegram Mini App.
+
+STRICT OUTPUT CONTRACT:
+- OUTPUT RAW HTML ONLY.
+- Your response MUST begin with exactly: <!doctype html>
+- Your response MUST end with exactly: </html>
+- Do NOT write any explanation before or after the HTML.
+- Do NOT use Markdown or triple-backtick code fences.
+- Do NOT return JSON.
+- Do NOT say "Here is", "Sure", "I created", or anything similar.
+- Do NOT return a partial file, patch, excerpt, pseudocode, TODO, ellipsis, or placeholder.
+- Include <html>, <head>, <style>, <body>, and <script> as needed in the SAME document.
+- Put all app CSS and JavaScript inside this single HTML file.
+- Every visible primary control must actually work.
+- Use window.Telegram?.WebApp safely and keep a normal-browser fallback.
+- Never embed private API keys or secrets.
+
+COMPLETION IS MORE IMPORTANT THAN EXTRA FEATURES. If the requested app is too large, simplify the design and features so you can FINISH the entire document and still end with </html>. Before responding, silently verify that the first characters are <!doctype html> and the final characters are </html>. Return the HTML document and NOTHING ELSE.`;
+
+const HTML_RETRY_SYSTEM_PROMPT = `Your previous answer was rejected because it was not one complete HTML document.
+
+TRY AGAIN FROM SCRATCH. This is a machine-readable file response, not a conversation.
+1. First characters: <!doctype html>
+2. Return ONLY raw HTML. No Markdown fences and no explanation.
+3. Make a compact but functional single-file app with inline CSS and JavaScript.
+4. Do not use TODO, placeholders, ellipses, or omit code.
+5. If necessary, REMOVE optional features so the file can be completed.
+6. Final characters: </html>
+
+Anything outside the HTML document is an invalid answer.`;
+
 let webllmPromise = null;
 const engines = new Map();
 const enginePromises = new Map();
@@ -15,30 +46,52 @@ export function isLocalAISupported() {
 
 export async function localChat(messages, options = {}) {
   const model = options.model || LOCAL_FREE_MODELS[0];
+  const task = options.task || 'chat';
   if (!isLocalAISupported()) {
     throw new Error('Local Free AI needs a WebGPU-capable browser. Your work is saved — choose another AI to continue.');
   }
 
   const engine = await getEngine(model);
-  const prepared = prepareMessages(messages, options.task || 'chat');
+  const prepared = prepareMessages(messages, task);
   const inputChars = prepared.reduce((sum, message) => sum + String(message.content || '').length, 0);
   const requested = Number(options.maxTokens || options.max_tokens || 900);
-  const outputLimit = options.task === 'app-builder'
-    ? Math.min(requested, inputChars > 7000 ? 900 : inputChars > 4000 ? 1200 : 1600)
+  const outputLimit = task === 'app-builder'
+    ? Math.min(requested, inputChars > 11000 ? 2600 : inputChars > 7000 ? 3200 : 3800)
     : Math.min(requested, 900);
 
+  let text = await runCompletion(engine, prepared, {
+    temperature: task === 'app-builder' ? Math.min(Number(options.temperature) || 0.35, 0.35) : options.temperature,
+    maxTokens: outputLimit
+  });
+
+  if (task === 'app-builder' && !isCompleteHtml(text)) {
+    dispatchRetry({ model, reason: htmlFailureReason(text) });
+    const retryMessages = prepareHtmlRetryMessages(messages);
+    text = await runCompletion(engine, retryMessages, {
+      temperature: 0.1,
+      maxTokens: Math.max(outputLimit, Math.min(requested, 3800))
+    });
+  }
+
+  if (!text.trim()) throw new Error('Local Free AI returned an empty response.');
+  if (task === 'app-builder' && !isCompleteHtml(text)) {
+    throw new Error(`Local Free AI could not finish a valid HTML document after retrying (${htmlFailureReason(text)}). Your project is saved — try a shorter request or switch AI.`);
+  }
+
+  return { text: cleanHtmlResponse(text, task), model };
+}
+
+async function runCompletion(engine, messages, { temperature, maxTokens }) {
   const response = await engine.chat.completions.create({
-    messages: prepared,
-    temperature: Number.isFinite(options.temperature) ? options.temperature : 0.55,
-    max_tokens: Math.max(64, outputLimit)
+    messages,
+    temperature: Number.isFinite(temperature) ? temperature : 0.55,
+    max_tokens: Math.max(64, maxTokens)
   });
 
   const content = response?.choices?.[0]?.message?.content;
-  const text = Array.isArray(content)
+  return Array.isArray(content)
     ? content.map(part => typeof part === 'string' ? part : part?.text || '').join('')
     : String(content || '');
-  if (!text.trim()) throw new Error('Local Free AI returned an empty response.');
-  return { text, model };
 }
 
 async function getEngine(model) {
@@ -93,16 +146,53 @@ function prepareMessages(messages, task) {
       }));
   }
 
-  const system = {
-    role: 'system',
-    content: 'You are AppGPT Local Free AI. Build or edit a compact, functional Telegram Mini App. Return ONLY one complete self-contained HTML document starting with <!doctype html> and ending with </html>. Put CSS and JavaScript in the file. Use window.Telegram?.WebApp safely, keep normal-browser fallback working, make every visible control functional, never embed secrets, and keep the code concise because this local model has a small context window.'
-  };
   const nonSystem = input.filter(message => message?.role !== 'system' && message?.content != null);
   const recent = nonSystem.slice(-2).map(message => ({
     role: normalizeRole(message.role),
-    content: trimText(flattenContent(message.content), 7600)
+    content: trimText(flattenContent(message.content), 9000)
   }));
-  return [system, ...recent];
+  return [{ role: 'system', content: APP_BUILDER_SYSTEM_PROMPT }, ...recent];
+}
+
+function prepareHtmlRetryMessages(messages) {
+  const input = Array.isArray(messages) ? messages : [];
+  const nonSystem = input.filter(message => message?.role !== 'system' && message?.content != null);
+  const userBrief = nonSystem.length
+    ? trimText(flattenContent(nonSystem.at(-1)?.content), 8500)
+    : 'Build the requested compact Telegram Mini App.';
+
+  return [
+    { role: 'system', content: `${APP_BUILDER_SYSTEM_PROMPT}\n\n${HTML_RETRY_SYSTEM_PROMPT}` },
+    { role: 'user', content: userBrief }
+  ];
+}
+
+function isCompleteHtml(value) {
+  const text = cleanHtmlResponse(value, 'app-builder').trim();
+  return /^<!doctype html>/i.test(text) && /<html(?:\s|>)/i.test(text) && /<head(?:\s|>)/i.test(text) && /<body(?:\s|>)/i.test(text) && /<\/html>\s*$/i.test(text);
+}
+
+function cleanHtmlResponse(value, task) {
+  let text = String(value || '').trim();
+  if (task !== 'app-builder') return text;
+
+  const fenced = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  if (fenced) text = fenced[1].trim();
+  const start = text.search(/<!doctype html>/i);
+  if (start >= 0) text = text.slice(start);
+  const end = text.toLowerCase().lastIndexOf('</html>');
+  if (end >= 0) text = text.slice(0, end + 7);
+  return text.trim();
+}
+
+function htmlFailureReason(value) {
+  const text = String(value || '').trim();
+  if (!text) return 'empty response';
+  if (!/<!doctype html>/i.test(text) && !/<html(?:\s|>)/i.test(text)) return 'response was not HTML';
+  if (!/<head(?:\s|>)/i.test(text)) return 'missing <head>';
+  if (!/<body(?:\s|>)/i.test(text)) return 'missing <body>';
+  if (!/<\/html>/i.test(text)) return 'response was cut off before </html>';
+  return 'extra or malformed output';
 }
 
 function flattenContent(content) {
@@ -128,6 +218,12 @@ function normalizeRole(role) {
 function dispatchProgress(detail) {
   try {
     window.dispatchEvent(new CustomEvent('digitbox-local-ai-progress', { detail }));
+  } catch {}
+}
+
+function dispatchRetry(detail) {
+  try {
+    window.dispatchEvent(new CustomEvent('digitbox-local-ai-retry', { detail }));
   } catch {}
 }
 
