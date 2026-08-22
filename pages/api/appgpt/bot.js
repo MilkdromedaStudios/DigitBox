@@ -3,6 +3,7 @@ export const config = { runtime: "edge" };
 const APP_URL = "https://digitbox.dev/appgpt";
 const RUNNER_URL = "https://digitbox.dev/appgpt/telegram-runner.html";
 const BUILD_LINK_MAX_AGE = 30 * 60;
+const MAX_HTML_BYTES = 500000;
 
 const MAIN_MENU = {
   keyboard: [
@@ -50,12 +51,16 @@ export default async function handler(request) {
         return json({ error: error.message || "Telegram setup failed." }, 500);
       }
     }
+
+    if (url.searchParams.get("source") === "1") {
+      return revisionSource(url, botToken);
+    }
+
     return json({ ok: true, service: "AppGPT Telegram bot", webhook: `${url.origin}/api/appgpt/bot` });
   }
 
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  // The tiny browser runner posts the finished local-AI build back here.
   if (url.searchParams.get("complete") === "1") {
     return completeBrowserBuild(request, botToken);
   }
@@ -97,11 +102,14 @@ async function handleUpdate(update, botToken) {
   if (text === "🧠 Local Free AI") return sendLocalAIInfo(chatId, botToken);
   if (text === "🌐 Advanced settings") return sendAdvancedSettings(chatId, botToken);
 
+  const repliedDocument = message.reply_to_message?.document;
+  if (isHtmlDocument(repliedDocument)) {
+    return sendRevisionReady(chatId, text, repliedDocument.file_id, botToken);
+  }
+
   const template = templatePrompt(text);
   if (template) return sendBuildReady(chatId, template, botToken, `Template: ${text}`);
 
-  // If the user replied to the New App question, or simply typed an idea,
-  // treat the message as the app request. Telegram remains the main UI.
   return sendBuildReady(chatId, text, botToken);
 }
 
@@ -109,7 +117,7 @@ async function sendMainMenu(chatId, user, botToken) {
   const firstName = escapeHtml(user?.first_name || "there");
   return telegram(botToken, "sendMessage", {
     chat_id: chatId,
-    text: `<b>AppGPT ✦</b>\nHi ${firstName}. Build apps without living in the website UI.\n\nChoose a menu item below, or just type what you want to build.`,
+    text: `<b>AppGPT ✦</b>\nHi ${firstName}. Build and revise apps from Telegram.\n\nChoose a menu item below, or just type what you want to build.`,
     parse_mode: "HTML",
     reply_markup: MAIN_MENU
   });
@@ -130,7 +138,7 @@ async function askForApp(chatId, botToken) {
 async function sendProjects(chatId, botToken) {
   return telegram(botToken, "sendMessage", {
     chat_id: chatId,
-    text: "<b>📂 Projects</b>\n\nYour Telegram builds are delivered back here as <code>index.html</code> files, so this chat becomes the simple project history.\n\nStart another app with <b>➕ New app</b>, or type a new app idea anytime.",
+    text: "<b>📂 Projects</b>\n\nEach build is an <code>index.html</code> file in this chat. Reply directly to any AppGPT HTML file with a change request to revise that exact version.\n\nExample: <i>make the cards more glassy and add a settings button</i>.",
     parse_mode: "HTML",
     reply_markup: MAIN_MENU
   });
@@ -139,7 +147,7 @@ async function sendProjects(chatId, botToken) {
 async function sendTemplates(chatId, botToken) {
   return telegram(botToken, "sendMessage", {
     chat_id: chatId,
-    text: "<b>🧩 Templates</b>\nPick a starting point. You can describe changes after you choose one.",
+    text: "<b>🧩 Templates</b>\nPick a starting point. After it builds, just reply to the HTML file with changes.",
     parse_mode: "HTML",
     reply_markup: TEMPLATE_MENU
   });
@@ -157,7 +165,7 @@ async function sendSettings(chatId, botToken) {
 async function sendLocalAIInfo(chatId, botToken) {
   return telegram(botToken, "sendMessage", {
     chat_id: chatId,
-    text: "<b>🧠 Local Free AI</b>\n\n• No API key\n• No sign-in\n• No Cloudflare Workers AI usage\n• Runs in your phone/tablet/desktop browser\n• Uses a local coding model when you build\n\nThe tiny runner only shows build progress; it does not open the full AppGPT dashboard.",
+    text: "<b>🧠 Local Free AI</b>\n\n• No API key\n• No sign-in\n• No Cloudflare Workers AI usage\n• Runs in your phone/tablet/desktop browser\n• Builds and revises HTML\n\nThe tiny runner only handles the local model; Telegram stays the main UI.",
     parse_mode: "HTML",
     reply_markup: SETTINGS_MENU
   });
@@ -176,7 +184,7 @@ async function sendAdvancedSettings(chatId, botToken) {
 async function sendHelp(chatId, botToken) {
   return telegram(botToken, "sendMessage", {
     chat_id: chatId,
-    text: "<b>AppGPT Telegram mode</b>\n\n1. Tap <b>➕ New app</b> or type an app idea.\n2. Tap <b>⚡ Build with Local Free AI</b>.\n3. A tiny build screen runs the model on your device.\n4. The finished <code>index.html</code> is sent back into this chat.\n\nThe website dashboard is optional.",
+    text: "<b>AppGPT Telegram mode</b>\n\n1. Tap <b>➕ New app</b> or type an app idea.\n2. Tap <b>⚡ Build with Local Free AI</b>.\n3. The finished <code>index.html</code> comes back here.\n4. Type your next change in the reply box under that HTML file.\n5. Tap <b>⚡ Apply revision</b> and a new HTML version comes back.\n\nNo project database is required — the Telegram file itself is the revision context.",
     parse_mode: "HTML",
     reply_markup: MAIN_MENU
   });
@@ -185,15 +193,31 @@ async function sendHelp(chatId, botToken) {
 async function sendBuildReady(chatId, prompt, botToken, label = "") {
   const cleanPrompt = String(prompt || "").trim().slice(0, 3000);
   if (!cleanPrompt) return askForApp(chatId, botToken);
-  const url = await signedRunnerUrl(botToken, chatId, cleanPrompt);
+  const url = await signedRunnerUrl(botToken, chatId, cleanPrompt, "build", "");
   const summary = cleanPrompt.length > 260 ? `${cleanPrompt.slice(0, 257)}…` : cleanPrompt;
 
   return telegram(botToken, "sendMessage", {
     chat_id: chatId,
-    text: `${label ? `<b>${escapeHtml(label)}</b>\n` : ""}<b>Ready to build</b>\n${escapeHtml(summary)}\n\nThe free AI has to run on your device, so this opens a tiny build runner — not the full website UI.`,
+    text: `${label ? `<b>${escapeHtml(label)}</b>\n` : ""}<b>Ready to build</b>\n${escapeHtml(summary)}\n\nThe free AI runs locally on your device, so tap once to start the tiny runner.`,
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [[{ text: "⚡ Build with Local Free AI", web_app: { url } }]]
+    }
+  });
+}
+
+async function sendRevisionReady(chatId, editPrompt, fileId, botToken) {
+  const cleanPrompt = String(editPrompt || "").trim().slice(0, 3000);
+  if (!cleanPrompt || !fileId) return;
+  const url = await signedRunnerUrl(botToken, chatId, cleanPrompt, "revise", fileId);
+  const summary = cleanPrompt.length > 260 ? `${cleanPrompt.slice(0, 257)}…` : cleanPrompt;
+
+  return telegram(botToken, "sendMessage", {
+    chat_id: chatId,
+    text: `<b>✏️ Ready to revise this app</b>\n${escapeHtml(summary)}\n\nAppGPT will load the HTML file you replied to, preserve the existing app, apply your change, and send a new version back here.`,
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [[{ text: "⚡ Apply revision", web_app: { url } }]]
     }
   });
 }
@@ -208,15 +232,32 @@ function templatePrompt(text) {
   return templates[text] || "";
 }
 
-async function signedRunnerUrl(botToken, chatId, prompt) {
+async function signedRunnerUrl(botToken, chatId, prompt, mode, fileId) {
   const ts = Math.floor(Date.now() / 1000);
-  const sig = await signBuild(botToken, chatId, ts, prompt);
+  const sig = await signBuild(botToken, chatId, ts, mode, prompt, fileId);
   const url = new URL(RUNNER_URL);
   url.searchParams.set("chat", String(chatId));
   url.searchParams.set("ts", String(ts));
+  url.searchParams.set("mode", mode);
   url.searchParams.set("prompt", prompt);
+  if (fileId) url.searchParams.set("file", fileId);
   url.searchParams.set("sig", sig);
   return url.href;
+}
+
+async function revisionSource(url, botToken) {
+  const ticket = ticketFromSearch(url.searchParams);
+  if (ticket.mode !== "revise" || !ticket.fileId) return json({ error: "Missing revision source" }, 400);
+  const authError = await validateTicket(botToken, ticket);
+  if (authError) return json({ error: authError }, authError === "Build link expired" ? 401 : 403);
+
+  try {
+    const html = await telegramFileText(botToken, ticket.fileId);
+    if (!looksLikeHtml(html) || html.length > MAX_HTML_BYTES) return json({ error: "The replied file is not a usable HTML document." }, 400);
+    return json({ ok: true, html });
+  } catch (error) {
+    return json({ error: error.message || "Could not load the previous HTML file." }, 500);
+  }
 }
 
 async function completeBrowserBuild(request, botToken) {
@@ -224,41 +265,60 @@ async function completeBrowserBuild(request, botToken) {
   try { body = await request.json(); }
   catch { return json({ error: "Invalid JSON" }, 400); }
 
-  const chatId = String(body?.chat || "");
-  const ts = Number(body?.ts || 0);
-  const prompt = String(body?.prompt || "").slice(0, 3000);
-  const sig = String(body?.sig || "");
+  const ticket = {
+    chatId: String(body?.chat || ""),
+    ts: Number(body?.ts || 0),
+    mode: body?.mode === "revise" ? "revise" : "build",
+    prompt: String(body?.prompt || "").slice(0, 3000),
+    fileId: String(body?.file || ""),
+    sig: String(body?.sig || "")
+  };
   const html = String(body?.html || "");
   const buildError = String(body?.error || "").slice(0, 600);
 
-  if (!chatId || !ts || !prompt || !sig) return json({ error: "Incomplete build token" }, 400);
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - ts) > BUILD_LINK_MAX_AGE) return json({ error: "Build link expired" }, 401);
-  const expected = await signBuild(botToken, chatId, ts, prompt);
-  if (!constantTimeEqual(sig, expected)) return json({ error: "Invalid build token" }, 401);
+  const authError = await validateTicket(botToken, ticket);
+  if (authError) return json({ error: authError }, authError === "Build link expired" ? 401 : 403);
 
   if (buildError) {
     await telegram(botToken, "sendMessage", {
-      chat_id: chatId,
-      text: `⚠️ Local Free AI could not finish this build.\n\n${buildError}\n\nYour request is still here in Telegram — you can try again with a shorter description.`,
+      chat_id: ticket.chatId,
+      text: `⚠️ Local Free AI could not finish this ${ticket.mode === "revise" ? "revision" : "build"}.\n\n${buildError}\n\nYour request is still here in Telegram — you can try again with a shorter change.`,
       reply_markup: MAIN_MENU
     });
     return json({ ok: true, sent: "error" });
   }
 
-  if (!/^\s*<!doctype html>/i.test(html) || !/<\/html>\s*$/i.test(html) || html.length > 500000) {
+  if (!looksLikeHtml(html) || html.length > MAX_HTML_BYTES) {
     return json({ error: "Runner did not return a valid HTML file" }, 400);
   }
 
-  const filename = `${slug(inferTitle(prompt)) || "app"}-index.html`;
-  await telegramDocument(botToken, chatId, filename, html, `✅ ${inferTitle(prompt)}\nBuilt with Local Free AI on your device.`);
-  await telegram(botToken, "sendMessage", {
-    chat_id: chatId,
-    text: "✦ Build complete. The HTML file is above. Your Telegram chat is the project history — no dashboard required.",
-    reply_markup: MAIN_MENU
-  });
+  const caption = ticket.mode === "revise"
+    ? "✅ Revision complete. Reply to this HTML file with another change."
+    : "✅ Build complete. Reply to this HTML file with a change to revise it.";
 
-  return json({ ok: true, sent: filename });
+  await telegramDocument(botToken, ticket.chatId, "index.html", html, caption, true);
+  return json({ ok: true, sent: "index.html", mode: ticket.mode });
+}
+
+function ticketFromSearch(params) {
+  return {
+    chatId: String(params.get("chat") || ""),
+    ts: Number(params.get("ts") || 0),
+    mode: params.get("mode") === "revise" ? "revise" : "build",
+    prompt: String(params.get("prompt") || "").slice(0, 3000),
+    fileId: String(params.get("file") || ""),
+    sig: String(params.get("sig") || "")
+  };
+}
+
+async function validateTicket(botToken, ticket) {
+  if (!ticket.chatId || !ticket.ts || !ticket.prompt || !ticket.sig) return "Incomplete build token";
+  if (ticket.mode === "revise" && !ticket.fileId) return "Incomplete revision token";
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - ticket.ts) > BUILD_LINK_MAX_AGE) return "Build link expired";
+  const expected = await signBuild(botToken, ticket.chatId, ticket.ts, ticket.mode, ticket.prompt, ticket.fileId);
+  if (!constantTimeEqual(ticket.sig, expected)) return "Invalid build token";
+  return "";
 }
 
 async function setupTelegram(botToken, origin) {
@@ -273,8 +333,6 @@ async function setupTelegram(botToken, origin) {
     ]
   });
 
-  // Keep Telegram's built-in Menu button as commands. The website is not the
-  // primary navigation anymore.
   await telegram(botToken, "setChatMenuButton", { menu_button: { type: "commands" } });
 
   await telegram(botToken, "setWebhook", {
@@ -288,7 +346,7 @@ async function setupTelegram(botToken, origin) {
   return { webhook: webhookUrl, bot: me?.username ? `@${me.username}` : null, mode: "telegram-first" };
 }
 
-async function signBuild(botToken, chatId, ts, prompt) {
+async function signBuild(botToken, chatId, ts, mode, prompt, fileId) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(botToken),
@@ -296,7 +354,7 @@ async function signBuild(botToken, chatId, ts, prompt) {
     false,
     ["sign"]
   );
-  const data = new TextEncoder().encode(`${chatId}\n${ts}\n${prompt}`);
+  const data = new TextEncoder().encode(`${chatId}\n${ts}\n${mode}\n${prompt}\n${fileId || ""}`);
   const signed = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
   return [...signed].map(value => value.toString(16).padStart(2, "0")).join("");
 }
@@ -317,33 +375,44 @@ async function telegram(botToken, method, body) {
   return data.result;
 }
 
-async function telegramDocument(botToken, chatId, filename, html, caption) {
+async function telegramFileText(botToken, fileId) {
+  const file = await telegram(botToken, "getFile", { file_id: fileId });
+  if (!file?.file_path) throw new Error("Telegram did not return a file path.");
+  const response = await fetch(`https://api.telegram.org/file/bot${botToken}/${file.file_path}`);
+  if (!response.ok) throw new Error(`Could not download the previous HTML (${response.status}).`);
+  const text = await response.text();
+  if (text.length > MAX_HTML_BYTES) throw new Error("The HTML file is too large for Local Free revision mode.");
+  return text;
+}
+
+async function telegramDocument(botToken, chatId, filename, html, caption, forceRevisionReply = false) {
   const form = new FormData();
   form.set("chat_id", String(chatId));
   form.set("caption", caption);
   form.set("document", new Blob([html], { type: "text/html;charset=utf-8" }), filename);
+  if (forceRevisionReply) {
+    form.set("reply_markup", JSON.stringify({
+      force_reply: true,
+      selective: true,
+      input_field_placeholder: "Describe what to change in this app…"
+    }));
+  }
   const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: "POST", body: form });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok === false) throw new Error(data?.description || `Telegram sendDocument failed (${response.status})`);
   return data.result;
 }
 
-function inferTitle(prompt) {
-  return String(prompt || "")
-    .replace(/^(build|make|create)\s+(me\s+)?(a|an)?\s*/i, "")
-    .split(/[.!?\n]/)[0]
-    .trim()
-    .split(/\s+/)
-    .slice(0, 5)
-    .join(" ") || "New app";
+function isHtmlDocument(document) {
+  if (!document?.file_id) return false;
+  const name = String(document.file_name || "").toLowerCase();
+  const mime = String(document.mime_type || "").toLowerCase();
+  return name.endsWith(".html") || mime === "text/html";
 }
 
-function slug(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 45);
+function looksLikeHtml(html) {
+  const text = String(html || "").trim();
+  return /^<!doctype html>/i.test(text) && /<html(?:\s|>)/i.test(text) && /<head(?:\s|>)/i.test(text) && /<body(?:\s|>)/i.test(text) && /<\/html>\s*$/i.test(text);
 }
 
 function constantTimeEqual(a, b) {
