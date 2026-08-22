@@ -7,177 +7,63 @@
   <title>AppGPT Runner</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#070b14;color:#f7f9ff}body{min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at 15% 0%,rgba(113,95,255,.28),transparent 36%),radial-gradient(circle at 95% 90%,rgba(61,190,255,.22),transparent 38%),#070b14;overflow:hidden}.orb{position:fixed;width:320px;height:320px;border-radius:50%;filter:blur(72px);opacity:.28;pointer-events:none}.a{left:-120px;top:-110px;background:#7968ff}.b{right:-130px;bottom:-130px;background:#47caff}.card{position:relative;width:min(560px,100%);padding:26px;border-radius:30px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 28px 90px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.22);backdrop-filter:blur(30px) saturate(1.42);-webkit-backdrop-filter:blur(30px) saturate(1.42);overflow:hidden}.card:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 75% at 8% -10%,rgba(255,255,255,.23),transparent 45%)}.content{position:relative;z-index:1}.mark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-size:24px;font-weight:900;background:linear-gradient(135deg,#7968ff,#5ecfff);box-shadow:0 14px 36px rgba(91,114,255,.34),inset 0 1px 0 rgba(255,255,255,.34)}h1{font-size:25px;margin:18px 0 7px}.sub{margin:0;color:#adb8ce;line-height:1.55;font-size:14px}.prompt{margin:20px 0;padding:14px 15px;border-radius:17px;border:1px solid rgba(255,255,255,.1);background:rgba(3,7,15,.38);color:#dce4f6;font-size:13px;line-height:1.5;max-height:120px;overflow:auto}.track{height:12px;border-radius:999px;background:rgba(255,255,255,.065);overflow:hidden;margin:22px 0 10px}.fill{height:100%;width:3%;border-radius:inherit;background:linear-gradient(90deg,#7968ff,#58d1ff);transition:width .35s ease;position:relative}.fill.active:after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 10%,rgba(255,255,255,.35) 45%,transparent 70%);animation:s 1.25s linear infinite}.row{display:flex;justify-content:space-between;gap:14px;color:#aab6ca;font-size:12px}.status{font-weight:700;color:#f4f7ff}.note{min-height:48px;margin-top:18px;padding:12px 13px;border-radius:15px;background:rgba(255,255,255,.045);color:#b9c5d9;font-size:12px;line-height:1.55;border:1px solid rgba(255,255,255,.075)}.done,.error{display:none;margin-top:18px;padding:13px 15px;border-radius:15px;font-size:13px;line-height:1.45}.done{background:rgba(86,230,164,.09);border:1px solid rgba(86,230,164,.18);color:#93f1c3}.error{background:rgba(255,122,142,.09);border:1px solid rgba(255,122,142,.18);color:#ffb2bf}button{width:100%;margin-top:16px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.07);color:#fff;border-radius:15px;padding:13px 15px;font:inherit;font-weight:750;cursor:pointer;display:none}@keyframes s{from{transform:translateX(-100%)}to{transform:translateX(120%)}}
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#070b14;color:#f7f9ff}body{min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at 15% 0%,rgba(113,95,255,.28),transparent 36%),radial-gradient(circle at 95% 90%,rgba(61,190,255,.22),transparent 38%),#070b14}.card{width:min(560px,100%);padding:26px;border-radius:30px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 28px 90px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.22);backdrop-filter:blur(30px) saturate(1.42);-webkit-backdrop-filter:blur(30px) saturate(1.42)}.mark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-size:24px;font-weight:900;background:linear-gradient(135deg,#7968ff,#5ecfff)}h1{font-size:25px;margin:18px 0 7px}.sub{margin:0;color:#adb8ce;line-height:1.55;font-size:14px}.prompt,.note{margin-top:18px;padding:13px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.09);background:rgba(3,7,15,.38);font-size:13px;line-height:1.5;color:#c8d2e5}.prompt{max-height:120px;overflow:auto}.track{height:12px;border-radius:999px;background:rgba(255,255,255,.065);overflow:hidden;margin:22px 0 10px}.fill{height:100%;width:4%;border-radius:inherit;background:linear-gradient(90deg,#7968ff,#58d1ff);transition:width .35s}.row{display:flex;justify-content:space-between;color:#aab6ca;font-size:12px}.status{font-weight:700;color:#f4f7ff}.done,.error{display:none;margin-top:18px;padding:13px 15px;border-radius:15px;font-size:13px}.done{background:rgba(86,230,164,.09);border:1px solid rgba(86,230,164,.18);color:#93f1c3}.error{background:rgba(255,122,142,.09);border:1px solid rgba(255,122,142,.18);color:#ffb2bf}button{width:100%;margin-top:16px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.07);color:#fff;border-radius:15px;padding:13px;font:inherit;font-weight:750;cursor:pointer;display:none}
   </style>
 </head>
 <body>
-  <div class="orb a"></div><div class="orb b"></div>
-  <main class="card"><div class="content">
+  <main class="card">
     <div class="mark">A</div>
     <h1 id="title">Building your app</h1>
-    <p id="sub" class="sub">Local Free AI runs on this device. Keep this small runner open until the finished HTML file appears back in Telegram.</p>
+    <p id="sub" class="sub">AppGPT uses cloud AI first, so your device GPU stays free. Local AI is only a backup when available.</p>
     <div id="prompt" class="prompt"></div>
-    <div class="track"><div id="fill" class="fill active"></div></div>
-    <div class="row"><span id="status" class="status">Starting…</span><strong id="pct">3%</strong></div>
-    <div id="note" class="note">Checking WebGPU and preparing the local coding model…</div>
-    <div id="done" class="done">✓ HTML sent back to Telegram. Reply to the new file to keep revising.</div>
+    <div class="track"><div id="fill" class="fill"></div></div>
+    <div class="row"><span id="status" class="status">Starting…</span><strong id="pct">4%</strong></div>
+    <div id="note" class="note">Connecting to AppGPT Cloud…</div>
+    <div id="done" class="done">✓ HTML sent back to Telegram. Reply to the new file to revise it again.</div>
     <div id="error" class="error"></div>
     <button id="close">Close</button>
-  </div></main>
+  </main>
 
   <script type="module">
-    import { localChat, isLocalAISupported } from './local-free-builder.js';
+    const tg=window.Telegram?.WebApp,$=id=>document.getElementById(id),p=new URLSearchParams(location.search);
+    const ticket={chat:p.get('chat')||'',ts:p.get('ts')||'',mode:p.get('mode')==='revise'?'revise':'build',prompt:p.get('prompt')||'',file:p.get('file')||'',sig:p.get('sig')||''};
+    $('prompt').textContent=ticket.prompt||'No request supplied.';
+    if(ticket.mode==='revise'){$('title').textContent='Revising your app';$('sub').textContent='AppGPT Cloud is revising the exact HTML file you replied to. Your GPU is not used.'}
+    $('close').onclick=()=>{try{tg?.close()}catch{}};
+    try{tg?.ready();tg?.expand();tg?.setHeaderColor?.('#070b14');tg?.setBackgroundColor?.('#070b14');tg?.enableClosingConfirmation?.()}catch{}
 
-    const tg = window.Telegram?.WebApp;
-    const $ = id => document.getElementById(id);
-    const params = new URLSearchParams(location.search);
-    const chat = params.get('chat') || '';
-    const ts = params.get('ts') || '';
-    const mode = params.get('mode') === 'revise' ? 'revise' : 'build';
-    const prompt = params.get('prompt') || '';
-    const file = params.get('file') || '';
-    const sig = params.get('sig') || '';
+    let progress=4;function setProgress(v,s,n){progress=Math.max(progress,Math.min(100,Number(v)||0));$('fill').style.width=`${progress}%`;$('pct').textContent=`${Math.round(progress)}%`;if(s)$('status').textContent=s;if(n)$('note').textContent=n}
+    async function post(url,payload){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));return{response:r,data:d}}
+    async function sendResult(payload){const {response,data}=await post('/api/appgpt/bot?complete=1',{...ticket,...payload});if(!response.ok||!data.ok)throw new Error(data.error||`Could not send result to Telegram (${response.status}).`);return data}
 
-    if (mode === 'revise') {
-      $('title').textContent = 'Revising your app';
-      $('sub').textContent = 'AppGPT is loading the exact HTML file you replied to, then applying only your requested changes.';
-    }
-    $('prompt').textContent = prompt || 'No request was supplied.';
-    $('close').onclick = () => { try { tg?.close(); } catch {} };
+    async function cloudBuild(){setProgress(18,'Using AppGPT Cloud','Generating on the server — no WebGPU or device AI compute is being used.');const {response,data}=await post('/api/appgpt/cloud-build',ticket);if(response.ok&&data.ok&&data.html)return data;if(data.cloud_unavailable){const e=new Error(data.error||'Cloud AI is not configured.');e.cloudUnavailable=true;throw e}throw new Error(data.error||`Cloud build failed (${response.status}).`)}
 
-    try {
-      tg?.ready();
-      tg?.expand();
-      tg?.setHeaderColor?.('#070b14');
-      tg?.setBackgroundColor?.('#070b14');
-      tg?.enableClosingConfirmation?.();
-    } catch {}
-
-    let progress = 3;
-    const setProgress = (value, status, note) => {
-      progress = Math.max(progress, Math.min(100, Number(value) || 0));
-      $('fill').style.width = `${progress}%`;
-      $('pct').textContent = `${Math.round(progress)}%`;
-      if (status) $('status').textContent = status;
-      if (note) $('note').textContent = note;
-    };
-
-    window.addEventListener('digitbox-local-ai-progress', event => {
-      const value = Math.max(0, Math.min(1, Number(event.detail?.value || 0)));
-      setProgress(10 + value * 28, value >= 1 ? 'Model ready' : 'Loading model', event.detail?.text || 'Preparing Local Free AI…');
-    });
-    window.addEventListener('digitbox-local-ai-retry', event => {
-      setProgress(Math.max(progress, 64), 'Retrying strict HTML', `The previous output was ${event.detail?.reason || 'incomplete'}. AppGPT is retrying with a smaller HTML-only response.`);
-    });
-    window.addEventListener('appgpt-build-note', event => {
-      if (event.detail?.text) $('note').textContent = event.detail.text;
-    });
-
-    async function sendResult(payload) {
-      const response = await fetch('/api/appgpt/bot?complete=1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat, ts, mode, prompt, file, sig, ...payload })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || `Could not send result back to Telegram (${response.status}).`);
-      return data;
-    }
-
-    async function loadRevisionSource() {
-      if (mode !== 'revise') return '';
-      setProgress(6, 'Loading current app', 'Getting the exact HTML file you replied to from Telegram…');
-      const query = new URLSearchParams({ source: '1', chat, ts, mode, prompt, file, sig });
-      const response = await fetch(`/api/appgpt/bot?${query.toString()}`, { cache: 'no-store' });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok || !data.html) throw new Error(data.error || 'Could not load the HTML being revised.');
-      return String(data.html);
-    }
-
-    function extractHtml(raw) {
-      let text = String(raw || '').trim();
-      if (!text) return '';
-      try { const parsed = JSON.parse(text); if (typeof parsed?.html === 'string') text = parsed.html.trim(); } catch {}
-      const fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
-      if (fence) text = fence[1].trim();
-      const starts = [text.search(/<!doctype html>/i), text.search(/<html(?:\s|>)/i), text.search(/<body(?:\s|>)/i)].filter(i => i >= 0).sort((a,b) => a-b);
-      if (starts.length && starts[0] > 0) text = text.slice(starts[0]);
-      if (/^<html(?:\s|>)/i.test(text)) text = `<!doctype html>\n${text}`;
-      if (/^<body(?:\s|>)/i.test(text)) text = `<!doctype html>\n<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>\n${text}`;
-      if (/<!doctype html>/i.test(text) && /<html(?:\s|>)/i.test(text)) {
-        if (/<body(?:\s|>)/i.test(text) && !/<\/body>/i.test(text)) text += '\n</body>';
-        if (!/<\/html>\s*$/i.test(text)) text += '\n</html>';
+    async function localFallback(){
+      const {localChat,isLocalAISupported}=await import('./local-free-builder.js');
+      if(!isLocalAISupported())throw new Error('AppGPT Cloud is unavailable and this device does not support the optional Local AI fallback.');
+      setProgress(35,'Optional Local AI fallback','Cloud AI was unavailable. Using the local coding model as a backup; this may use significant GPU resources.');
+      let source='';
+      if(ticket.mode==='revise'){
+        const q=new URLSearchParams({source:'1',chat:ticket.chat,ts:ticket.ts,mode:ticket.mode,prompt:ticket.prompt,file:ticket.file,sig:ticket.sig});
+        const r=await fetch(`/api/appgpt/bot?${q}`);const d=await r.json().catch(()=>({}));if(!r.ok||!d.html)throw new Error(d.error||'Could not load revision source.');source=String(d.html).slice(0,8500)
       }
-      const end = text.toLowerCase().lastIndexOf('</html>');
-      if (end >= 0) text = text.slice(0, end + 7);
-      return text.trim();
+      const task=ticket.mode==='revise'?`Return ONLY one complete revised HTML document. Begin <!doctype html> and end </html>. No Markdown or explanation.\nCHANGE:\n${ticket.prompt}\nCURRENT HTML:\n${source}`:`Return ONLY one complete HTML document. Begin <!doctype html> and end </html>. No Markdown or explanation. Keep it compact and functional.\nAPP REQUEST:\n${ticket.prompt}`;
+      const result=await localChat([{role:'user',content:task}],{temperature:.08,maxTokens:2200});
+      const html=normalize(result?.text||'');if(!valid(html))throw new Error('Local fallback did not return complete HTML.');return{html,provider:'local'}
     }
 
-    function isValidHtml(html) {
-      const text = String(html || '').trim();
-      return /^<!doctype html>/i.test(text) && /<html(?:\s|>)/i.test(text) && /<head(?:\s|>)/i.test(text) && /<body(?:\s|>)/i.test(text) && /<\/html>\s*$/i.test(text) && text.length >= 180;
+    function normalize(raw){let t=String(raw||'').trim();const f=t.match(/```(?:html)?\s*([\s\S]*?)```/i);if(f)t=f[1].trim();const starts=[t.search(/<!doctype html>/i),t.search(/<html(?:\s|>)/i)].filter(i=>i>=0);if(starts.length)t=t.slice(Math.min(...starts));if(/^<html(?:\s|>)/i.test(t))t='<!doctype html>\n'+t;if(/<!doctype html>/i.test(t)&&/<html(?:\s|>)/i.test(t)&&!/<\/html>\s*$/i.test(t))t+='\n</html>';const end=t.toLowerCase().lastIndexOf('</html>');return(end>=0?t.slice(0,end+7):t).trim()}
+    function valid(h){const t=String(h||'').trim();return/^<!doctype html>/i.test(t)&&/<html(?:\s|>)/i.test(t)&&/<head(?:\s|>)/i.test(t)&&/<body(?:\s|>)/i.test(t)&&/<\/html>\s*$/i.test(t)&&t.length>=180}
+
+    async function run(){
+      if(!ticket.chat||!ticket.ts||!ticket.prompt||!ticket.sig||(ticket.mode==='revise'&&!ticket.file))throw new Error('This build link is incomplete. Return to Telegram and try again.');
+      let result;try{result=await cloudBuild()}catch(cloudError){console.warn('Cloud build unavailable/failed',cloudError);result=await localFallback()}
+      if(!valid(result.html))throw new Error('AppGPT did not produce a complete HTML document.');
+      setProgress(88,'HTML ready',`Built with ${result.provider==='local'?'Local AI fallback':'AppGPT Cloud'}. Sending the file back to Telegram…`);
+      await sendResult({html:result.html});setProgress(100,'Sent to Telegram','Done. Your new index.html is in the chat.');$('done').style.display='block';$('close').style.display='block';try{tg?.disableClosingConfirmation?.();tg?.HapticFeedback?.notificationOccurred?.('success')}catch{}
     }
 
-    function clippedSource(html) {
-      const text = String(html || '');
-      if (text.length <= 8500) return text;
-      return `${text.slice(0, 5200)}\n\n<!-- middle omitted only for local-model context -->\n\n${text.slice(-3000)}`;
-    }
-
-    function buildRequest(sourceHtml = '', tiny = false) {
-      const sizeRule = tiny
-        ? 'Keep the replacement file very small, roughly 80-120 lines. Preserve the requested behavior but remove optional complexity if needed.'
-        : 'Keep the replacement compact enough to finish completely. Preserve existing features unless the edit explicitly changes them.';
-      const contract = `You are generating a file, not chatting.\nRETURN ONLY ONE COMPLETE HTML DOCUMENT.\nFirst characters: <!doctype html>.\nFinal characters: </html>.\nNO Markdown fences. NO explanation. NO preface. NO JSON.\nAll CSS and JavaScript must be inline.\nEvery main button must work.\n${sizeRule}`;
-      if (mode === 'revise') {
-        return `${contract}\n\nREVISION TASK:\nModify the existing app below according to this request. Return the FULL replacement HTML, not a patch.\n\nCHANGE REQUEST:\n${prompt.slice(0, 1800)}\n\nCURRENT HTML:\n${clippedSource(sourceHtml)}`;
-      }
-      return `${contract}\n\nUSER APP REQUEST:\n${prompt.slice(0, 2400)}`;
-    }
-
-    async function generateStrictHtml(sourceHtml) {
-      const attempts = [
-        { tiny: false, temperature: 0.10, maxTokens: 2500 },
-        { tiny: true, temperature: 0.04, maxTokens: 1900 }
-      ];
-      let last = '';
-      for (let i = 0; i < attempts.length; i += 1) {
-        const attempt = attempts[i];
-        if (i > 0) setProgress(72, 'Final compact retry', mode === 'revise' ? 'Rebuilding a smaller complete revision from the same HTML and change request.' : 'Rebuilding a smaller complete app from scratch.');
-        const result = await localChat([{ role: 'user', content: buildRequest(sourceHtml, attempt.tiny) }], { temperature: attempt.temperature, maxTokens: attempt.maxTokens });
-        last = extractHtml(result?.text || '');
-        if (isValidHtml(last)) return last;
-      }
-      throw new Error(last ? 'The local model still returned malformed or non-HTML output after strict retries.' : 'The local model returned no usable HTML.');
-    }
-
-    async function run() {
-      if (!chat || !ts || !prompt || !sig || (mode === 'revise' && !file)) throw new Error('This build link is incomplete. Return to Telegram and try again.');
-      if (!isLocalAISupported()) throw new Error('This browser does not expose WebGPU. Local Free AI needs a WebGPU-capable browser.');
-      const sourceHtml = await loadRevisionSource();
-      setProgress(mode === 'revise' ? 12 : 5, mode === 'revise' ? 'Preparing revision' : 'Preparing build', 'Starting the local coding model. The first run may download the model to this device.');
-      const html = await generateStrictHtml(sourceHtml);
-      setProgress(90, 'Validating HTML', `The model returned a complete ${mode === 'revise' ? 'revised ' : ''}HTML document. Sending it back to Telegram…`);
-      await sendResult({ html });
-      setProgress(100, 'Sent to Telegram', 'The new index.html is now in the chat. Reply to it to revise again.');
-      $('fill').classList.remove('active');
-      $('done').style.display = 'block';
-      $('close').style.display = 'block';
-      try { tg?.disableClosingConfirmation?.(); tg?.HapticFeedback?.notificationOccurred?.('success'); } catch {}
-    }
-
-    run().catch(async error => {
-      console.error(error);
-      const message = String(error?.message || error || 'Build failed.').slice(0, 550);
-      try { await sendResult({ error: message }); } catch {}
-      $('fill').classList.remove('active');
-      $('status').textContent = mode === 'revise' ? 'Revision failed' : 'Build failed';
-      $('note').textContent = 'No non-HTML output was sent as an app file.';
-      $('error').textContent = message;
-      $('error').style.display = 'block';
-      $('close').style.display = 'block';
-      try { tg?.disableClosingConfirmation?.(); tg?.HapticFeedback?.notificationOccurred?.('error'); } catch {}
-    });
+    run().catch(async e=>{const message=String(e?.message||e||'Build failed.').slice(0,550);try{await sendResult({error:message})}catch{}$('status').textContent='Build failed';$('note').textContent='No invalid or non-HTML file was sent.';$('error').textContent=message;$('error').style.display='block';$('close').style.display='block';try{tg?.disableClosingConfirmation?.();tg?.HapticFeedback?.notificationOccurred?.('error')}catch{}})
   </script>
 </body>
 </html>
