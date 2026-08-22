@@ -4,35 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#070b14">
-  <title>AppGPT Build Runner</title>
+  <title>AppGPT Runner</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background:#070b14;color:#f7f9ff}
-    body{min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at 15% 0%,rgba(113,95,255,.28),transparent 36%),radial-gradient(circle at 95% 90%,rgba(61,190,255,.22),transparent 38%),#070b14;overflow:hidden}
-    .orb{position:fixed;width:320px;height:320px;border-radius:50%;filter:blur(72px);opacity:.28;pointer-events:none}.a{left:-120px;top:-110px;background:#7968ff}.b{right:-130px;bottom:-130px;background:#47caff}
-    .card{position:relative;width:min(560px,100%);padding:26px;border-radius:30px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 28px 90px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.22);backdrop-filter:blur(30px) saturate(1.42);-webkit-backdrop-filter:blur(30px) saturate(1.42);overflow:hidden}
-    .card:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 75% at 8% -10%,rgba(255,255,255,.23),transparent 45%)}
-    .content{position:relative;z-index:1}.mark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-size:24px;font-weight:900;background:linear-gradient(135deg,#7968ff,#5ecfff);box-shadow:0 14px 36px rgba(91,114,255,.34),inset 0 1px 0 rgba(255,255,255,.34)}
-    h1{font-size:25px;margin:18px 0 7px}.sub{margin:0;color:#adb8ce;line-height:1.55;font-size:14px}.prompt{margin:20px 0;padding:14px 15px;border-radius:17px;border:1px solid rgba(255,255,255,.1);background:rgba(3,7,15,.38);color:#dce4f6;font-size:13px;line-height:1.5;max-height:120px;overflow:auto}
-    .track{height:12px;border-radius:999px;background:rgba(255,255,255,.065);overflow:hidden;margin:22px 0 10px}.fill{height:100%;width:3%;border-radius:inherit;background:linear-gradient(90deg,#7968ff,#58d1ff);transition:width .35s ease;position:relative}.fill.active:after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 10%,rgba(255,255,255,.35) 45%,transparent 70%);animation:s 1.25s linear infinite}.row{display:flex;justify-content:space-between;gap:14px;color:#aab6ca;font-size:12px}.status{font-weight:700;color:#f4f7ff}.note{min-height:48px;margin-top:18px;padding:12px 13px;border-radius:15px;background:rgba(255,255,255,.045);color:#b9c5d9;font-size:12px;line-height:1.55;border:1px solid rgba(255,255,255,.075)}
-    .done,.error{display:none;margin-top:18px;padding:13px 15px;border-radius:15px;font-size:13px;line-height:1.45}.done{background:rgba(86,230,164,.09);border:1px solid rgba(86,230,164,.18);color:#93f1c3}.error{background:rgba(255,122,142,.09);border:1px solid rgba(255,122,142,.18);color:#ffb2bf}
-    button{width:100%;margin-top:16px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.07);color:#fff;border-radius:15px;padding:13px 15px;font:inherit;font-weight:750;cursor:pointer;display:none}
-    @keyframes s{from{transform:translateX(-100%)}to{transform:translateX(120%)}}
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#070b14;color:#f7f9ff}body{min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at 15% 0%,rgba(113,95,255,.28),transparent 36%),radial-gradient(circle at 95% 90%,rgba(61,190,255,.22),transparent 38%),#070b14;overflow:hidden}.orb{position:fixed;width:320px;height:320px;border-radius:50%;filter:blur(72px);opacity:.28;pointer-events:none}.a{left:-120px;top:-110px;background:#7968ff}.b{right:-130px;bottom:-130px;background:#47caff}.card{position:relative;width:min(560px,100%);padding:26px;border-radius:30px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 28px 90px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.22);backdrop-filter:blur(30px) saturate(1.42);-webkit-backdrop-filter:blur(30px) saturate(1.42);overflow:hidden}.card:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 75% at 8% -10%,rgba(255,255,255,.23),transparent 45%)}.content{position:relative;z-index:1}.mark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-size:24px;font-weight:900;background:linear-gradient(135deg,#7968ff,#5ecfff);box-shadow:0 14px 36px rgba(91,114,255,.34),inset 0 1px 0 rgba(255,255,255,.34)}h1{font-size:25px;margin:18px 0 7px}.sub{margin:0;color:#adb8ce;line-height:1.55;font-size:14px}.prompt{margin:20px 0;padding:14px 15px;border-radius:17px;border:1px solid rgba(255,255,255,.1);background:rgba(3,7,15,.38);color:#dce4f6;font-size:13px;line-height:1.5;max-height:120px;overflow:auto}.track{height:12px;border-radius:999px;background:rgba(255,255,255,.065);overflow:hidden;margin:22px 0 10px}.fill{height:100%;width:3%;border-radius:inherit;background:linear-gradient(90deg,#7968ff,#58d1ff);transition:width .35s ease;position:relative}.fill.active:after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 10%,rgba(255,255,255,.35) 45%,transparent 70%);animation:s 1.25s linear infinite}.row{display:flex;justify-content:space-between;gap:14px;color:#aab6ca;font-size:12px}.status{font-weight:700;color:#f4f7ff}.note{min-height:48px;margin-top:18px;padding:12px 13px;border-radius:15px;background:rgba(255,255,255,.045);color:#b9c5d9;font-size:12px;line-height:1.55;border:1px solid rgba(255,255,255,.075)}.done,.error{display:none;margin-top:18px;padding:13px 15px;border-radius:15px;font-size:13px;line-height:1.45}.done{background:rgba(86,230,164,.09);border:1px solid rgba(86,230,164,.18);color:#93f1c3}.error{background:rgba(255,122,142,.09);border:1px solid rgba(255,122,142,.18);color:#ffb2bf}button{width:100%;margin-top:16px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.07);color:#fff;border-radius:15px;padding:13px 15px;font:inherit;font-weight:750;cursor:pointer;display:none}@keyframes s{from{transform:translateX(-100%)}to{transform:translateX(120%)}}
   </style>
 </head>
 <body>
   <div class="orb a"></div><div class="orb b"></div>
   <main class="card"><div class="content">
     <div class="mark">A</div>
-    <h1>Building your app</h1>
-    <p class="sub">Local Free AI runs on this device. Keep this small runner open until the finished HTML file appears back in Telegram.</p>
+    <h1 id="title">Building your app</h1>
+    <p id="sub" class="sub">Local Free AI runs on this device. Keep this small runner open until the finished HTML file appears back in Telegram.</p>
     <div id="prompt" class="prompt"></div>
     <div class="track"><div id="fill" class="fill active"></div></div>
     <div class="row"><span id="status" class="status">Starting…</span><strong id="pct">3%</strong></div>
     <div id="note" class="note">Checking WebGPU and preparing the local coding model…</div>
-    <div id="done" class="done">✓ Build sent back to Telegram. You can close this runner.</div>
+    <div id="done" class="done">✓ HTML sent back to Telegram. Reply to the new file to keep revising.</div>
     <div id="error" class="error"></div>
     <button id="close">Close</button>
   </div></main>
@@ -45,10 +33,16 @@
     const params = new URLSearchParams(location.search);
     const chat = params.get('chat') || '';
     const ts = params.get('ts') || '';
+    const mode = params.get('mode') === 'revise' ? 'revise' : 'build';
     const prompt = params.get('prompt') || '';
+    const file = params.get('file') || '';
     const sig = params.get('sig') || '';
 
-    $('prompt').textContent = prompt || 'No build request was supplied.';
+    if (mode === 'revise') {
+      $('title').textContent = 'Revising your app';
+      $('sub').textContent = 'AppGPT is loading the exact HTML file you replied to, then applying only your requested changes.';
+    }
+    $('prompt').textContent = prompt || 'No request was supplied.';
     $('close').onclick = () => { try { tg?.close(); } catch {} };
 
     try {
@@ -70,13 +64,11 @@
 
     window.addEventListener('digitbox-local-ai-progress', event => {
       const value = Math.max(0, Math.min(1, Number(event.detail?.value || 0)));
-      setProgress(8 + value * 30, value >= 1 ? 'Model ready' : 'Loading model', event.detail?.text || 'Preparing Local Free AI…');
+      setProgress(10 + value * 28, value >= 1 ? 'Model ready' : 'Loading model', event.detail?.text || 'Preparing Local Free AI…');
     });
-
     window.addEventListener('digitbox-local-ai-retry', event => {
-      setProgress(Math.max(progress, 64), 'Retrying strict HTML', `The previous output was ${event.detail?.reason || 'incomplete'}. AppGPT is automatically retrying with a smaller HTML-only build.`);
+      setProgress(Math.max(progress, 64), 'Retrying strict HTML', `The previous output was ${event.detail?.reason || 'incomplete'}. AppGPT is retrying with a smaller HTML-only response.`);
     });
-
     window.addEventListener('appgpt-build-note', event => {
       if (event.detail?.text) $('note').textContent = event.detail.text;
     });
@@ -85,41 +77,37 @@
       const response = await fetch('/api/appgpt/bot?complete=1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat, ts, prompt, sig, ...payload })
+        body: JSON.stringify({ chat, ts, mode, prompt, file, sig, ...payload })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || `Could not send result back to Telegram (${response.status}).`);
       return data;
     }
 
+    async function loadRevisionSource() {
+      if (mode !== 'revise') return '';
+      setProgress(6, 'Loading current app', 'Getting the exact HTML file you replied to from Telegram…');
+      const query = new URLSearchParams({ source: '1', chat, ts, mode, prompt, file, sig });
+      const response = await fetch(`/api/appgpt/bot?${query.toString()}`, { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok || !data.html) throw new Error(data.error || 'Could not load the HTML being revised.');
+      return String(data.html);
+    }
+
     function extractHtml(raw) {
       let text = String(raw || '').trim();
       if (!text) return '';
-
-      try {
-        const parsed = JSON.parse(text);
-        if (typeof parsed?.html === 'string') text = parsed.html.trim();
-      } catch {}
-
+      try { const parsed = JSON.parse(text); if (typeof parsed?.html === 'string') text = parsed.html.trim(); } catch {}
       const fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
       if (fence) text = fence[1].trim();
-
-      const doctype = text.search(/<!doctype html>/i);
-      const htmlTag = text.search(/<html(?:\s|>)/i);
-      const bodyTag = text.search(/<body(?:\s|>)/i);
-      const firstHtml = [doctype, htmlTag, bodyTag].filter(i => i >= 0).sort((a,b) => a-b)[0];
-      if (Number.isFinite(firstHtml) && firstHtml > 0) text = text.slice(firstHtml);
-
-      // Safe normalization for common small-model mistakes. We only repair
-      // document wrappers/closing tags; we never turn plain prose into HTML.
+      const starts = [text.search(/<!doctype html>/i), text.search(/<html(?:\s|>)/i), text.search(/<body(?:\s|>)/i)].filter(i => i >= 0).sort((a,b) => a-b);
+      if (starts.length && starts[0] > 0) text = text.slice(starts[0]);
       if (/^<html(?:\s|>)/i.test(text)) text = `<!doctype html>\n${text}`;
       if (/^<body(?:\s|>)/i.test(text)) text = `<!doctype html>\n<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>\n${text}`;
-
       if (/<!doctype html>/i.test(text) && /<html(?:\s|>)/i.test(text)) {
         if (/<body(?:\s|>)/i.test(text) && !/<\/body>/i.test(text)) text += '\n</body>';
         if (!/<\/html>\s*$/i.test(text)) text += '\n</html>';
       }
-
       const end = text.toLowerCase().lastIndexOf('</html>');
       if (end >= 0) text = text.slice(0, end + 7);
       return text.trim();
@@ -127,53 +115,51 @@
 
     function isValidHtml(html) {
       const text = String(html || '').trim();
-      return /^<!doctype html>/i.test(text) &&
-        /<html(?:\s|>)/i.test(text) &&
-        /<head(?:\s|>)/i.test(text) &&
-        /<body(?:\s|>)/i.test(text) &&
-        /<\/html>\s*$/i.test(text) &&
-        text.length >= 180;
+      return /^<!doctype html>/i.test(text) && /<html(?:\s|>)/i.test(text) && /<head(?:\s|>)/i.test(text) && /<body(?:\s|>)/i.test(text) && /<\/html>\s*$/i.test(text) && text.length >= 180;
     }
 
-    function buildRequest(userPrompt, mode = 'normal') {
-      const compact = mode === 'tiny'
-        ? 'Make the app very small: roughly 80-120 lines. Implement only the core feature. No external libraries.'
-        : 'Keep the app compact enough to finish completely. Prefer working core features over extra features.';
-      return `You are generating a file, not chatting.\n\nRETURN ONLY ONE COMPLETE HTML DOCUMENT.\nThe first characters MUST be <!doctype html>.\nThe final characters MUST be </html>.\nNO Markdown fences. NO explanation. NO preface. NO JSON. NO comments outside the HTML.\nInclude all CSS and JavaScript inline.\nEvery main button must work.\n${compact}\n\nUSER APP REQUEST:\n${String(userPrompt || '').slice(0, 2400)}`;
+    function clippedSource(html) {
+      const text = String(html || '');
+      if (text.length <= 8500) return text;
+      return `${text.slice(0, 5200)}\n\n<!-- middle omitted only for local-model context -->\n\n${text.slice(-3000)}`;
     }
 
-    async function generateStrictHtml() {
+    function buildRequest(sourceHtml = '', tiny = false) {
+      const sizeRule = tiny
+        ? 'Keep the replacement file very small, roughly 80-120 lines. Preserve the requested behavior but remove optional complexity if needed.'
+        : 'Keep the replacement compact enough to finish completely. Preserve existing features unless the edit explicitly changes them.';
+      const contract = `You are generating a file, not chatting.\nRETURN ONLY ONE COMPLETE HTML DOCUMENT.\nFirst characters: <!doctype html>.\nFinal characters: </html>.\nNO Markdown fences. NO explanation. NO preface. NO JSON.\nAll CSS and JavaScript must be inline.\nEvery main button must work.\n${sizeRule}`;
+      if (mode === 'revise') {
+        return `${contract}\n\nREVISION TASK:\nModify the existing app below according to this request. Return the FULL replacement HTML, not a patch.\n\nCHANGE REQUEST:\n${prompt.slice(0, 1800)}\n\nCURRENT HTML:\n${clippedSource(sourceHtml)}`;
+      }
+      return `${contract}\n\nUSER APP REQUEST:\n${prompt.slice(0, 2400)}`;
+    }
+
+    async function generateStrictHtml(sourceHtml) {
       const attempts = [
-        { mode: 'normal', temperature: 0.12, maxTokens: 2400 },
-        { mode: 'tiny', temperature: 0.05, maxTokens: 1900 }
+        { tiny: false, temperature: 0.10, maxTokens: 2500 },
+        { tiny: true, temperature: 0.04, maxTokens: 1900 }
       ];
       let last = '';
-
       for (let i = 0; i < attempts.length; i += 1) {
         const attempt = attempts[i];
-        if (i > 0) setProgress(72, 'Final compact retry', 'The model did not produce a clean file, so AppGPT is rebuilding a smaller version from scratch.');
-        const result = await localChat(
-          [{ role: 'user', content: buildRequest(prompt, attempt.mode) }],
-          { temperature: attempt.temperature, maxTokens: attempt.maxTokens }
-        );
+        if (i > 0) setProgress(72, 'Final compact retry', mode === 'revise' ? 'Rebuilding a smaller complete revision from the same HTML and change request.' : 'Rebuilding a smaller complete app from scratch.');
+        const result = await localChat([{ role: 'user', content: buildRequest(sourceHtml, attempt.tiny) }], { temperature: attempt.temperature, maxTokens: attempt.maxTokens });
         last = extractHtml(result?.text || '');
         if (isValidHtml(last)) return last;
       }
-
-      throw new Error(last
-        ? 'The local model still returned malformed or non-HTML output after strict retries.'
-        : 'The local model returned no usable HTML.');
+      throw new Error(last ? 'The local model still returned malformed or non-HTML output after strict retries.' : 'The local model returned no usable HTML.');
     }
 
     async function run() {
-      if (!chat || !ts || !prompt || !sig) throw new Error('This build link is incomplete. Return to Telegram and start the build again.');
+      if (!chat || !ts || !prompt || !sig || (mode === 'revise' && !file)) throw new Error('This build link is incomplete. Return to Telegram and try again.');
       if (!isLocalAISupported()) throw new Error('This browser does not expose WebGPU. Local Free AI needs a WebGPU-capable browser.');
-
-      setProgress(5, 'Preparing', 'Starting the local coding model. The first run may download the model to this device.');
-      const html = await generateStrictHtml();
-      setProgress(90, 'Validating HTML', 'The model returned a complete HTML document. Sending the file back to Telegram…');
+      const sourceHtml = await loadRevisionSource();
+      setProgress(mode === 'revise' ? 12 : 5, mode === 'revise' ? 'Preparing revision' : 'Preparing build', 'Starting the local coding model. The first run may download the model to this device.');
+      const html = await generateStrictHtml(sourceHtml);
+      setProgress(90, 'Validating HTML', `The model returned a complete ${mode === 'revise' ? 'revised ' : ''}HTML document. Sending it back to Telegram…`);
       await sendResult({ html });
-      setProgress(100, 'Sent to Telegram', 'Your index.html file is now in the Telegram chat.');
+      setProgress(100, 'Sent to Telegram', 'The new index.html is now in the chat. Reply to it to revise again.');
       $('fill').classList.remove('active');
       $('done').style.display = 'block';
       $('close').style.display = 'block';
@@ -185,8 +171,8 @@
       const message = String(error?.message || error || 'Build failed.').slice(0, 550);
       try { await sendResult({ error: message }); } catch {}
       $('fill').classList.remove('active');
-      $('status').textContent = 'Build failed';
-      $('note').textContent = 'Nothing except valid HTML is ever sent as an app file.';
+      $('status').textContent = mode === 'revise' ? 'Revision failed' : 'Build failed';
+      $('note').textContent = 'No non-HTML output was sent as an app file.';
       $('error').textContent = message;
       $('error').style.display = 'block';
       $('close').style.display = 'block';
