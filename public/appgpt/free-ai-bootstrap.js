@@ -1,42 +1,53 @@
 import { PROVIDERS } from './providers.js';
 import { E, toast } from './app-state.js';
+import { LOCAL_FREE_MODELS, localChat, isLocalAISupported } from '../local-free-ai-runtime.js';
 
-// AppGPT Free intentionally falls back only among models that Puter currently
-// exposes at $0 input / $0 output. A paid/BYOK provider is never selected
-// automatically when these models are unavailable or rate-limited.
-const FREE_MODELS = [
-  'cohere/north-mini-code:free',
-  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-  'liquid/lfm-2.5-2.6b:free'
-];
-
+const FREE_MODELS = [...LOCAL_FREE_MODELS];
 const provider = PROVIDERS.appgptFree;
-let puterReady = null;
-let authRunning = false;
-let replaying = false;
+let lastProgressBucket = -1;
 
 if (provider) {
   provider.model = FREE_MODELS[0];
   provider.fallbackModels = FREE_MODELS.slice(1);
+  provider.baseUrl = 'local://webllm';
   provider.freeTier = true;
   provider.requiresKey = false;
-  provider.freeLabel = 'No API key · $0 hosted fallback chain';
-  provider.hint = 'Already connected · free coding model with automatic $0 fallbacks';
+  provider.freeLabel = 'No API key · no sign-in · runs locally';
+  provider.hint = 'Local browser AI · no account, API key, or cloud quota';
 }
 
+installLocalCompatibilityShim();
 migrateSavedFreePreset();
-preloadPuter();
 syncLivePreset();
 wireFreeLock();
-wireFirstUseGate();
+wireProgress();
+
+function installLocalCompatibilityShim() {
+  // providers.js already knows how to call the old keyless adapter. Keep that
+  // interface stable, but fulfill it locally with WebLLM instead of Puter.
+  const root = window.puter || {};
+  root.ai = {
+    ...(root.ai || {}),
+    async chat(messages, options = {}) {
+      const result = await localChat(messages, {
+        model: options.model || FREE_MODELS[0],
+        temperature: options.temperature,
+        maxTokens: options.max_tokens,
+        task: 'app-builder'
+      });
+      return { message: { content: result.text }, model: result.model };
+    }
+  };
+  window.puter = root;
+}
 
 function migrateSavedFreePreset() {
   try {
     const key = 'appgpt_provider_config';
     const saved = JSON.parse(localStorage.getItem(key) || 'null');
     if (!saved || saved.provider !== 'appgptFree') return;
-    if (!FREE_MODELS.includes(saved.model)) saved.model = FREE_MODELS[0];
-    saved.baseUrl = 'puter://ai';
+    saved.model = FREE_MODELS[0];
+    saved.baseUrl = 'local://webllm';
     localStorage.setItem(key, JSON.stringify(saved));
   } catch {}
 }
@@ -50,102 +61,45 @@ function wireFreeLock() {
 }
 
 function syncLivePreset() {
-  const free = isFreeSelected();
+  const free = Boolean(provider && E.provider?.value === 'appgptFree');
   if (E.modelInput) E.modelInput.readOnly = free;
   if (E.base) E.base.readOnly = free;
   if (!free) return;
+
   E.modelInput.value = FREE_MODELS[0];
-  E.base.value = 'puter://ai';
+  E.base.value = 'local://webllm';
   if (E.key) E.key.value = '';
-  if (E.badge) E.badge.textContent = `AppGPT Free · ${FREE_MODELS[0]}`;
-  if (E.model) E.model.textContent = `AppGPT Free · ${FREE_MODELS[0]}`;
+  if (E.badge) E.badge.textContent = `AppGPT Free · ${shortModel(FREE_MODELS[0])}`;
+  if (E.model) E.model.textContent = `AppGPT Free · ${shortModel(FREE_MODELS[0])}`;
+
+  if (E.providerStatus && !isLocalAISupported()) {
+    E.providerStatus.textContent = 'This browser does not expose WebGPU. Your projects are safe; choose another AI to generate.';
+    E.providerStatus.className = 'inline-status error';
+  }
 }
 
-function preloadPuter() {
-  if (window.puter?.ai?.chat) {
-    puterReady = Promise.resolve(window.puter);
-    return puterReady;
-  }
-  if (puterReady) return puterReady;
-  puterReady = new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-appgpt-puter]');
-    if (existing) {
-      if (window.puter?.ai?.chat) return resolve(window.puter);
-      existing.addEventListener('load', () => resolve(window.puter), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Could not load AppGPT Free AI.')), { once: true });
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://js.puter.com/v2/';
-    script.async = true;
-    script.dataset.appgptPuter = '1';
-    script.onload = () => window.puter?.ai?.chat ? resolve(window.puter) : reject(new Error('AppGPT Free AI did not initialize.'));
-    script.onerror = () => reject(new Error('Could not load AppGPT Free AI.'));
-    document.head.append(script);
+function wireProgress() {
+  window.addEventListener('digitbox-local-ai-progress', event => {
+    if (!isFreeSelected()) return;
+    const value = Math.max(0, Math.min(1, Number(event.detail?.value || 0)));
+    const bucket = Math.floor(value * 4);
+    if (bucket === lastProgressBucket && value < 1) return;
+    lastProgressBucket = bucket;
+    const percent = Math.round(value * 100);
+    const text = value >= 1
+      ? 'Local Free AI model is ready.'
+      : `Preparing Local Free AI · ${percent}%${percent < 100 ? ' · first load downloads the model once' : ''}`;
+    window.dispatchEvent(new CustomEvent('appgpt-build-note', { detail: { text } }));
+    if (value >= 1) toast('Local Free AI ready');
   });
-  return puterReady;
-}
-
-function wireFirstUseGate() {
-  // Capture before the chat/build handlers. If Puter needs first-use auth,
-  // perform it from the same user gesture and replay the original action only
-  // after auth succeeds. This prevents popup blocking and prevents AppGPT from
-  // falling into Provider settings just because first-use auth was not ready.
-  document.addEventListener('click', event => {
-    if (replaying || !isFreeSelected()) return;
-    const target = event.target.closest?.('#simpleChatSend, #buildBtn, #createAppBtn');
-    if (!target || isPuterSignedIn()) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    gateAndReplay(() => target.click());
-  }, true);
-
-  document.addEventListener('keydown', event => {
-    if (replaying || !isFreeSelected() || isPuterSignedIn()) return;
-    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
-    if (event.target?.id !== 'simpleChatComposer') return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    gateAndReplay(() => document.getElementById('simpleChatSend')?.click());
-  }, true);
-}
-
-async function gateAndReplay(action) {
-  if (authRunning) return;
-  authRunning = true;
-  try {
-    // The script is preloaded at startup. If it somehow has not finished yet,
-    // do not start a build that will immediately fail; ask for one more tap.
-    if (!window.puter?.auth) {
-      toast('AppGPT Free is finishing setup — tap Send again in a moment.');
-      preloadPuter().catch(() => {});
-      return;
-    }
-
-    if (!isPuterSignedIn()) {
-      await window.puter.auth.signIn({ attempt_temp_user_creation: true });
-    }
-    replaying = true;
-    action();
-  } catch (error) {
-    const code = String(error?.error || error?.code || error?.message || '');
-    if (/closed|cancel/i.test(code)) toast('Free AI setup was cancelled. Your chat is still here.');
-    else toast('Could not start AppGPT Free. Try again or choose another AI.');
-  } finally {
-    setTimeout(() => { replaying = false; }, 0);
-    authRunning = false;
-  }
-}
-
-function isPuterSignedIn() {
-  try { return Boolean(window.puter?.auth?.isSignedIn?.()); }
-  catch { return false; }
 }
 
 function isFreeSelected() {
   return Boolean(provider && E.provider?.value === 'appgptFree');
+}
+
+function shortModel(value = '') {
+  return String(value).replace(/-Instruct.*$/i, '').replace(/-q\w+.*$/i, '') || value;
 }
 
 export const APPGPT_FREE_MODELS = FREE_MODELS;
