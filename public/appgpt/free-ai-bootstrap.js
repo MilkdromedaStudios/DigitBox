@@ -1,6 +1,6 @@
 import { PROVIDERS } from './providers.js';
 import { E, toast } from './app-state.js';
-import { LOCAL_FREE_MODELS, localChat, isLocalAISupported } from '../local-free-ai-runtime.js';
+import { LOCAL_FREE_MODELS, localChat, isLocalAISupported } from './local-free-builder.js';
 
 const FREE_MODELS = [...LOCAL_FREE_MODELS];
 const provider = PROVIDERS.appgptFree;
