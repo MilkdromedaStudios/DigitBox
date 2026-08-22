@@ -1,5 +1,9 @@
 import './appearance.js';
 
+const GEMINI_DEFAULT_MODEL = 'gemini-3.5-flash';
+const PROVIDER_CONFIG_KEY = 'appgpt_provider_config';
+migrateLegacyGeminiDefault();
+
 export const PROVIDERS = {
   openai: { name: 'OpenAI', kind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-mini', vision: true, hint: 'OpenAI-compatible chat endpoint' },
   openrouter: { name: 'OpenRouter', kind: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-5-mini', vision: true, hint: 'Many models through one API' },
@@ -28,19 +32,30 @@ export const PROVIDERS = {
   mistral: { name: 'Mistral', kind: 'openai-compatible', baseUrl: 'https://api.mistral.ai/v1', model: 'mistral-small-latest', vision: false, hint: 'Mistral chat completions' },
   together: { name: 'Together AI', kind: 'openai-compatible', baseUrl: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', vision: false, hint: 'Open-source model hosting' },
   xai: { name: 'xAI', kind: 'openai-compatible', baseUrl: 'https://api.x.ai/v1', model: 'grok-3-mini', vision: true, hint: 'OpenAI-style chat API' },
-  gemini: { name: 'Google Gemini', kind: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.5-flash', vision: true, hint: 'Gemini multimodal generateContent API' },
+  gemini: { name: 'Google Gemini', kind: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: GEMINI_DEFAULT_MODEL, vision: true, hint: 'Gemini multimodal generateContent API · 3.5 Flash default' },
   anthropic: { name: 'Anthropic', kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-0', vision: true, hint: 'Claude Messages API' },
   custom: { name: 'Custom OpenAI-compatible', kind: 'openai-compatible', baseUrl: 'https://example.com/v1', model: 'your-model', vision: true, hint: 'Any compatible /chat/completions endpoint' }
 };
 
+function migrateLegacyGeminiDefault() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROVIDER_CONFIG_KEY) || 'null');
+    if (!saved || saved.provider !== 'gemini') return;
+    if (!saved.model || saved.model === 'gemini-2.5-flash' || saved.model === 'gemini-2.5-flash-001') {
+      saved.model = GEMINI_DEFAULT_MODEL;
+      localStorage.setItem(PROVIDER_CONFIG_KEY, JSON.stringify(saved));
+    }
+  } catch {}
+}
+
 function trimSlash(url) { return String(url || '').replace(/\/+$/, ''); }
 
 export async function callProvider(config, messages, options = {}) {
-  const { temperature = 0.35, maxTokens = 9000, responseMode = 'text', thinkingBudget } = options;
+  const { temperature = 0.35, maxTokens = 9000, responseMode = 'text', thinkingBudget, thinkingLevel } = options;
   if (!config?.apiKey) throw new Error('Add an API key first.');
   if (!config?.model) throw new Error('Choose a model first.');
   if (!config?.baseUrl) throw new Error('Add a provider base URL first.');
-  if (config.kind === 'gemini') return callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget });
+  if (config.kind === 'gemini') return callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget, thinkingLevel });
   if (config.kind === 'anthropic') return callAnthropic(config, messages, { temperature, maxTokens });
   return callOpenAICompatible(config, messages, { temperature, maxTokens });
 }
@@ -79,18 +94,20 @@ function toOpenAIMessage(message) {
   };
 }
 
-async function callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget }) {
+async function callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget, thinkingLevel }) {
   const system = messages.filter(m => m.role === 'system').map(m => flattenText(m.content)).join('\n\n');
   const contents = messages.filter(m => m.role !== 'system').map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: toGeminiParts(m.content)
   }));
 
-  const resolvedThinkingBudget = geminiThinkingBudget(config.model, thinkingBudget);
+  const name = String(config.model || '').toLowerCase();
+  const isGemini3 = /^gemini-3(?:\.|-|$)/.test(name);
+  const thinkingConfig = geminiThinkingConfig(config.model, { thinkingBudget, thinkingLevel });
   const generationConfig = {
-    temperature,
     maxOutputTokens: maxTokens,
-    ...(resolvedThinkingBudget !== null ? { thinkingConfig: { thinkingBudget: resolvedThinkingBudget } } : {})
+    ...(!isGemini3 ? { temperature } : {}),
+    ...(thinkingConfig ? { thinkingConfig } : {})
   };
   if (responseMode === 'html') {
     generationConfig.responseMimeType = 'application/json';
@@ -112,7 +129,7 @@ async function callGemini(config, messages, { temperature, maxTokens, responseMo
   });
   const data = await safeJson(response);
   if (!response.ok) throw new Error(extractError(data, response.status));
-  reportGeminiUsage(config, data?.usageMetadata, resolvedThinkingBudget);
+  reportGeminiUsage(config, data?.usageMetadata, thinkingConfig);
   const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('');
   if (!text) throw new Error('Gemini returned an empty response.');
   if (responseMode === 'html') {
@@ -124,17 +141,19 @@ async function callGemini(config, messages, { temperature, maxTokens, responseMo
   return text;
 }
 
-function geminiThinkingBudget(model, explicit) {
-  if (Number.isFinite(explicit)) return Math.trunc(explicit);
+function geminiThinkingConfig(model, explicit = {}) {
   const name = String(model || '').toLowerCase();
-  // Gemini 2.5 Flash defaults to dynamic thinking when no budget is supplied.
-  // AppGPT's normal build/edit path prioritizes predictable token use; these
-  // coding tasks already include a detailed engineering prompt and static QA.
-  if (/^gemini-2\.5-flash(?:-|$)/.test(name)) return 0;
+  if (/^gemini-3(?:\.|-|$)/.test(name)) {
+    const level = String(explicit.thinkingLevel || 'LOW').toUpperCase();
+    return { thinkingLevel: ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'].includes(level) ? level : 'LOW' };
+  }
+  if (Number.isFinite(explicit.thinkingBudget)) return { thinkingBudget: Math.trunc(explicit.thinkingBudget) };
+  // Keep legacy 2.5 Flash predictable if somebody deliberately switches back.
+  if (/^gemini-2\.5-flash(?:-|$)/.test(name)) return { thinkingBudget: 0 };
   return null;
 }
 
-function reportGeminiUsage(config, usage, thinkingBudget) {
+function reportGeminiUsage(config, usage, thinkingConfig) {
   if (!usage) return;
   const detail = {
     provider: 'gemini',
@@ -144,7 +163,8 @@ function reportGeminiUsage(config, usage, thinkingBudget) {
     thoughtTokens: Number(usage.thoughtsTokenCount || 0),
     cachedTokens: Number(usage.cachedContentTokenCount || 0),
     totalTokens: Number(usage.totalTokenCount || 0),
-    thinkingBudget
+    thinkingBudget: Number.isFinite(thinkingConfig?.thinkingBudget) ? thinkingConfig.thinkingBudget : null,
+    thinkingLevel: thinkingConfig?.thinkingLevel || ''
   };
 
   try {
