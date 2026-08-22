@@ -16,46 +16,46 @@ console.log(`Configuring @${me.username}…`);
 
 await api('setMyCommands', {
   commands: [
-    { command: 'start', description: 'First-time guide and AppGPT quick links' },
-    { command: 'app', description: 'Open the AppGPT builder' },
-    { command: 'projects', description: 'Open your saved AppGPT projects' },
-    { command: 'keys', description: 'API-key setup and security guide' },
+    { command: 'start', description: 'Open your AppGPT workspace menu' },
+    { command: 'menu', description: 'Choose a new or existing app' },
+    { command: 'new', description: 'Start a new app in Telegram' },
+    { command: 'build', description: 'Build an app directly from a prompt' },
+    { command: 'projects', description: 'Choose existing apps or visual projects' },
     { command: 'templates', description: 'Browse Mini App templates' },
-    { command: 'providers', description: 'Connect an AI provider' },
     { command: 'createbot', description: 'Create a Telegram bot for an AppGPT project' },
-    { command: 'help', description: 'Show all AppGPT commands' }
+    { command: 'providers', description: 'Open AI settings' },
+    { command: 'help', description: 'Show Telegram workspace help' }
   ]
 });
 
 await api('setMyDescription', {
-  description: 'Build Telegram Mini Apps with AI. Turn a chat into a complete app, sync projects to your Telegram account, edit visually, debug, and connect managed bots.'
+  description: 'Build and edit Telegram Mini Apps directly in chat. Pick an app, type changes, and AppGPT sends each version back as an HTML file.'
 });
 
 await api('setMyShortDescription', {
-  short_description: 'AI builder for Telegram Mini Apps.'
+  short_description: 'Build Telegram Mini Apps directly in chat.'
 });
 
 await api('setChatMenuButton', {
   menu_button: {
-    type: 'web_app',
-    text: 'Open AppGPT',
-    web_app: { url: app }
+    type: 'commands'
   }
 });
 
 await api('setWebhook', {
   url: `${worker}/webhook`,
   secret_token: WEBHOOK_SECRET,
-  allowed_updates: ['message', 'managed_bot'],
+  allowed_updates: ['message', 'callback_query', 'managed_bot'],
   drop_pending_updates: false
 });
 
 const webhook = await api('getWebhookInfo');
-console.log('✓ Commands configured');
+console.log('✓ Telegram workspace commands configured');
+console.log('✓ Callback menu updates enabled');
 console.log('✓ Bot description configured');
-console.log('✓ Menu button opens AppGPT');
+console.log('✓ Chat menu shows bot commands');
 console.log(`✓ Managed Bot mode: ${me.can_manage_bots ? 'enabled' : 'not enabled — turn on Bot Management Mode in BotFather for /createbot'}`);
-console.log(`✓ App URL: ${app}`);
+console.log(`✓ Visual App URL: ${app}`);
 console.log(`✓ Webhook: ${webhook.url}`);
 console.log(`✓ Bot: https://t.me/${me.username}`);
 
