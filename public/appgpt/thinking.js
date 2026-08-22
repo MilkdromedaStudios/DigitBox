@@ -2,6 +2,7 @@ import './appearance.js';
 import './simple-chat.js';
 import './visual-editor-loader.js';
 import './telegram-account.js';
+import './telegram-account-security.js';
 
 const $=id=>document.getElementById(id);let startedAt=0;let clock=null;let waiting=false;let currentValue=0;mount();window.addEventListener('appgpt-progress',event=>update(event.detail||{}));window.addEventListener('appgpt-build-note',event=>addNote(event.detail?.text||''));window.addEventListener('appgpt-build-reset',reset);
 function mount(){const host=document.querySelector('#view-build .session-panel');if(!host)return;const section=document.createElement('section');section.className='panel glass thinking-panel';section.innerHTML=`<div class="panel-head"><div><p class="kicker">BUILD PROGRESS</p><h2>Watch AppGPT build</h2></div><span id="buildPhaseBadge" class="pill">Idle</span></div><div class="build-progress-meta"><strong id="buildPhaseText">Ready</strong><span id="buildElapsed">0s</span></div><div class="build-progress-track" aria-label="Build progress"><div id="buildProgressFill" class="build-progress-fill"></div><div id="buildProgressGlow" class="build-progress-glow"></div></div><div class="build-progress-row"><span id="buildProgressHint">Progress moves on real build milestones.</span><strong id="buildProgressPercent">0%</strong></div><div id="buildNotes" class="build-notes"><div class="build-note muted-note">Start a build to see planner notes, validation, and artifact events.</div></div>`;host.before(section)}
