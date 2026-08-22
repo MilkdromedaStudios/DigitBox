@@ -1,0 +1,31 @@
+name: AppGPT checks
+
+on:
+  pull_request:
+    paths:
+      - 'public/appgpt/**'
+      - 'public/local-free-ai-runtime.js'
+      - 'scripts/check-appgpt.mjs'
+      - '.github/workflows/appgpt-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'public/appgpt/**'
+      - 'public/local-free-ai-runtime.js'
+      - 'scripts/check-appgpt.mjs'
+      - '.github/workflows/appgpt-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check AppGPT wiring and regressions
+        run: node scripts/check-appgpt.mjs
