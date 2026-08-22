@@ -7,5 +7,6 @@ APP_URL = "https://digitbox.dev/appgpt"
 GUIDE_URL = "https://digitbox.dev/appgpt/getting-started.html"
 GITHUB_URL = "https://github.com/MilkdromedaStudios/DigitBox"
 
-[ai]
-binding = "AI"
+# Deliberately no [ai] binding here. The Telegram bot must not consume
+# Cloudflare Workers AI allocation unless an AI provider is explicitly
+# configured in a future change.
