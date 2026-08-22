@@ -75,14 +75,24 @@ export default async function handler(request) {
         if (current) {
           try {
             const old = await decryptPayload(current.payload, encryptionSecret);
-            if (old?.provider?.apiKey) {
-              data.provider = { ...(data.provider || {}), apiKey: old.provider.apiKey };
-            }
+            if (old?.provider?.apiKey) data.provider = { ...(data.provider || {}), apiKey: old.provider.apiKey };
           } catch {}
         }
       }
 
       data.v = 1;
+      data.syncedAt = new Date().toISOString();
+      const payload = await encryptPayload(data, encryptionSecret);
+      const updatedAt = new Date().toISOString();
+      await writeVault(supabaseUrl, serviceKey, userId, payload, updatedAt);
+      return json({ ok: true, user: publicUser(identity.user), updatedAt });
+    }
+
+    if (operation === "clearKey") {
+      const current = await readVault(supabaseUrl, serviceKey, userId);
+      if (!current) return json({ ok: true, user: publicUser(identity.user), updatedAt: null });
+      const data = await decryptPayload(current.payload, encryptionSecret);
+      if (data?.provider) delete data.provider.apiKey;
       data.syncedAt = new Date().toISOString();
       const payload = await encryptPayload(data, encryptionSecret);
       const updatedAt = new Date().toISOString();
