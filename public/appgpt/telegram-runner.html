@@ -7,20 +7,21 @@
   <title>AppGPT Runner</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#070b14;color:#f7f9ff}body{min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at 15% 0%,rgba(113,95,255,.28),transparent 36%),radial-gradient(circle at 95% 90%,rgba(61,190,255,.22),transparent 38%),#070b14}.card{width:min(560px,100%);padding:26px;border-radius:30px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 28px 90px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.22);backdrop-filter:blur(30px) saturate(1.42);-webkit-backdrop-filter:blur(30px) saturate(1.42)}.mark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-size:24px;font-weight:900;background:linear-gradient(135deg,#7968ff,#5ecfff)}h1{font-size:25px;margin:18px 0 7px}.sub{margin:0;color:#adb8ce;line-height:1.55;font-size:14px}.prompt,.note{margin-top:18px;padding:13px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.09);background:rgba(3,7,15,.38);font-size:13px;line-height:1.5;color:#c8d2e5}.prompt{max-height:120px;overflow:auto}.track{height:12px;border-radius:999px;background:rgba(255,255,255,.065);overflow:hidden;margin:22px 0 10px}.fill{height:100%;width:4%;border-radius:inherit;background:linear-gradient(90deg,#7968ff,#58d1ff);transition:width .35s}.row{display:flex;justify-content:space-between;color:#aab6ca;font-size:12px}.status{font-weight:700;color:#f4f7ff}.done,.error{display:none;margin-top:18px;padding:13px 15px;border-radius:15px;font-size:13px}.done{background:rgba(86,230,164,.09);border:1px solid rgba(86,230,164,.18);color:#93f1c3}.error{background:rgba(255,122,142,.09);border:1px solid rgba(255,122,142,.18);color:#ffb2bf}button{width:100%;margin-top:16px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.07);color:#fff;border-radius:15px;padding:13px;font:inherit;font-weight:750;cursor:pointer;display:none}
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#070b14;color:#f7f9ff}body{min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at 15% 0%,rgba(113,95,255,.28),transparent 36%),radial-gradient(circle at 95% 90%,rgba(61,190,255,.22),transparent 38%),#070b14}.card{width:min(560px,100%);padding:26px;border-radius:30px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 28px 90px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.22);backdrop-filter:blur(30px) saturate(1.42);-webkit-backdrop-filter:blur(30px) saturate(1.42)}.mark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-size:24px;font-weight:900;background:linear-gradient(135deg,#7968ff,#5ecfff)}h1{font-size:25px;margin:18px 0 7px}.sub{margin:0;color:#adb8ce;line-height:1.55;font-size:14px}.prompt,.note{margin-top:18px;padding:13px 14px;border-radius:16px;border:1px solid rgba(255,255,255,.09);background:rgba(3,7,15,.38);font-size:13px;line-height:1.5;color:#c8d2e5}.prompt{max-height:120px;overflow:auto}.track{height:12px;border-radius:999px;background:rgba(255,255,255,.065);overflow:hidden;margin:22px 0 10px}.fill{height:100%;width:4%;border-radius:inherit;background:linear-gradient(90deg,#7968ff,#58d1ff);transition:width .35s}.row{display:flex;justify-content:space-between;color:#aab6ca;font-size:12px}.status{font-weight:700;color:#f4f7ff}.done,.error{display:none;margin-top:18px;padding:13px 15px;border-radius:15px;font-size:13px}.done{background:rgba(86,230,164,.09);border:1px solid rgba(86,230,164,.18);color:#93f1c3}.error{background:rgba(255,122,142,.09);border:1px solid rgba(255,122,142,.18);color:#ffb2bf}button{width:100%;margin-top:12px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.07);color:#fff;border-radius:15px;padding:13px;font:inherit;font-weight:750;cursor:pointer;display:none}.warn{background:rgba(255,190,80,.12);border-color:rgba(255,190,80,.24);color:#ffd68a}
   </style>
 </head>
 <body>
   <main class="card">
     <div class="mark">A</div>
     <h1 id="title">Building your app</h1>
-    <p id="sub" class="sub">AppGPT uses cloud AI first, so your device GPU stays free. Local AI is only a backup when available.</p>
+    <p id="sub" class="sub">AppGPT Cloud runs the AI off-device, so your phone, tablet, or computer GPU stays free.</p>
     <div id="prompt" class="prompt"></div>
     <div class="track"><div id="fill" class="fill"></div></div>
     <div class="row"><span id="status" class="status">Starting…</span><strong id="pct">4%</strong></div>
     <div id="note" class="note">Connecting to AppGPT Cloud…</div>
     <div id="done" class="done">✓ HTML sent back to Telegram. Reply to the new file to revise it again.</div>
     <div id="error" class="error"></div>
+    <button id="local" class="warn">Use Local AI backup (uses GPU)</button>
     <button id="close">Close</button>
   </main>
 
@@ -35,35 +36,26 @@
     let progress=4;function setProgress(v,s,n){progress=Math.max(progress,Math.min(100,Number(v)||0));$('fill').style.width=`${progress}%`;$('pct').textContent=`${Math.round(progress)}%`;if(s)$('status').textContent=s;if(n)$('note').textContent=n}
     async function post(url,payload){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));return{response:r,data:d}}
     async function sendResult(payload){const {response,data}=await post('/api/appgpt/bot?complete=1',{...ticket,...payload});if(!response.ok||!data.ok)throw new Error(data.error||`Could not send result to Telegram (${response.status}).`);return data}
+    async function cloudBuild(){setProgress(18,'Using AppGPT Cloud','Generating on the server — no WebGPU or device AI compute is being used.');const {response,data}=await post('/api/appgpt/cloud-build',ticket);if(response.ok&&data.ok&&data.html)return data;const e=new Error(data.error||`Cloud build failed (${response.status}).`);e.cloudUnavailable=Boolean(data.cloud_unavailable);throw e}
 
-    async function cloudBuild(){setProgress(18,'Using AppGPT Cloud','Generating on the server — no WebGPU or device AI compute is being used.');const {response,data}=await post('/api/appgpt/cloud-build',ticket);if(response.ok&&data.ok&&data.html)return data;if(data.cloud_unavailable){const e=new Error(data.error||'Cloud AI is not configured.');e.cloudUnavailable=true;throw e}throw new Error(data.error||`Cloud build failed (${response.status}).`)}
-
+    async function canUseLocal(){try{const m=await import('./local-free-builder.js');return Boolean(m.isLocalAISupported?.())}catch{return false}}
     async function localFallback(){
       const {localChat,isLocalAISupported}=await import('./local-free-builder.js');
-      if(!isLocalAISupported())throw new Error('AppGPT Cloud is unavailable and this device does not support the optional Local AI fallback.');
-      setProgress(35,'Optional Local AI fallback','Cloud AI was unavailable. Using the local coding model as a backup; this may use significant GPU resources.');
-      let source='';
-      if(ticket.mode==='revise'){
-        const q=new URLSearchParams({source:'1',chat:ticket.chat,ts:ticket.ts,mode:ticket.mode,prompt:ticket.prompt,file:ticket.file,sig:ticket.sig});
-        const r=await fetch(`/api/appgpt/bot?${q}`);const d=await r.json().catch(()=>({}));if(!r.ok||!d.html)throw new Error(d.error||'Could not load revision source.');source=String(d.html).slice(0,8500)
-      }
+      if(!isLocalAISupported())throw new Error('This device does not support the optional Local AI backup.');
+      $('local').style.display='none';setProgress(35,'Using Local AI backup','You chose Local AI. It may use significant GPU and memory until generation finishes.');
+      let source='';if(ticket.mode==='revise'){const q=new URLSearchParams({source:'1',chat:ticket.chat,ts:ticket.ts,mode:ticket.mode,prompt:ticket.prompt,file:ticket.file,sig:ticket.sig});const r=await fetch(`/api/appgpt/bot?${q}`);const d=await r.json().catch(()=>({}));if(!r.ok||!d.html)throw new Error(d.error||'Could not load revision source.');source=String(d.html).slice(0,8500)}
       const task=ticket.mode==='revise'?`Return ONLY one complete revised HTML document. Begin <!doctype html> and end </html>. No Markdown or explanation.\nCHANGE:\n${ticket.prompt}\nCURRENT HTML:\n${source}`:`Return ONLY one complete HTML document. Begin <!doctype html> and end </html>. No Markdown or explanation. Keep it compact and functional.\nAPP REQUEST:\n${ticket.prompt}`;
-      const result=await localChat([{role:'user',content:task}],{temperature:.08,maxTokens:2200});
-      const html=normalize(result?.text||'');if(!valid(html))throw new Error('Local fallback did not return complete HTML.');return{html,provider:'local'}
+      const result=await localChat([{role:'user',content:task}],{temperature:.08,maxTokens:2200});const html=normalize(result?.text||'');if(!valid(html))throw new Error('Local backup did not return complete HTML.');return{html,provider:'local'}
     }
 
     function normalize(raw){let t=String(raw||'').trim();const f=t.match(/```(?:html)?\s*([\s\S]*?)```/i);if(f)t=f[1].trim();const starts=[t.search(/<!doctype html>/i),t.search(/<html(?:\s|>)/i)].filter(i=>i>=0);if(starts.length)t=t.slice(Math.min(...starts));if(/^<html(?:\s|>)/i.test(t))t='<!doctype html>\n'+t;if(/<!doctype html>/i.test(t)&&/<html(?:\s|>)/i.test(t)&&!/<\/html>\s*$/i.test(t))t+='\n</html>';const end=t.toLowerCase().lastIndexOf('</html>');return(end>=0?t.slice(0,end+7):t).trim()}
     function valid(h){const t=String(h||'').trim();return/^<!doctype html>/i.test(t)&&/<html(?:\s|>)/i.test(t)&&/<head(?:\s|>)/i.test(t)&&/<body(?:\s|>)/i.test(t)&&/<\/html>\s*$/i.test(t)&&t.length>=180}
+    async function finish(result){if(!valid(result.html))throw new Error('AppGPT did not produce a complete HTML document.');setProgress(88,'HTML ready',`Built with ${result.provider==='local'?'Local AI backup':'AppGPT Cloud'}. Sending it back to Telegram…`);await sendResult({html:result.html});setProgress(100,'Sent to Telegram','Done. Your new index.html is in the chat.');$('done').style.display='block';$('close').style.display='block';try{tg?.disableClosingConfirmation?.();tg?.HapticFeedback?.notificationOccurred?.('success')}catch{}}
+    async function fail(e){const message=String(e?.message||e||'Build failed.').slice(0,550);$('status').textContent='Cloud unavailable';$('note').textContent=message;if(await canUseLocal()){$('local').style.display='block';$('local').onclick=async()=>{try{await finish(await localFallback())}catch(err){showFinalError(err)}}}else showFinalError(new Error(`${message} This device also cannot run the optional Local AI backup.`))}
+    async function showFinalError(e){const message=String(e?.message||e||'Build failed.').slice(0,550);try{await sendResult({error:message})}catch{}$('status').textContent='Build failed';$('error').textContent=message;$('error').style.display='block';$('local').style.display='none';$('close').style.display='block';try{tg?.disableClosingConfirmation?.();tg?.HapticFeedback?.notificationOccurred?.('error')}catch{}}
 
-    async function run(){
-      if(!ticket.chat||!ticket.ts||!ticket.prompt||!ticket.sig||(ticket.mode==='revise'&&!ticket.file))throw new Error('This build link is incomplete. Return to Telegram and try again.');
-      let result;try{result=await cloudBuild()}catch(cloudError){console.warn('Cloud build unavailable/failed',cloudError);result=await localFallback()}
-      if(!valid(result.html))throw new Error('AppGPT did not produce a complete HTML document.');
-      setProgress(88,'HTML ready',`Built with ${result.provider==='local'?'Local AI fallback':'AppGPT Cloud'}. Sending the file back to Telegram…`);
-      await sendResult({html:result.html});setProgress(100,'Sent to Telegram','Done. Your new index.html is in the chat.');$('done').style.display='block';$('close').style.display='block';try{tg?.disableClosingConfirmation?.();tg?.HapticFeedback?.notificationOccurred?.('success')}catch{}
-    }
-
-    run().catch(async e=>{const message=String(e?.message||e||'Build failed.').slice(0,550);try{await sendResult({error:message})}catch{}$('status').textContent='Build failed';$('note').textContent='No invalid or non-HTML file was sent.';$('error').textContent=message;$('error').style.display='block';$('close').style.display='block';try{tg?.disableClosingConfirmation?.();tg?.HapticFeedback?.notificationOccurred?.('error')}catch{}})
+    async function run(){if(!ticket.chat||!ticket.ts||!ticket.prompt||!ticket.sig||(ticket.mode==='revise'&&!ticket.file))throw new Error('This build link is incomplete. Return to Telegram and try again.');try{await finish(await cloudBuild())}catch(e){console.warn('Cloud build unavailable/failed',e);await fail(e)}}
+    run().catch(showFinalError)
   </script>
 </body>
 </html>
