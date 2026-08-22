@@ -56,6 +56,7 @@ function wireFreeLock() {
   E.provider?.addEventListener('change', () => setTimeout(syncLivePreset, 0));
   E.modelInput?.addEventListener('change', syncLivePreset);
   E.base?.addEventListener('change', syncLivePreset);
+  window.addEventListener('appgpt-chat-changed', () => setTimeout(syncLivePreset, 0));
   setTimeout(syncLivePreset, 120);
   setTimeout(syncLivePreset, 700);
 }
