@@ -1,3 +1,5 @@
+import { PROVIDERS } from './providers.js';
+
 // Small compatibility hooks for the legacy chat/sidebar renderer. They keep the
 // project-AI switcher informed when a chat is opened without changing main.js.
 boot();
@@ -73,7 +75,8 @@ function lockFreeSwitchFields() {
   model.readOnly = free;
   base.readOnly = free;
   if (free) {
-    model.value = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
-    base.value = 'local://webllm';
+    const preset = PROVIDERS.appgptFree;
+    model.value = preset?.model || model.value;
+    base.value = preset?.baseUrl || base.value;
   }
 }
