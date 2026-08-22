@@ -36,11 +36,11 @@ export const PROVIDERS = {
 function trimSlash(url) { return String(url || '').replace(/\/+$/, ''); }
 
 export async function callProvider(config, messages, options = {}) {
-  const { temperature = 0.35, maxTokens = 9000, responseMode = 'text' } = options;
+  const { temperature = 0.35, maxTokens = 9000, responseMode = 'text', thinkingBudget } = options;
   if (!config?.apiKey) throw new Error('Add an API key first.');
   if (!config?.model) throw new Error('Choose a model first.');
   if (!config?.baseUrl) throw new Error('Add a provider base URL first.');
-  if (config.kind === 'gemini') return callGemini(config, messages, { temperature, maxTokens, responseMode });
+  if (config.kind === 'gemini') return callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget });
   if (config.kind === 'anthropic') return callAnthropic(config, messages, { temperature, maxTokens });
   return callOpenAICompatible(config, messages, { temperature, maxTokens });
 }
@@ -79,14 +79,19 @@ function toOpenAIMessage(message) {
   };
 }
 
-async function callGemini(config, messages, { temperature, maxTokens, responseMode }) {
+async function callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget }) {
   const system = messages.filter(m => m.role === 'system').map(m => flattenText(m.content)).join('\n\n');
   const contents = messages.filter(m => m.role !== 'system').map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: toGeminiParts(m.content)
   }));
 
-  const generationConfig = { temperature, maxOutputTokens: maxTokens };
+  const resolvedThinkingBudget = geminiThinkingBudget(config.model, thinkingBudget);
+  const generationConfig = {
+    temperature,
+    maxOutputTokens: maxTokens,
+    ...(resolvedThinkingBudget !== null ? { thinkingConfig: { thinkingBudget: resolvedThinkingBudget } } : {})
+  };
   if (responseMode === 'html') {
     generationConfig.responseMimeType = 'application/json';
     generationConfig.responseSchema = {
@@ -107,6 +112,7 @@ async function callGemini(config, messages, { temperature, maxTokens, responseMo
   });
   const data = await safeJson(response);
   if (!response.ok) throw new Error(extractError(data, response.status));
+  reportGeminiUsage(config, data?.usageMetadata, resolvedThinkingBudget);
   const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('');
   if (!text) throw new Error('Gemini returned an empty response.');
   if (responseMode === 'html') {
@@ -116,6 +122,45 @@ async function callGemini(config, messages, { temperature, maxTokens, responseMo
     } catch {}
   }
   return text;
+}
+
+function geminiThinkingBudget(model, explicit) {
+  if (Number.isFinite(explicit)) return Math.trunc(explicit);
+  const name = String(model || '').toLowerCase();
+  // Gemini 2.5 Flash defaults to dynamic thinking when no budget is supplied.
+  // AppGPT's normal build/edit path prioritizes predictable token use; these
+  // coding tasks already include a detailed engineering prompt and static QA.
+  if (/^gemini-2\.5-flash(?:-|$)/.test(name)) return 0;
+  return null;
+}
+
+function reportGeminiUsage(config, usage, thinkingBudget) {
+  if (!usage) return;
+  const detail = {
+    provider: 'gemini',
+    model: config.model,
+    promptTokens: Number(usage.promptTokenCount || 0),
+    outputTokens: Number(usage.candidatesTokenCount || 0),
+    thoughtTokens: Number(usage.thoughtsTokenCount || 0),
+    cachedTokens: Number(usage.cachedContentTokenCount || 0),
+    totalTokens: Number(usage.totalTokenCount || 0),
+    thinkingBudget
+  };
+
+  try {
+    const key = 'appgpt_gemini_usage_session_v1';
+    let totals = { calls: 0, promptTokens: 0, outputTokens: 0, thoughtTokens: 0, totalTokens: 0 };
+    try { totals = { ...totals, ...(JSON.parse(sessionStorage.getItem(key) || '{}') || {}) }; } catch {}
+    totals.calls += 1;
+    totals.promptTokens += detail.promptTokens;
+    totals.outputTokens += detail.outputTokens;
+    totals.thoughtTokens += detail.thoughtTokens;
+    totals.totalTokens += detail.totalTokens;
+    sessionStorage.setItem(key, JSON.stringify(totals));
+    detail.session = totals;
+  } catch {}
+
+  window.dispatchEvent(new CustomEvent('appgpt-provider-usage', { detail }));
 }
 
 function toGeminiParts(content) {
