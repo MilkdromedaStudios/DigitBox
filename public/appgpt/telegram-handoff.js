@@ -1,3 +1,4 @@
+import './liquid-glass-restore.js';
 import { E } from './app-state.js';
 
 const params = new URLSearchParams(window.location.search);
