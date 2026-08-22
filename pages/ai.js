@@ -9,92 +9,40 @@ import {
 
 const BARREL_ROLL_RE = /^\/?(do a )?barrel ?roll!?$/i;
 const FREE_MODELS = [
-  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-  "cohere/north-mini-code:free",
-  "liquid/lfm-2.5-2.6b:free",
+  "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+  "SmolLM2-360M-Instruct-q4f16_1-MLC",
 ];
-let puterLoadPromise = null;
+let localRuntimePromise = null;
 
-function preloadPuter() {
+function loadLocalRuntime() {
   if (typeof window === "undefined") return Promise.resolve(null);
-  if (window.puter?.ai?.chat) return Promise.resolve(window.puter);
-  if (puterLoadPromise) return puterLoadPromise;
+  if (window.DigitboxLocalAI) return Promise.resolve(window.DigitboxLocalAI);
+  if (localRuntimePromise) return localRuntimePromise;
 
-  puterLoadPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector("script[data-digitbox-puter]");
+  localRuntimePromise = new Promise((resolve, reject) => {
+    const finish = () => {
+      if (window.DigitboxLocalAI) resolve(window.DigitboxLocalAI);
+      else reject(new Error("Local Free AI did not initialize."));
+    };
+
+    window.addEventListener("digitbox-local-ai-ready", finish, { once: true });
+    const existing = document.querySelector('script[data-digitbox-local-ai]');
     if (existing) {
-      if (window.puter?.ai?.chat) return resolve(window.puter);
-      existing.addEventListener("load", () => resolve(window.puter), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Could not load Free AI.")), { once: true });
+      existing.addEventListener("load", finish, { once: true });
+      existing.addEventListener("error", () => reject(new Error("Could not load Local Free AI.")), { once: true });
       return;
     }
+
     const script = document.createElement("script");
-    script.src = "https://js.puter.com/v2/";
-    script.async = true;
-    script.dataset.digitboxPuter = "1";
-    script.onload = () => window.puter?.ai?.chat
-      ? resolve(window.puter)
-      : reject(new Error("Free AI did not initialize."));
-    script.onerror = () => reject(new Error("Could not load Free AI."));
+    script.type = "module";
+    script.src = "/local-free-ai-runtime.js";
+    script.dataset.digitboxLocalAi = "1";
+    script.onload = finish;
+    script.onerror = () => reject(new Error("Could not load Local Free AI."));
     document.head.appendChild(script);
   });
-  return puterLoadPromise;
-}
 
-function beginFreeAuthFromGesture() {
-  if (typeof window === "undefined" || !window.puter?.auth) return null;
-  try {
-    if (window.puter.auth.isSignedIn?.()) return Promise.resolve(true);
-    // Puter documents temporary-user creation as the fast onboarding path.
-    // Starting it here (before any await) keeps it tied to the Send click.
-    return window.puter.auth.signIn({ attempt_temp_user_creation: true });
-  } catch (error) {
-    return Promise.reject(error);
-  }
-}
-
-function normalizePuterMessages(messages) {
-  return (messages || []).map((message) => ({
-    role: message.role === "assistant" ? "assistant" : "user",
-    content: String(message.content || ""),
-  }));
-}
-
-function puterText(response) {
-  const content = response?.message?.content ?? response?.content ?? response;
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
-  }
-  return "";
-}
-
-async function freeCompletion(messages) {
-  if (!window.puter?.ai?.chat) throw new Error("Free AI is still loading — press Send again in a moment.");
-  let lastError = null;
-
-  for (let i = 0; i < FREE_MODELS.length; i += 1) {
-    const candidate = FREE_MODELS[i];
-    try {
-      const response = await window.puter.ai.chat(normalizePuterMessages(messages), {
-        model: candidate,
-        temperature: 0.65,
-        max_tokens: 1400,
-      });
-      const reply = puterText(response);
-      if (!reply) throw new Error("The free model returned an empty response.");
-      return { reply, model: candidate, fallback: i > 0 };
-    } catch (error) {
-      lastError = error;
-      console.warn(`Digitbox Free AI model ${candidate} failed`, error);
-    }
-  }
-
-  const raw = String(lastError?.message || lastError || "").toLowerCase();
-  if (/quota|limit|rate|credits|balance|429|too many|capacity/.test(raw)) {
-    throw new Error("Free AI hit a usage or capacity limit. Your chat is saved. Retry later or switch to Site AI if it is available.");
-  }
-  throw new Error("Free AI is temporarily unavailable. Your chat is saved — retry or switch to Site AI if available.");
+  return localRuntimePromise;
 }
 
 export default function DigitboxAiPage() {
@@ -107,6 +55,7 @@ export default function DigitboxAiPage() {
   const [model, setModel] = useState(FREE_MODELS[0]);
   const [aiMode, setAiMode] = useState("free");
   const [freeReady, setFreeReady] = useState(false);
+  const [freeSupported, setFreeSupported] = useState(true);
   const [showApi, setShowApi] = useState(false);
 
   const scrollRef = useRef(null);
@@ -117,14 +66,31 @@ export default function DigitboxAiPage() {
     setChats(loaded);
     setActiveId(loaded[0].id);
 
-    preloadPuter()
-      .then(() => setFreeReady(true))
-      .catch(() => setFreeReady(false));
+    loadLocalRuntime()
+      .then((runtime) => {
+        setFreeReady(Boolean(runtime));
+        setFreeSupported(Boolean(runtime?.supported?.()));
+      })
+      .catch(() => {
+        setFreeReady(false);
+        setFreeSupported(false);
+      });
 
     fetch("/api/ai/request?info=1")
       .then((r) => r.json())
       .then((d) => setConfigured(Boolean(d.configured)))
       .catch(() => setConfigured(false));
+
+    const onProgress = (event) => {
+      const value = Math.max(0, Math.min(1, Number(event.detail?.value || 0)));
+      if (value >= 1) {
+        setStatus("");
+        return;
+      }
+      setStatus(`Loading Local Free AI… ${Math.round(value * 100)}%`);
+    };
+    window.addEventListener("digitbox-local-ai-progress", onProgress);
+    return () => window.removeEventListener("digitbox-local-ai-progress", onProgress);
   }, []);
 
   const activeChat = useMemo(
@@ -185,9 +151,6 @@ export default function DigitboxAiPage() {
     const text = input.trim();
     if (!text || sending || !activeChat) return;
 
-    // Start Puter auth from the actual user gesture before any await/state work.
-    const freeAuth = aiMode === "free" ? beginFreeAuthFromGesture() : null;
-
     if (BARREL_ROLL_RE.test(text)) {
       triggerBarrelRoll();
       setActiveMessages([
@@ -207,41 +170,54 @@ export default function DigitboxAiPage() {
 
     try {
       if (aiMode === "free") {
-        if (!window.puter?.ai?.chat) {
-          preloadPuter().catch(() => {});
-          setStatus("Free AI is finishing setup — press Send again in a moment.");
+        const runtime = await loadLocalRuntime();
+        if (!runtime?.supported?.()) {
+          setFreeSupported(false);
+          setStatus("This browser cannot run Local Free AI because WebGPU is unavailable. Your chat is saved; choose Site AI if available.");
           return;
         }
-        if (freeAuth) await freeAuth;
-        const result = await freeCompletion(history);
-        setActiveMessages([...history, { role: "assistant", content: result.reply }]);
-        setModel(result.model);
-        if (result.fallback) setStatus(`Free fallback in use · ${result.model}`);
-      } else {
-        if (!configured) {
-          setStatus("Site AI is not configured. Switch back to Free AI.");
-          return;
+
+        let lastError = null;
+        for (let i = 0; i < FREE_MODELS.length; i += 1) {
+          const candidate = FREE_MODELS[i];
+          try {
+            const result = await runtime.chat(history, {
+              model: candidate,
+              task: "chat",
+              maxTokens: 900,
+              temperature: 0.65,
+            });
+            setActiveMessages([...history, { role: "assistant", content: result.text }]);
+            setModel(result.model || candidate);
+            if (i > 0) setStatus(`Using local fallback · ${shortModel(candidate)}`);
+            return;
+          } catch (error) {
+            lastError = error;
+            console.warn(`Local Free AI model ${candidate} failed`, error);
+          }
         }
-        const res = await fetch("/api/ai/request", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: history }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          setStatus(data.error || "Site AI request failed. Switch to Free AI or try again.");
-          return;
-        }
-        setActiveMessages([...history, { role: "assistant", content: data.reply }]);
-        if (data.model) setModel(data.model);
+        throw lastError || new Error("Local Free AI could not run on this device.");
       }
+
+      if (!configured) {
+        setStatus("Site AI is not configured. Switch back to Local Free AI.");
+        return;
+      }
+
+      const res = await fetch("/api/ai/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setStatus(data.error || "Site AI request failed. Switch to Local Free AI or try again.");
+        return;
+      }
+      setActiveMessages([...history, { role: "assistant", content: data.reply }]);
+      if (data.model) setModel(data.model);
     } catch (error) {
-      const raw = String(error?.error || error?.code || error?.message || "");
-      if (/auth_window_closed|cancel/i.test(raw)) {
-        setStatus("Free AI setup was cancelled. Your message is saved — press Send when you want to continue.");
-      } else {
-        setStatus(error?.message || "AI request failed. Your chat is saved.");
-      }
+      setStatus(error?.message || "AI request failed. Your chat is saved.");
     } finally {
       setSending(false);
     }
@@ -256,7 +232,7 @@ export default function DigitboxAiPage() {
 
   function switchMode(next) {
     if (next === "site" && !configured) {
-      setStatus("Site AI is not configured on this deployment. Free AI is still available.");
+      setStatus("Site AI is not configured on this deployment.");
       return;
     }
     setAiMode(next);
@@ -273,31 +249,28 @@ export default function DigitboxAiPage() {
           Digitbox <span className="ai-grad">AI</span>
         </h1>
         <p className="post-meta">
-          Your friendly built-in assistant · {aiMode === "free" ? "Free AI" : "Site AI"}
-          {model ? ` · ${model}` : ""}. Chats are saved on this device.
+          Your friendly built-in assistant · {aiMode === "free" ? "Local Free AI" : "Site AI"}
+          {model ? ` · ${shortModel(model)}` : ""}. Chats are saved on this device.
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
           <button
             type="button"
             className={aiMode === "free" ? "auth-btn" : "ghost-btn"}
             onClick={() => switchMode("free")}
+            title="Runs locally in your browser with no sign-in or API key"
           >
-            ✦ Free AI{freeReady ? " · ready" : " · loading"}
+            ✦ Local Free AI{!freeSupported ? " · unsupported" : freeReady ? "" : " · loading"}
           </button>
           <button
             type="button"
             className={aiMode === "site" ? "auth-btn" : "ghost-btn"}
             onClick={() => switchMode("site")}
             disabled={!configured}
-            title={configured ? "Use the server-configured Digitbox AI provider" : "No server AI key is configured"}
+            title={configured ? "Use the server-configured Digitbox AI provider" : "No server AI provider is configured"}
           >
             Site AI{configured ? "" : " · unavailable"}
           </button>
         </div>
-      </div>
-
-      <div className="notice" role="status">
-        <strong>Free AI is the default.</strong> No API key is needed. It tries multiple $0 hosted models and stays in this chat. On first use, Puter may create a temporary user so the free models can run. If free capacity is exhausted, Digitbox warns you instead of silently switching to a paid provider.
       </div>
 
       <div className="ai-shell">
@@ -385,7 +358,7 @@ export default function DigitboxAiPage() {
           <h2>Developer API {showApi ? "▲" : "▼"}</h2>
         </button>
         <p className="post-meta">
-          The public JSON API remains server-backed. The website chat above can use Free AI without a server key.
+          The public JSON API remains server-backed. Local Free AI is available in the website chat above.
         </p>
         {showApi && (
           <div className="ai-api-body">
@@ -405,11 +378,17 @@ export default function DigitboxAiPage() {
             <p><strong>Response</strong>:</p>
             <pre className="octo-code">{`{ "ok": true, "reply": "…", "model": "…" }`}</pre>
             <p className="post-meta">
-              Server API errors return <code>{`{ "ok": false, "error": "…" }`}</code>. If no server provider is configured it returns 503; the browser Free AI above still works independently.
+              Server API errors return <code>{`{ "ok": false, "error": "…" }`}</code>. If no server provider is configured it returns 503; Local Free AI above still works independently on supported browsers.
             </p>
           </div>
         )}
       </section>
     </div>
   );
+}
+
+function shortModel(value = "") {
+  return String(value)
+    .replace(/-Instruct.*$/i, "")
+    .replace(/-q\w+.*$/i, "") || value;
 }
