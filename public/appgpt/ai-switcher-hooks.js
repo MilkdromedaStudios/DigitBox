@@ -10,22 +10,26 @@ function boot() {
       setTimeout(notifyChatChange, 60);
       setTimeout(notifyChatChange, 220);
     }
-    if (event.target.closest?.('#aiSwitchProvider')) setTimeout(lockFreeSwitchFields, 0);
+    if (event.target.closest?.('#aiSwitchProvider')) setTimeout(syncFreeCopy, 0);
   }, true);
 
   document.addEventListener('change', event => {
-    if (event.target?.id === 'aiSwitchProvider') setTimeout(lockFreeSwitchFields, 0);
+    if (event.target?.id === 'aiSwitchProvider' || event.target?.id === 'providerSelect') {
+      setTimeout(syncFreeCopy, 20);
+      setTimeout(lockFreeSwitchFields, 40);
+    }
   }, true);
 
   window.addEventListener('appgpt-chat-changed', () => {
     decorateFreeProvider();
+    setTimeout(syncFreeCopy, 0);
     setTimeout(lockFreeSwitchFields, 0);
   });
 
   setTimeout(() => {
     decorateFreeProvider();
     notifyChatChange();
-    rewriteFreeCopy();
+    syncFreeCopy();
     lockFreeSwitchFields();
   }, 700);
 }
@@ -41,9 +45,23 @@ function decorateFreeProvider() {
   });
 }
 
-function rewriteFreeCopy() {
+function syncFreeCopy() {
   const note = document.querySelector('#aiSwitchFreeNote span');
-  if (note) note.textContent = 'No API key. AppGPT starts with North Mini Code and falls back only to other $0 Puter-hosted models. Free services can still have rate or capacity limits; if every free model fails, your project stays saved and AppGPT asks you to switch AI. A paid/BYOK key is never used automatically.';
+  if (note) note.textContent = 'No API key and no sign-in. AppGPT Free runs a small AI model directly in this browser. The first use downloads the model once; afterward it can reuse the browser cache. If this device cannot run it, your project stays saved and you can switch to any other AI.';
+
+  const selected = document.getElementById('providerSelect')?.value === 'appgptFree';
+  const providerStatus = document.getElementById('providerStatus');
+  if (selected && providerStatus && /Puter|sign.?in|API key required|no API key required/i.test(providerStatus.textContent || '')) {
+    providerStatus.textContent = 'Local Free AI · no sign-in or API key.';
+    providerStatus.className = 'inline-status ok';
+  }
+
+  const switchProvider = document.getElementById('aiSwitchProvider');
+  const switchStatus = document.getElementById('aiSwitchStatus');
+  if (switchProvider?.value === 'appgptFree' && switchStatus && /Puter|sign.?in|already connected/i.test(switchStatus.textContent || '')) {
+    switchStatus.textContent = 'Local Free AI · no sign-in or API key.';
+    switchStatus.className = 'inline-status ok';
+  }
 }
 
 function lockFreeSwitchFields() {
@@ -55,7 +73,7 @@ function lockFreeSwitchFields() {
   model.readOnly = free;
   base.readOnly = free;
   if (free) {
-    model.value = 'cohere/north-mini-code:free';
-    base.value = 'puter://ai';
+    model.value = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+    base.value = 'local://webllm';
   }
 }
