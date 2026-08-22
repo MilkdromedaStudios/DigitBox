@@ -1,5 +1,5 @@
 import { PROVIDERS } from './providers.js';
-import { E } from './app-state.js';
+import { E, toast } from './app-state.js';
 
 // AppGPT Free intentionally falls back only among models that Puter currently
 // exposes at $0 input / $0 output. A paid/BYOK provider is never selected
@@ -11,6 +11,10 @@ const FREE_MODELS = [
 ];
 
 const provider = PROVIDERS.appgptFree;
+let puterReady = null;
+let authRunning = false;
+let replaying = false;
+
 if (provider) {
   provider.model = FREE_MODELS[0];
   provider.fallbackModels = FREE_MODELS.slice(1);
@@ -21,8 +25,10 @@ if (provider) {
 }
 
 migrateSavedFreePreset();
+preloadPuter();
 syncLivePreset();
 wireFreeLock();
+wireFirstUseGate();
 
 function migrateSavedFreePreset() {
   try {
@@ -44,7 +50,7 @@ function wireFreeLock() {
 }
 
 function syncLivePreset() {
-  const free = Boolean(provider && E.provider?.value === 'appgptFree');
+  const free = isFreeSelected();
   if (E.modelInput) E.modelInput.readOnly = free;
   if (E.base) E.base.readOnly = free;
   if (!free) return;
@@ -53,6 +59,93 @@ function syncLivePreset() {
   if (E.key) E.key.value = '';
   if (E.badge) E.badge.textContent = `AppGPT Free · ${FREE_MODELS[0]}`;
   if (E.model) E.model.textContent = `AppGPT Free · ${FREE_MODELS[0]}`;
+}
+
+function preloadPuter() {
+  if (window.puter?.ai?.chat) {
+    puterReady = Promise.resolve(window.puter);
+    return puterReady;
+  }
+  if (puterReady) return puterReady;
+  puterReady = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-appgpt-puter]');
+    if (existing) {
+      if (window.puter?.ai?.chat) return resolve(window.puter);
+      existing.addEventListener('load', () => resolve(window.puter), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Could not load AppGPT Free AI.')), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://js.puter.com/v2/';
+    script.async = true;
+    script.dataset.appgptPuter = '1';
+    script.onload = () => window.puter?.ai?.chat ? resolve(window.puter) : reject(new Error('AppGPT Free AI did not initialize.'));
+    script.onerror = () => reject(new Error('Could not load AppGPT Free AI.'));
+    document.head.append(script);
+  });
+  return puterReady;
+}
+
+function wireFirstUseGate() {
+  // Capture before the chat/build handlers. If Puter needs first-use auth,
+  // perform it from the same user gesture and replay the original action only
+  // after auth succeeds. This prevents popup blocking and prevents AppGPT from
+  // falling into Provider settings just because first-use auth was not ready.
+  document.addEventListener('click', event => {
+    if (replaying || !isFreeSelected()) return;
+    const target = event.target.closest?.('#simpleChatSend, #buildBtn, #createAppBtn');
+    if (!target || isPuterSignedIn()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    gateAndReplay(() => target.click());
+  }, true);
+
+  document.addEventListener('keydown', event => {
+    if (replaying || !isFreeSelected() || isPuterSignedIn()) return;
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+    if (event.target?.id !== 'simpleChatComposer') return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    gateAndReplay(() => document.getElementById('simpleChatSend')?.click());
+  }, true);
+}
+
+async function gateAndReplay(action) {
+  if (authRunning) return;
+  authRunning = true;
+  try {
+    // The script is preloaded at startup. If it somehow has not finished yet,
+    // do not start a build that will immediately fail; ask for one more tap.
+    if (!window.puter?.auth) {
+      toast('AppGPT Free is finishing setup — tap Send again in a moment.');
+      preloadPuter().catch(() => {});
+      return;
+    }
+
+    if (!isPuterSignedIn()) {
+      await window.puter.auth.signIn({ attempt_temp_user_creation: true });
+    }
+    replaying = true;
+    action();
+  } catch (error) {
+    const code = String(error?.error || error?.code || error?.message || '');
+    if (/closed|cancel/i.test(code)) toast('Free AI setup was cancelled. Your chat is still here.');
+    else toast('Could not start AppGPT Free. Try again or choose another AI.');
+  } finally {
+    setTimeout(() => { replaying = false; }, 0);
+    authRunning = false;
+  }
+}
+
+function isPuterSignedIn() {
+  try { return Boolean(window.puter?.auth?.isSignedIn?.()); }
+  catch { return false; }
+}
+
+function isFreeSelected() {
+  return Boolean(provider && E.provider?.value === 'appgptFree');
 }
 
 export const APPGPT_FREE_MODELS = FREE_MODELS;
