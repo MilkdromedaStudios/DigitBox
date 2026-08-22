@@ -11,29 +11,18 @@ export default {
       return json({ ok: true, service: 'AppGPT Telegram bot', bot: me ? { username: me.username, can_manage_bots: Boolean(me.can_manage_bots) } : null });
     }
 
-    if (request.method !== 'POST' || url.pathname !== '/webhook') {
-      return new Response('AppGPT bot webhook', { status: 200 });
-    }
-
-    if (!env.BOT_TOKEN || !env.WEBHOOK_SECRET) {
-      return new Response('Bot is not configured', { status: 503 });
-    }
+    if (request.method !== 'POST' || url.pathname !== '/webhook') return new Response('AppGPT bot webhook', { status: 200 });
+    if (!env.BOT_TOKEN || !env.WEBHOOK_SECRET) return new Response('Bot is not configured', { status: 503 });
 
     const secret = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (secret !== env.WEBHOOK_SECRET) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+    if (secret !== env.WEBHOOK_SECRET) return new Response('Unauthorized', { status: 401 });
 
     let update;
     try { update = await request.json(); }
     catch { return new Response('Bad request', { status: 400 }); }
 
-    try {
-      await handleUpdate(update, env);
-    } catch (error) {
-      console.error('Telegram update failed', error);
-    }
-
+    try { await handleUpdate(update, env); }
+    catch (error) { console.error('Telegram update failed', error); }
     return new Response('OK');
   }
 };
@@ -43,7 +32,6 @@ async function handleUpdate(update, env) {
 
   const message = update?.message;
   if (!message?.chat?.id || typeof message.text !== 'string') return;
-
   const chatId = message.chat.id;
   const text = message.text.trim();
   const command = text.split(/\s+/, 1)[0].split('@')[0].toLowerCase();
@@ -56,8 +44,7 @@ async function handleUpdate(update, env) {
   if (command === '/providers') return sendSection(chatId, env, 'settings');
   if (command === '/keys') return sendKeys(chatId, env);
   if (command === '/projects') return sendProjects(chatId, env);
-  if (command === '/createbot') return sendCreateBot(chatId, env);
-
+  if (command === '/createbot') return sendCreateBot(chatId, message.from, env);
   if (text.startsWith('/')) return sendHelp(chatId, env);
 }
 
@@ -67,7 +54,7 @@ async function sendStart(chatId, user, env, payload = '') {
   const guideUrl = env.GUIDE_URL || DEFAULT_GUIDE_URL;
   const githubUrl = env.GITHUB_URL || DEFAULT_GITHUB_URL;
   const me = await telegram(env, 'getMe', {}).catch(() => null);
-  const createBotUrl = managedBotUrl(me, 'My AppGPT Bot');
+  const createBotUrl = managedBotUrl(me, suggestedManagedUsername(user?.id), 'My AppGPT Bot');
 
   const text = [
     `<b>Welcome to AppGPT, ${firstName} ✦</b>`,
@@ -88,7 +75,7 @@ async function sendStart(chatId, user, env, payload = '') {
     '',
     '<b>5 · Make a real Telegram bot</b>',
     createBotUrl
-      ? 'AppGPT supports Telegram’s new Managed Bots flow. You can create a bot owned by you and managed by AppGPT without manually copying its token.'
+      ? 'AppGPT supports Telegram’s Managed Bots flow. You can create a bot owned by you and managed by AppGPT without manually copying its token.'
       : 'Managed-bot creation becomes available after Bot Management Mode is enabled for this bot in BotFather.',
     '',
     'Use /keys for API-key help, /projects for saved projects, /createbot for bot creation, or /help for all commands.'
@@ -133,6 +120,7 @@ async function sendKeys(chatId, env) {
     '<b>How AppGPT stores it</b>',
     '• Current Telegram device: Telegram SecureStorage when supported.',
     '• Cross-device: only if you enable “Sync my AI API key securely” in AppGPT Settings. The server copy is encrypted and is returned only after Telegram initData is validated.',
+    '• Turning key sync off removes the encrypted cloud key copy.',
     '• Generated apps: the provider key is never embedded into the public index.html.',
     '',
     'If you do not enable cross-device key sync, you may need to enter the key again on another phone or computer.'
@@ -161,16 +149,15 @@ async function sendProjects(chatId, env) {
   });
 }
 
-async function sendCreateBot(chatId, env) {
+async function sendCreateBot(chatId, user, env) {
   const me = await telegram(env, 'getMe', {}).catch(() => null);
-  const url = managedBotUrl(me, 'My AppGPT Bot');
-  if (!url) {
+  if (!me?.can_manage_bots) {
     return telegram(env, 'sendMessage', {
       chat_id: chatId,
       text: [
         '<b>🤖 Managed Bot setup is not enabled yet</b>',
         '',
-        'Telegram now lets manager bots create and manage bots for users. To enable it once:',
+        'Telegram lets manager bots create and manage bots for users. To enable it once:',
         '1. Open @BotFather.',
         '2. Open this bot in /mybots.',
         '3. Open Bot Settings.',
@@ -184,17 +171,30 @@ async function sendCreateBot(chatId, env) {
     });
   }
 
+  const requestId = Math.floor(Date.now() / 1000) & 0x7fffffff;
   return telegram(env, 'sendMessage', {
     chat_id: chatId,
     text: [
       '<b>🤖 Create a Telegram bot for your AppGPT project</b>',
       '',
-      'Telegram will open its native managed-bot creation screen. You choose the final name and @username. The bot is owned by your Telegram account and AppGPT is allowed to manage it.',
+      'Tap the Telegram button below. Telegram will open its native Managed Bot creation flow. You can edit the suggested name and @username before confirming.',
       '',
-      'After creation, this manager bot receives a managed_bot update. AppGPT can then configure the bot without exposing its token in the browser.'
+      'The bot is owned by your Telegram account. AppGPT becomes its manager and can configure it later without exposing its token in the browser.'
     ].join('\n'),
     parse_mode: 'HTML',
-    reply_markup: { inline_keyboard: [[{ text: 'Create My Bot', url }]] }
+    reply_markup: {
+      keyboard: [[{
+        text: '🤖 Create My AppGPT Bot',
+        request_managed_bot: {
+          request_id: requestId,
+          suggested_name: 'My AppGPT Bot',
+          suggested_username: suggestedManagedUsername(user?.id || chatId)
+        }
+      }]],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+      input_field_placeholder: 'Create or share a managed bot'
+    }
   });
 }
 
@@ -263,9 +263,14 @@ async function sendSection(chatId, env, view) {
   });
 }
 
-function managedBotUrl(me, suggestedName) {
+function suggestedManagedUsername(seed) {
+  const digits = String(seed || Date.now()).replace(/\D/g, '').slice(-8) || String(Date.now()).slice(-8);
+  return `AppGPT${digits}Bot`.slice(0, 32);
+}
+
+function managedBotUrl(me, suggestedUsername, suggestedName) {
   if (!me?.can_manage_bots || !me?.username) return '';
-  return `https://t.me/newbot/${encodeURIComponent(me.username)}?name=${encodeURIComponent(suggestedName || 'My AppGPT Bot')}`;
+  return `https://t.me/newbot/${encodeURIComponent(me.username)}/${encodeURIComponent(suggestedUsername)}?name=${encodeURIComponent(suggestedName || 'My AppGPT Bot')}`;
 }
 
 function appUrlForPayload(appUrl, payload) {
@@ -294,9 +299,7 @@ async function telegram(env, method, body) {
     body: JSON.stringify(body || {})
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) {
-    throw new Error(data?.description || `Telegram ${method} failed (${response.status})`);
-  }
+  if (!response.ok || data.ok === false) throw new Error(data?.description || `Telegram ${method} failed (${response.status})`);
   return data.result;
 }
 
@@ -305,8 +308,5 @@ function escapeHtml(value = '') {
 }
 
 function json(value, status = 200) {
-  return new Response(JSON.stringify(value), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' }
-  });
+  return new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }
