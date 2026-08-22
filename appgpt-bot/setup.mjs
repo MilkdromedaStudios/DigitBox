@@ -16,20 +16,23 @@ console.log(`Configuring @${me.username}…`);
 
 await api('setMyCommands', {
   commands: [
-    { command: 'start', description: 'Start AppGPT and see quick links' },
+    { command: 'start', description: 'First-time guide and AppGPT quick links' },
     { command: 'app', description: 'Open the AppGPT builder' },
+    { command: 'projects', description: 'Open your saved AppGPT projects' },
+    { command: 'keys', description: 'API-key setup and security guide' },
     { command: 'templates', description: 'Browse Mini App templates' },
     { command: 'providers', description: 'Connect an AI provider' },
-    { command: 'help', description: 'How to use AppGPT' }
+    { command: 'createbot', description: 'Create a Telegram bot for an AppGPT project' },
+    { command: 'help', description: 'Show all AppGPT commands' }
   ]
 });
 
 await api('setMyDescription', {
-  description: 'Build Telegram Mini Apps with AI. Turn a chat into one complete index.html, preview it, edit it, debug it, and publish it.'
+  description: 'Build Telegram Mini Apps with AI. Turn a chat into a complete app, sync projects to your Telegram account, edit visually, debug, and connect managed bots.'
 });
 
 await api('setMyShortDescription', {
-  short_description: 'AI builder for complete Telegram Mini Apps.'
+  short_description: 'AI builder for Telegram Mini Apps.'
 });
 
 await api('setChatMenuButton', {
@@ -43,7 +46,7 @@ await api('setChatMenuButton', {
 await api('setWebhook', {
   url: `${worker}/webhook`,
   secret_token: WEBHOOK_SECRET,
-  allowed_updates: ['message'],
+  allowed_updates: ['message', 'managed_bot'],
   drop_pending_updates: false
 });
 
@@ -51,6 +54,7 @@ const webhook = await api('getWebhookInfo');
 console.log('✓ Commands configured');
 console.log('✓ Bot description configured');
 console.log('✓ Menu button opens AppGPT');
+console.log(`✓ Managed Bot mode: ${me.can_manage_bots ? 'enabled' : 'not enabled — turn on Bot Management Mode in BotFather for /createbot'}`);
 console.log(`✓ App URL: ${app}`);
 console.log(`✓ Webhook: ${webhook.url}`);
 console.log(`✓ Bot: https://t.me/${me.username}`);
