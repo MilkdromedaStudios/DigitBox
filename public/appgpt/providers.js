@@ -2,42 +2,34 @@ import './appearance.js';
 
 const GEMINI_DEFAULT_MODEL = 'gemini-3.5-flash';
 const PROVIDER_CONFIG_KEY = 'appgpt_provider_config';
-migrateLegacyGeminiDefault();
+const APPGPT_FREE_MODELS = [
+  'google/gemini-3.5-flash-lite',
+  'openai/gpt-5.4-nano',
+  'qwen-coder'
+];
+initializeProviderDefaults();
 
 export const PROVIDERS = {
+  appgptFree: {
+    name: 'AppGPT Free',
+    kind: 'puter',
+    baseUrl: 'puter://ai',
+    model: APPGPT_FREE_MODELS[0],
+    fallbackModels: APPGPT_FREE_MODELS.slice(1),
+    vision: false,
+    requiresKey: false,
+    freeTier: true,
+    freeLabel: 'No API key · free monthly allowance',
+    hint: 'Already connected · automatically falls back between free Puter-hosted models'
+  },
   openai: { name: 'OpenAI', kind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-mini', vision: true, hint: 'OpenAI-compatible chat endpoint' },
   openrouter: { name: 'OpenRouter', kind: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-5-mini', vision: true, hint: 'Many models through one API' },
-  openrouterFree: {
-    name: 'OpenRouter Free',
-    kind: 'openai-compatible',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'openrouter/free',
-    vision: true,
-    freeTier: true,
-    freeLabel: '25+ free models · 50 requests/day',
-    freeNote: 'The free router chooses among currently available free models, so output quality and model identity can vary between requests.',
-    hint: 'Free Models Router · availability changes automatically'
-  },
-  cerebras: {
-    name: 'Cerebras Free',
-    kind: 'openai-compatible',
-    baseUrl: 'https://api.cerebras.ai/v1',
-    model: 'gpt-oss-120b',
-    vision: false,
-    freeTier: true,
-    freeLabel: 'Free tier · 64K TPM · 1M tokens/day',
-    freeNote: 'Excellent free throughput for text/code, but no image input in this AppGPT preset.',
-    hint: 'Very fast hosted inference · OpenAI-compatible API'
-  },
   huggingface: {
     name: 'Hugging Face',
     kind: 'openai-compatible',
     baseUrl: 'https://router.huggingface.co/v1',
     model: 'Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest',
     vision: true,
-    freeTier: true,
-    freeLabel: '$0.10 monthly free inference credit',
-    freeNote: 'Useful for experiments, but the free monthly credit is tiny for large full-file app generations.',
     hint: 'Hugging Face Inference Providers router · LLMs and VLMs',
     modelHint: 'Use any chat-capable Hugging Face model ID. Routing suffixes like :fastest, :cheapest, and :preferred are supported.',
     models: [
@@ -52,52 +44,28 @@ export const PROVIDERS = {
       'Qwen/Qwen2.5-VL-3B-Instruct:fastest'
     ]
   },
-  groq: {
-    name: 'Groq Free',
-    kind: 'openai-compatible',
-    baseUrl: 'https://api.groq.com/openai/v1',
-    model: 'openai/gpt-oss-120b',
-    vision: false,
-    freeTier: true,
-    freeLabel: 'Free plan · up to 1,000 requests/day on selected models',
-    freeNote: 'Fast and genuinely useful, but current free token-per-minute limits can reject very large AppGPT edits.',
-    hint: 'Fast OpenAI-compatible inference · free-plan limits'
-  },
-  cloudflare: {
-    name: 'Cloudflare Workers AI',
-    kind: 'openai-compatible',
-    baseUrl: 'https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID/ai/v1',
-    model: '@cf/openai/gpt-oss-120b',
-    vision: false,
-    freeTier: true,
-    freeLabel: '10,000 neurons/day free allocation',
-    freeNote: 'Replace YOUR_ACCOUNT_ID in the Base URL and use a Cloudflare API token with Workers AI Read permission.',
-    hint: 'Workers AI hosted models · OpenAI-compatible endpoint'
-  },
+  groq: { name: 'Groq', kind: 'openai-compatible', baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', vision: false, hint: 'Fast OpenAI-compatible inference' },
   deepseek: { name: 'DeepSeek', kind: 'openai-compatible', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', vision: false, hint: 'OpenAI-compatible API' },
   mistral: { name: 'Mistral', kind: 'openai-compatible', baseUrl: 'https://api.mistral.ai/v1', model: 'mistral-small-latest', vision: false, hint: 'Mistral chat completions' },
   together: { name: 'Together AI', kind: 'openai-compatible', baseUrl: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', vision: false, hint: 'Open-source model hosting' },
   xai: { name: 'xAI', kind: 'openai-compatible', baseUrl: 'https://api.x.ai/v1', model: 'grok-3-mini', vision: true, hint: 'OpenAI-style chat API' },
-  gemini: {
-    name: 'Google Gemini',
-    kind: 'gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    model: GEMINI_DEFAULT_MODEL,
-    vision: true,
-    freeTier: true,
-    freeLabel: '3.5 Flash API Free Tier · input/output free',
-    freeNote: 'Free-tier prompts and responses may be used by Google to improve products. Rate limits still apply.',
-    hint: 'Gemini multimodal generateContent API · 3.5 Flash default'
-  },
+  gemini: { name: 'Google Gemini', kind: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: GEMINI_DEFAULT_MODEL, vision: true, hint: 'Gemini multimodal generateContent API · 3.5 Flash default' },
   anthropic: { name: 'Anthropic', kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-0', vision: true, hint: 'Claude Messages API' },
   custom: { name: 'Custom OpenAI-compatible', kind: 'openai-compatible', baseUrl: 'https://example.com/v1', model: 'your-model', vision: true, hint: 'Any compatible /chat/completions endpoint' }
 };
 
-function migrateLegacyGeminiDefault() {
+function initializeProviderDefaults() {
   try {
     const saved = JSON.parse(localStorage.getItem(PROVIDER_CONFIG_KEY) || 'null');
-    if (!saved || saved.provider !== 'gemini') return;
-    if (!saved.model || saved.model === 'gemini-2.5-flash' || saved.model === 'gemini-2.5-flash-001') {
+    if (!saved) {
+      localStorage.setItem(PROVIDER_CONFIG_KEY, JSON.stringify({
+        provider: 'appgptFree',
+        model: APPGPT_FREE_MODELS[0],
+        baseUrl: 'puter://ai'
+      }));
+      return;
+    }
+    if (saved.provider === 'gemini' && (!saved.model || saved.model === 'gemini-2.5-flash' || saved.model === 'gemini-2.5-flash-001')) {
       saved.model = GEMINI_DEFAULT_MODEL;
       localStorage.setItem(PROVIDER_CONFIG_KEY, JSON.stringify(saved));
     }
@@ -108,12 +76,94 @@ function trimSlash(url) { return String(url || '').replace(/\/+$/, ''); }
 
 export async function callProvider(config, messages, options = {}) {
   const { temperature = 0.35, maxTokens = 9000, responseMode = 'text', thinkingBudget, thinkingLevel } = options;
-  if (!config?.apiKey) throw new Error('Add an API key first.');
+  const provider = PROVIDERS[config?.provider];
+  if (!config?.apiKey && provider?.requiresKey !== false && config?.kind !== 'puter') throw new Error('Add an API key first.');
   if (!config?.model) throw new Error('Choose a model first.');
   if (!config?.baseUrl) throw new Error('Add a provider base URL first.');
+  if (config.kind === 'puter') return callPuter(config, messages, { temperature, maxTokens, responseMode });
   if (config.kind === 'gemini') return callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget, thinkingLevel });
   if (config.kind === 'anthropic') return callAnthropic(config, messages, { temperature, maxTokens });
   return callOpenAICompatible(config, messages, { temperature, maxTokens });
+}
+
+async function callPuter(config, messages, { temperature, maxTokens }) {
+  await loadPuter();
+  const preset = PROVIDERS[config.provider] || {};
+  const models = [...new Set([config.model, ...(preset.fallbackModels || [])].filter(Boolean))];
+  let lastError = null;
+
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    try {
+      const response = await window.puter.ai.chat(toPuterMessages(messages), {
+        model,
+        temperature,
+        max_tokens: Math.min(Number(maxTokens) || 9000, 18000)
+      });
+      const text = puterText(response);
+      if (!text) throw new Error('The free model returned an empty response.');
+      if (index > 0) {
+        window.dispatchEvent(new CustomEvent('appgpt-free-ai-fallback', {
+          detail: { from: models[0], to: model }
+        }));
+      }
+      return text;
+    } catch (error) {
+      lastError = error;
+      console.warn(`AppGPT Free model ${model} failed`, error);
+    }
+  }
+
+  const message = freeErrorMessage(lastError);
+  window.dispatchEvent(new CustomEvent('appgpt-free-ai-warning', {
+    detail: { message, models, error: String(lastError?.message || lastError || '') }
+  }));
+  throw new Error(message);
+}
+
+function toPuterMessages(messages) {
+  return messages.map(message => ({
+    role: message.role,
+    content: Array.isArray(message.content)
+      ? message.content.filter(part => part.type !== 'image').map(part => part.text || '').join('\n')
+      : String(message.content || '')
+  }));
+}
+
+function puterText(response) {
+  const content = response?.message?.content ?? response?.content ?? response;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map(part => typeof part === 'string' ? part : part?.text || '').join('');
+  return '';
+}
+
+function freeErrorMessage(error) {
+  const raw = String(error?.message || error || '').toLowerCase();
+  if (/quota|limit|credits|balance|allowance|payment|insufficient|429|too many/.test(raw)) {
+    return 'AppGPT Free reached a usage limit. Your project is saved — switch to another AI in Provider settings to continue.';
+  }
+  return 'AppGPT Free is temporarily unavailable. Your project is saved — try again or switch AI in Provider settings.';
+}
+
+function loadPuter() {
+  if (window.puter?.ai?.chat) return Promise.resolve(window.puter);
+  if (loadPuter.promise) return loadPuter.promise;
+  loadPuter.promise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-appgpt-puter]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.puter), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Could not load AppGPT Free AI.')), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://js.puter.com/v2/';
+    script.async = true;
+    script.dataset.appgptPuter = '1';
+    script.onload = () => window.puter?.ai?.chat ? resolve(window.puter) : reject(new Error('AppGPT Free AI did not initialize.'));
+    script.onerror = () => reject(new Error('Could not load AppGPT Free AI.'));
+    document.head.append(script);
+  });
+  return loadPuter.promise;
 }
 
 async function callOpenAICompatible(config, messages, { temperature, maxTokens }) {
@@ -122,14 +172,9 @@ async function callOpenAICompatible(config, messages, { temperature, maxTokens }
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.apiKey}`,
-      ...(/^openrouter/i.test(String(config.provider || '')) ? { 'HTTP-Referer': location.origin, 'X-Title': 'AppGPT' } : {})
+      ...(config.provider === 'openrouter' ? { 'HTTP-Referer': location.origin, 'X-Title': 'AppGPT' } : {})
     },
-    body: JSON.stringify({
-      model: config.model,
-      messages: messages.map(toOpenAIMessage),
-      temperature,
-      max_tokens: maxTokens
-    })
+    body: JSON.stringify({ model: config.model, messages: messages.map(toOpenAIMessage), temperature, max_tokens: maxTokens })
   });
   const data = await safeJson(response);
   if (!response.ok) throw new Error(extractError(data, response.status));
@@ -141,59 +186,30 @@ async function callOpenAICompatible(config, messages, { temperature, maxTokens }
 
 function toOpenAIMessage(message) {
   if (!Array.isArray(message.content)) return message;
-  return {
-    role: message.role,
-    content: message.content.map(part => {
-      if (part.type === 'image') return { type: 'image_url', image_url: { url: part.dataUrl } };
-      return { type: 'text', text: part.text || '' };
-    })
-  };
+  return { role: message.role, content: message.content.map(part => part.type === 'image' ? { type: 'image_url', image_url: { url: part.dataUrl } } : { type: 'text', text: part.text || '' }) };
 }
 
 async function callGemini(config, messages, { temperature, maxTokens, responseMode, thinkingBudget, thinkingLevel }) {
   const system = messages.filter(m => m.role === 'system').map(m => flattenText(m.content)).join('\n\n');
-  const contents = messages.filter(m => m.role !== 'system').map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: toGeminiParts(m.content)
-  }));
-
+  const contents = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: toGeminiParts(m.content) }));
   const name = String(config.model || '').toLowerCase();
   const isGemini3 = /^gemini-3(?:\.|-|$)/.test(name);
   const thinkingConfig = geminiThinkingConfig(config.model, { thinkingBudget, thinkingLevel });
-  const generationConfig = {
-    maxOutputTokens: maxTokens,
-    ...(!isGemini3 ? { temperature } : {}),
-    ...(thinkingConfig ? { thinkingConfig } : {})
-  };
+  const generationConfig = { maxOutputTokens: maxTokens, ...(!isGemini3 ? { temperature } : {}), ...(thinkingConfig ? { thinkingConfig } : {}) };
   if (responseMode === 'html') {
     generationConfig.responseMimeType = 'application/json';
-    generationConfig.responseSchema = {
-      type: 'object',
-      properties: { html: { type: 'string', description: 'One complete HTML document beginning with <!doctype html> and ending with </html>.' } },
-      required: ['html']
-    };
+    generationConfig.responseSchema = { type: 'object', properties: { html: { type: 'string', description: 'One complete HTML document beginning with <!doctype html> and ending with </html>.' } }, required: ['html'] };
   }
-
   const response = await fetch(`${trimSlash(config.baseUrl)}/models/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...(system ? { systemInstruction: { parts: [{ text: system }] } : {}),
-      contents,
-      generationConfig
-    })
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}), contents, generationConfig })
   });
   const data = await safeJson(response);
   if (!response.ok) throw new Error(extractError(data, response.status));
   reportGeminiUsage(config, data?.usageMetadata, thinkingConfig);
   const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('');
   if (!text) throw new Error('Gemini returned an empty response.');
-  if (responseMode === 'html') {
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed?.html) return parsed.html;
-    } catch {}
-  }
+  if (responseMode === 'html') { try { const parsed = JSON.parse(text); if (parsed?.html) return parsed.html; } catch {} }
   return text;
 }
 
@@ -210,66 +226,28 @@ function geminiThinkingConfig(model, explicit = {}) {
 
 function reportGeminiUsage(config, usage, thinkingConfig) {
   if (!usage) return;
-  const detail = {
-    provider: 'gemini',
-    model: config.model,
-    promptTokens: Number(usage.promptTokenCount || 0),
-    outputTokens: Number(usage.candidatesTokenCount || 0),
-    thoughtTokens: Number(usage.thoughtsTokenCount || 0),
-    cachedTokens: Number(usage.cachedContentTokenCount || 0),
-    totalTokens: Number(usage.totalTokenCount || 0),
-    thinkingBudget: Number.isFinite(thinkingConfig?.thinkingBudget) ? thinkingConfig.thinkingBudget : null,
-    thinkingLevel: thinkingConfig?.thinkingLevel || ''
-  };
-
+  const detail = { provider: 'gemini', model: config.model, promptTokens: Number(usage.promptTokenCount || 0), outputTokens: Number(usage.candidatesTokenCount || 0), thoughtTokens: Number(usage.thoughtsTokenCount || 0), cachedTokens: Number(usage.cachedContentTokenCount || 0), totalTokens: Number(usage.totalTokenCount || 0), thinkingBudget: Number.isFinite(thinkingConfig?.thinkingBudget) ? thinkingConfig.thinkingBudget : null, thinkingLevel: thinkingConfig?.thinkingLevel || '' };
   try {
     const key = 'appgpt_gemini_usage_session_v1';
     let totals = { calls: 0, promptTokens: 0, outputTokens: 0, thoughtTokens: 0, totalTokens: 0 };
     try { totals = { ...totals, ...(JSON.parse(sessionStorage.getItem(key) || '{}') || {}) }; } catch {}
-    totals.calls += 1;
-    totals.promptTokens += detail.promptTokens;
-    totals.outputTokens += detail.outputTokens;
-    totals.thoughtTokens += detail.thoughtTokens;
-    totals.totalTokens += detail.totalTokens;
-    sessionStorage.setItem(key, JSON.stringify(totals));
-    detail.session = totals;
+    totals.calls += 1; totals.promptTokens += detail.promptTokens; totals.outputTokens += detail.outputTokens; totals.thoughtTokens += detail.thoughtTokens; totals.totalTokens += detail.totalTokens;
+    sessionStorage.setItem(key, JSON.stringify(totals)); detail.session = totals;
   } catch {}
-
   window.dispatchEvent(new CustomEvent('appgpt-provider-usage', { detail }));
 }
 
 function toGeminiParts(content) {
   if (!Array.isArray(content)) return [{ text: String(content || '') }];
-  return content.map(part => {
-    if (part.type === 'image') {
-      const parsed = parseDataUrl(part.dataUrl);
-      return { inlineData: { mimeType: parsed.mime, data: parsed.base64 } };
-    }
-    return { text: part.text || '' };
-  });
+  return content.map(part => { if (part.type === 'image') { const parsed = parseDataUrl(part.dataUrl); return { inlineData: { mimeType: parsed.mime, data: parsed.base64 } }; } return { text: part.text || '' }; });
 }
 
 async function callAnthropic(config, messages, { temperature, maxTokens }) {
   const system = messages.filter(m => m.role === 'system').map(m => flattenText(m.content)).join('\n\n');
-  const claudeMessages = messages.filter(m => m.role !== 'system').map(m => ({
-    role: m.role,
-    content: toAnthropicContent(m.content)
-  }));
+  const claudeMessages = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: toAnthropicContent(m.content) }));
   const response = await fetch(`${trimSlash(config.baseUrl)}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': config.apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: maxTokens,
-      temperature,
-      ...(system ? { system } : {}),
-      messages: claudeMessages
-    })
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': config.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: config.model, max_tokens: maxTokens, temperature, ...(system ? { system } : {}), messages: claudeMessages })
   });
   const data = await safeJson(response);
   if (!response.ok) throw new Error(extractError(data, response.status));
@@ -280,13 +258,7 @@ async function callAnthropic(config, messages, { temperature, maxTokens }) {
 
 function toAnthropicContent(content) {
   if (!Array.isArray(content)) return String(content || '');
-  return content.map(part => {
-    if (part.type === 'image') {
-      const parsed = parseDataUrl(part.dataUrl);
-      return { type: 'image', source: { type: 'base64', media_type: parsed.mime, data: parsed.base64 } };
-    }
-    return { type: 'text', text: part.text || '' };
-  });
+  return content.map(part => { if (part.type === 'image') { const parsed = parseDataUrl(part.dataUrl); return { type: 'image', source: { type: 'base64', media_type: parsed.mime, data: parsed.base64 } }; } return { type: 'text', text: part.text || '' }; });
 }
 
 function parseDataUrl(dataUrl = '') {
