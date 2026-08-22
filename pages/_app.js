@@ -26,6 +26,15 @@ export default function MyApp({ Component, pageProps, router }) {
     };
   }, []);
 
+  const cleanPath = String(router?.asPath || "").split(/[?#]/, 1)[0];
+  const isAppGPT = router?.pathname === "/appgpt" || cleanPath === "/appgpt" || cleanPath === "/appgpt/";
+
+  // AppGPT is a standalone product surface. Never wrap it in DigitBox's
+  // header, navigation, content container, footer, or page transition UI.
+  if (isAppGPT) {
+    return <Component {...pageProps} />;
+  }
+
   if (router?.pathname?.startsWith("/projects/")) {
     return (
       <>
