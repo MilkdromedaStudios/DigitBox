@@ -83,7 +83,6 @@ export default function Layout({ children }) {
         <nav className="nav" aria-label="Primary navigation">
           <Link href="/">Home</Link>
           <Link href="/gallery">Gallery</Link>
-          <Link href="/posts">Posts</Link>
           <Link href="/ai" className="nav-ai">Digitbox AI</Link>
           <a href="https://blog.digitbox.dev/">Blogs</a>
           {isAdmin && <Link href="/admin">Admin</Link>}
