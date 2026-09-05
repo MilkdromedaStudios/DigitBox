@@ -1,5 +1,6 @@
 import Head from "next/head";
 import BetaGameV2 from "../components/deepforge/BetaGameV2";
+import DeepforgeOwnerTools from "../components/deepforge/DeepforgeOwnerTools";
 
 export default function BetaPage() {
   return (
@@ -14,6 +15,7 @@ export default function BetaPage() {
       </Head>
       <main className="df-beta-page">
         <BetaGameV2 />
+        <DeepforgeOwnerTools />
       </main>
     </>
   );
