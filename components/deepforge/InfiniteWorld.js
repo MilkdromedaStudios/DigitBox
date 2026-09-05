@@ -527,6 +527,12 @@ export default function InfiniteWorld(props) {
     if (pausedRef.current || !drillCbRef.current) return;
     const p = playerRef.current;
     let aim = aimRef.current;
+    const liveMove = moveRef.current;
+    const liveMagnitude = Math.sqrt(liveMove.x * liveMove.x + liveMove.y * liveMove.y);
+    const surfaceDepth = p.y - surfaceHeight(p.x);
+    if (surfaceDepth < 0.9 && liveMagnitude < 0.2) {
+      aim = { x: 0, y: 1 };
+    }
     const magnitude = Math.sqrt(aim.x * aim.x + aim.y * aim.y);
     if (magnitude < 0.2) aim = { x: 0, y: 1 };
     const normalized = Math.sqrt(aim.x * aim.x + aim.y * aim.y) || 1;
@@ -767,6 +773,25 @@ export default function InfiniteWorld(props) {
 
       const playerScreenX = width / 2;
       const playerScreenY = worldToScreenY(p.y, cameraY, ppu, height);
+
+      let previewAim = aimRef.current;
+      const previewMoveMagnitude = Math.sqrt(moveRef.current.x * moveRef.current.x + moveRef.current.y * moveRef.current.y);
+      if (depth < 0.9 && previewMoveMagnitude < 0.2) previewAim = { x: 0, y: 1 };
+      const previewMag = Math.sqrt(previewAim.x * previewAim.x + previewAim.y * previewAim.y) || 1;
+      const pax = previewAim.x / previewMag;
+      const pay = previewAim.y / previewMag;
+      const previewDistance = 0.86 + drillRadiusRef.current * 0.38;
+      const reticleX = playerScreenX + pax * previewDistance * ppu;
+      const reticleY = playerScreenY + pay * previewDistance * ppu;
+      ctx.save();
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = depth < 1 ? "rgba(255,248,218,.58)" : "rgba(255,224,155,.46)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(reticleX, reticleY, drillRadiusRef.current * ppu, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
       const moving = Math.abs(v.x) > 0.12 || Math.abs(v.y) > 0.3;
       drawMiner(ctx, playerScreenX, playerScreenY, facingRef.current, moving, ppu, day.light, day.angle);
 
