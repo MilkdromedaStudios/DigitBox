@@ -1,1 +1,11 @@
-name = "digitbox-deepforge-api"\nmain = "src/index.js"\ncompatibility_date = "2026-09-01"\n\n[[d1_databases]]\nbinding = "DB"\ndatabase_name = "digitbox-deepforge"\ndatabase_id = "REPLACE_WITH_D1_DATABASE_ID"\n\n[vars]\nALLOWED_ORIGIN = "https://digitbox.dev"\n
+name = "digitbox-deepforge-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "digitbox-deepforge"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+ALLOWED_ORIGIN = "https://digitbox.dev"
