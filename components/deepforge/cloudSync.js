@@ -2,13 +2,36 @@ const CONFIGURED_API_ROOT = (process.env.NEXT_PUBLIC_DEEPFORGE_API || "").replac
 
 function apiRoot() {
   if (CONFIGURED_API_ROOT) return CONFIGURED_API_ROOT;
-  if (typeof window !== "undefined" && window.location && window.location.origin) {
-    return window.location.origin.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    try {
+      const override = String(localStorage.getItem(API_OVERRIDE_KEY) || "").trim().replace(/\/$/, "");
+      if (/^https:\/\//i.test(override)) return override;
+    } catch (_) {}
+    if (window.location && window.location.origin) {
+      return window.location.origin.replace(/\/$/, "");
+    }
   }
   return "";
 }
+
+export function getCloudApiRoot() {
+  return apiRoot();
+}
+
+export function setCloudApiRoot(value) {
+  if (typeof window === "undefined") return "";
+  let root = String(value || "").trim().replace(/\/$/, "");
+  if (root && !/^https:\/\//i.test(root)) root = "https://" + root;
+  if (!root) {
+    localStorage.removeItem(API_OVERRIDE_KEY);
+    return "";
+  }
+  localStorage.setItem(API_OVERRIDE_KEY, root);
+  return root;
+}
 const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
 const AUTH_KEY = "digitbox-deepforge-auth-v1";
+const API_OVERRIDE_KEY = "digitbox-deepforge-api-root-v1";
 
 export function cloudEnabled() {
   return true;
