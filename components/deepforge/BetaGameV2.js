@@ -5,7 +5,6 @@ import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
 import {
   RESOURCE_TYPES,
   addDigCircle,
-  addLadder,
   depositsHitByCircle,
   emptyWorldChanges,
   markDepositMined,
@@ -26,7 +25,11 @@ function normalizeSave(raw) {
     updatedAt: Number(raw.updatedAt) || 0,
     player,
     game: raw.game
-      ? { ...INITIAL, ...raw.game, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) } }
+      ? (function () {
+          const clean = { ...raw.game };
+          delete clean.ladders;
+          return { ...INITIAL, ...clean, buildings: { ...INITIAL.buildings, ...(clean.buildings || {}) } };
+        })()
       : INITIAL,
     worldChanges: isContinuousWorld ? normalizeWorldChanges(raw.worldChanges) : emptyWorldChanges(),
   };
@@ -71,8 +74,6 @@ function WorldScreen(props) {
         worldChanges={props.worldChanges}
         onPosition={props.onPosition}
         onDrill={props.onDrill}
-        onPlaceLadder={props.onPlaceLadder}
-        ladderCount={game.ladders || 0}
         paused={props.paused}
         drillRadius={props.drillRadius}
       />
@@ -90,7 +91,6 @@ function WorldScreen(props) {
           <button onClick={props.sellCargo}>SELL</button>
         </div>
         <RigPanel game={game} drillDamage={props.drillDamage} gearCost={props.gearCost} upgradeGear={props.upgradeGear} />
-        <button className="df2-ladder-buy" onClick={props.buyLadders}>🪜 Buy 6 ladders · $45</button>
       </div>
     </div>
   );
@@ -302,44 +302,6 @@ export default function BetaGameV2() {
     }
   }
 
-  function placeLadder(position) {
-    if (challenge || tab !== "world") return;
-    if ((game.ladders || 0) <= 0) {
-      setNotice("No ladder segments left. Buy more from the mining rig.");
-      return;
-    }
-
-    const depth = Number(position.y) - surfaceHeight(Number(position.x));
-    if (depth < 0.35) {
-      setNotice("Start the shaft first, then place the ladder inside the excavation.");
-      return;
-    }
-
-    setWorldChanges(function (current) {
-      return addLadder(current, {
-        x: Number(position.x),
-        y: Number(position.y),
-        h: 1.55,
-      });
-    });
-    setGame(function (g) {
-      return { ...g, ladders: Math.max(0, (g.ladders || 0) - 1) };
-    });
-    setNotice("Wooden ladder segment placed. Move up/down while touching it to climb.");
-  }
-
-  function buyLadders() {
-    const cost = 45;
-    if (game.coins < cost) {
-      setNotice("Need $45 for a bundle of 6 ladder segments.");
-      return;
-    }
-    setGame(function (g) {
-      return { ...g, coins: g.coins - cost, ladders: (g.ladders || 0) + 6 };
-    });
-    setNotice("Bought 6 wooden ladder segments.");
-  }
-
   function sellCargo() {
     if (!game.cargoCount) { setNotice("Cargo cart is empty."); return; }
     let raw = 0;
@@ -416,7 +378,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} onPlaceLadder={placeLadder} paused={Boolean(challenge)} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} buyLadders={buyLadders} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
         {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} />}
         {tab === "league" && <LeagueScreen selectedRival={selectedRival} setSelectedRival={setSelectedRival} raid={raid} raidLog={raidLog} leaderboard={leaderboard} />}
