@@ -57,5 +57,13 @@ if [ -d "public/projects" ]; then
   fi
 fi
 
+# When Cloudflare Pages builds this repo, expose that deployment's own
+# Pages Functions URL to the browser. This keeps DEEPFORGE D1/R2 calls on
+# the Pages project even when a custom frontend hostname differs.
+if [ -z "${NEXT_PUBLIC_DEEPFORGE_API:-}" ] && [ -n "${CF_PAGES_URL:-}" ]; then
+  export NEXT_PUBLIC_DEEPFORGE_API="${CF_PAGES_URL%/}"
+  echo "[build] DEEPFORGE API -> ${NEXT_PUBLIC_DEEPFORGE_API}"
+fi
+
 echo "[build] Running next build..."
 next build
