@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import InfiniteWorld from "./InfiniteWorld";
 import ClanScreen from "./ClanScreen";
+import ClanWarScreen from "./ClanWarScreen";
 import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
 import {
   RESOURCE_TYPES,
@@ -33,7 +34,7 @@ function normalizeSave(raw) {
             }
             return acc;
           }, {});
-          return { ...INITIAL, ...clean, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) } };
+          return { ...INITIAL, ...clean, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) }, researchTech: { ...INITIAL.researchTech, ...(raw.game.researchTech || {}) } };
         })()
       : INITIAL,
     worldChanges: isContinuousWorld ? normalizeWorldChanges(raw.worldChanges) : emptyWorldChanges(),
@@ -185,6 +186,51 @@ function LabScreen(props) {
   );
 }
 
+function ResearchScreen(props) {
+  const tech = props.game.researchTech || {};
+  const projects = [
+    { key: "drilling", icon: "⛏", name: "Drill Engineering", effect: "+0.04 m excavation radius per level" },
+    { key: "processing", icon: "⚙", name: "Ore Processing", effect: "+5% ore sale value per level" },
+    { key: "survey", icon: "🧭", name: "Geological Survey", effect: "More research from valuable mineral samples" },
+    { key: "tactics", icon: "⚔", name: "Clan Tactics", effect: "+12% personal war contribution per level" },
+  ];
+
+  return (
+    <div className="df2-screen-scroll df-research-screen">
+      <div className="df-research-hero">
+        <div className="df-research-icon">🔬</div>
+        <section>
+          <span className="df-kicker">RESEARCH WORKSHOP</span>
+          <h2>Turn mineral samples into better technology.</h2>
+          <p>Research is earned while mining. Spend it on permanent mine and clan upgrades.</p>
+        </section>
+        <div className="df-research-points"><small>AVAILABLE</small><b>{props.game.research}</b><span>research</span></div>
+      </div>
+
+      <div className="df-research-grid">
+        {projects.map(function (project) {
+          const level = tech[project.key] || 0;
+          const cost = props.researchCost(project.key);
+          return (
+            <article key={project.key}>
+              <span>{project.icon}</span>
+              <div><small>LEVEL {level}</small><b>{project.name}</b><p>{project.effect}</p></div>
+              <button disabled={props.game.research < cost} onClick={function () { props.buyResearch(project.key); }}>
+                {cost} RP
+              </button>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="df-research-note">
+        <b>How research is earned</b>
+        <span>Every third ordinary ore sample can produce research. Quartz and gold produce extra research automatically.</span>
+      </div>
+    </div>
+  );
+}
+
 export default function BetaGameV2() {
   const [player, setPlayer] = useState(DEFAULT_PLAYER);
   const [game, setGame] = useState(INITIAL);
@@ -203,13 +249,21 @@ export default function BetaGameV2() {
   const playerIdRef = useRef(null);
   const lastCloudSaveRef = useRef(0);
 
+  const researchTech = game.researchTech || INITIAL.researchTech;
   const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);
-  const drillRadius = 0.7 + Math.min(0.42, drillDamage * 0.055);
-  const refineryMult = 1 + (game.buildings.refinery || 0) * 0.12;
+  const drillRadius = 0.7 + Math.min(0.42, drillDamage * 0.055) + (researchTech.drilling || 0) * 0.04;
+  const refineryMult = 1 + (game.buildings.refinery || 0) * 0.12 + (researchTech.processing || 0) * 0.05;
   const academyBonus = game.buildings.academy || 0;
   const cityDefense = game.armor * 15 + (game.buildings.walls || 0) * 18;
   const raidPower = game.blaster * 22 + game.drill * 8 + Math.floor(game.trophies / 20);
-  const companyValue = Math.round(game.coins + game.blocksMined * 4 + game.trophies * 5 + Object.values(game.buildings).reduce(function (a, b) { return a + b; }, 0) * 180);
+  const companyValue = Math.round(
+    game.coins +
+    game.blocksMined * 4 +
+    game.trophies * 5 +
+    Object.values(game.buildings).reduce(function (a, b) { return a + b; }, 0) * 180 +
+    Object.values(researchTech).reduce(function (a, b) { return a + b; }, 0) * 110
+  );
+  const warPower = Math.round((raidPower + game.armor * 12 + companyValue * 0.012) * (1 + (researchTech.tactics || 0) * 0.12));
   const leaderboard = useMemo(function () {
     return RIVALS.map(function (rival) { return { name: rival.name, trophies: rival.trophies, npc: true }; })
       .concat([{ name: "YOU", trophies: game.trophies, npc: false }])
@@ -318,20 +372,21 @@ export default function BetaGameV2() {
     if (collected) {
       const type = collected.type;
       const nextCount = game.blocksMined + 1;
+      const baseResearch = type === "quartz" || type === "gold" ? 2 : (nextCount % 3 === 0 ? 1 : 0);
+      const surveyBonus = baseResearch > 0 ? Math.floor((researchTech.survey || 0) / 2) : 0;
       setGame(function (g) {
         return {
           ...g,
           cargo: { ...g.cargo, [type]: (g.cargo[type] || 0) + 1 },
           cargoCount: g.cargoCount + 1,
           blocksMined: g.blocksMined + 1,
-          research: g.research + (type === "quartz" || type === "gold" ? 1 : 0),
+          research: g.research + baseResearch + surveyBonus,
         };
       });
-      setNotice("Exposed and collected " + collected.resource.name + " from the rock.");
-      if (nextCount % 7 === 0) {
-        setChallenge(challengeFor(nextCount + Math.floor(circle.x + circle.y)));
-        setChallengeResult(null);
-      }
+      setNotice(
+        "Exposed and collected " + collected.resource.name +
+        (baseResearch + surveyBonus > 0 ? " · +" + (baseResearch + surveyBonus) + " research." : ".")
+      );
     } else {
       const depth = circle.y - surfaceHeight(circle.x);
       setNotice(depth < 5.5 ? "Excavated a round cut through soil." : depth < 22 ? "Excavated a round cut through compact earth." : "Cut a round section of bedrock.");
@@ -388,6 +443,42 @@ export default function BetaGameV2() {
     setRaidLog(win ? "Won the claim. +" + delta + " trophies and $" + reward + "." : "The rival held the claim. " + delta + " trophies.");
   }
 
+  function researchCost(key) {
+    const level = (game.researchTech && game.researchTech[key]) || 0;
+    const base = key === "drilling" ? 3 : key === "processing" ? 4 : key === "survey" ? 4 : 5;
+    return base + level * 3;
+  }
+
+  function buyResearch(key) {
+    const cost = researchCost(key);
+    if (game.research < cost) {
+      setNotice("Need " + cost + " research points.");
+      return;
+    }
+    setGame(function (g) {
+      return {
+        ...g,
+        research: g.research - cost,
+        researchTech: {
+          ...INITIAL.researchTech,
+          ...(g.researchTech || {}),
+          [key]: ((g.researchTech && g.researchTech[key]) || 0) + 1,
+        },
+      };
+    });
+    setNotice("Research completed: " + key + " upgraded.");
+  }
+
+  function applyClanWarResult(result) {
+    setGame(function (g) {
+      return {
+        ...g,
+        coins: g.coins + Math.max(0, Number(result.reward) || 0),
+        trophies: Math.max(0, g.trophies + (Number(result.trophyDelta) || 0)),
+      };
+    });
+  }
+
   function closeChallenge() { setChallenge(null); setChallengeResult(null); }
   function reset() {
     if (typeof window !== "undefined" && !window.confirm("Reset DEEPFORGE beta progress?")) return;
@@ -415,7 +506,7 @@ export default function BetaGameV2() {
       </header>
 
       <nav className="df2-tabs">
-        {[["world","⛏ Mine"],["empire","🏚 Town"],["clan","👥 Clans"],["league","⚔ League"],["lab","📐 Learn"]].map(function (item) {
+        {[["world","⛏ Mine"],["empire","🏚 Town"],["clan","👥 Clans"],["league","⚔ Clan Wars"],["research","🔬 Research"]].map(function (item) {
           return <button key={item[0]} className={tab === item[0] ? "active" : ""} onClick={function () { setTab(item[0]); }}>{item[1]}</button>;
         })}
       </nav>
@@ -425,8 +516,8 @@ export default function BetaGameV2() {
         {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
         {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} />}
-        {tab === "league" && <LeagueScreen selectedRival={selectedRival} setSelectedRival={setSelectedRival} raid={raid} raidLog={raidLog} leaderboard={leaderboard} />}
-        {tab === "lab" && <LabScreen game={game} openChallenge={openChallenge} />}
+        {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
+        {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
       </main>
 
       <footer className="df2-footer"><span>{cloudStatus}</span><span>{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>
