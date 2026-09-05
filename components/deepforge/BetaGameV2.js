@@ -560,9 +560,13 @@ export default function BetaGameV2() {
           <button
             className={"df2-account-button" + (authUser ? " logged-in" : "")}
             onClick={function () { setAccountError(""); setAccountOpen(true); }}
+            aria-label={authUser ? "Open DEEPFORGE account" : "Log in to DEEPFORGE"}
           >
-            <span>{authUser ? "●" : "♟"}</span>
-            <b>{authLoading ? "Checking…" : authUser ? (authUser.displayName || authUser.email || "Account") : "Log in"}</b>
+            <span className="df2-account-avatar">{authUser ? "✓" : "👤"}</span>
+            <span className="df2-account-copy">
+              <small>{authUser ? "ACCOUNT" : "CLOUD SAVE"}</small>
+              <b>{authLoading ? "Checking…" : authUser ? (authUser.displayName || authUser.email || "Account") : "Log in"}</b>
+            </span>
           </button>
         </div>
       </header>
@@ -586,12 +590,25 @@ export default function BetaGameV2() {
 
       {accountOpen && (
         <div className="df2-modal df2-account-modal" onMouseDown={function (event) { if (event.target === event.currentTarget) setAccountOpen(false); }}>
-          <section>
-            <span>DEEPFORGE ACCOUNT · CLOUDFLARE D1</span>
+          <section className="df2-account-card">
+            <div className="df2-account-card-head">
+              <div className="df2-account-mark">DF</div>
+              <div>
+                <span>DEEPFORGE ACCOUNT</span>
+                <small>Cloudflare Pages + D1</small>
+              </div>
+              <button type="button" className="df2-account-x" onClick={function () { setAccountOpen(false); }}>×</button>
+            </div>
             {authUser ? (
               <>
-                <h2>{authUser.displayName || "Miner account"}</h2>
-                <p>{authUser.email}</p>
+                <div className="df2-account-user">
+                  <div className="df2-account-user-avatar">⛏</div>
+                  <div>
+                    <small>SIGNED IN</small>
+                    <h2>{authUser.displayName || "Miner account"}</h2>
+                    <p>{authUser.email}</p>
+                  </div>
+                </div>
                 <div className="df2-account-actions">
                   <button type="button" onClick={function () { setAccountOpen(false); setTab("clan"); }}>Open clans</button>
                   <button type="button" className="danger" disabled={accountBusy} onClick={signOutAccount}>
@@ -601,8 +618,11 @@ export default function BetaGameV2() {
               </>
             ) : (
               <>
-                <h2>{accountMode === "signup" ? "Create your miner account" : "Log in"}</h2>
-                <p>Your DEEPFORGE account is stored through the Cloudflare Pages Function + D1 database.</p>
+                <div className="df2-account-intro">
+                  <small>{accountMode === "signup" ? "NEW MINER" : "WELCOME BACK"}</small>
+                  <h2>{accountMode === "signup" ? "Create your miner account" : "Log in"}</h2>
+                  <p>{accountMode === "signup" ? "Create one account for clans and future cloud progress." : "Continue with your DEEPFORGE account."}</p>
+                </div>
                 <form className="df2-account-form" onSubmit={submitAccount}>
                   {accountMode === "signup" && (
                     <label>
@@ -655,7 +675,7 @@ export default function BetaGameV2() {
               </>
             )}
             {authUser && accountError && <aside className="bad">{accountError}</aside>}
-            <button className="df2-account-close" type="button" onClick={function () { setAccountOpen(false); }}>Close</button>
+            <div className="df2-account-storage-note"><span>☁</span><small>Account data is handled by your Cloudflare D1 backend.</small></div>
           </section>
         </div>
       )}
