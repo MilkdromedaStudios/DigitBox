@@ -23,6 +23,7 @@ function normalizeBindings(env, request) {
         typeof value.get === "function" &&
         typeof value.put === "function" &&
         typeof value.delete === "function" &&
+        typeof value.head === "function" &&
         typeof value.prepare !== "function"
       ) {
         bucket = value;
@@ -825,6 +826,14 @@ export default {
       ).run();
 
       return json({ ok: true }, 200, env);
+    }
+
+    if (
+      !url.pathname.startsWith("/v1/") &&
+      env.ASSETS &&
+      typeof env.ASSETS.fetch === "function"
+    ) {
+      return env.ASSETS.fetch(request);
     }
 
     return json({ error: "Not found" }, 404, env);
