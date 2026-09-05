@@ -1,7 +1,7 @@
 function cors(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "https://digitbox.dev",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Cache-Control": "no-store",
   };
@@ -199,6 +199,30 @@ function inviteCode() {
 
 function clanId() {
   return "clan_" + crypto.randomUUID().replace(/-/g, "").slice(0, 20);
+}
+
+function validClanId(value) {
+  return typeof value === "string" && /^clan_[a-zA-Z0-9_-]{8,64}$/.test(value);
+}
+
+function clanEmblemKey(value) {
+  return "clans/" + value + "/emblem";
+}
+
+async function requireClanOwner(request, env, clanIdValue) {
+  const authResult = await authenticatedD1User(request, env);
+  if (authResult.error) return authResult;
+
+  const clan = await env.DB.prepare(
+    "SELECT id, owner_id FROM clans WHERE id = ?1"
+  ).bind(clanIdValue).first();
+
+  if (!clan) return { error: "Clan not found.", status: 404 };
+  if (clan.owner_id !== authResult.user.id) {
+    return { error: "Only the clan owner can change the emblem.", status: 403 };
+  }
+
+  return { user: authResult.user, clan };
 }
 
 async function clanSnapshot(env, playerId) {
@@ -404,6 +428,81 @@ export default {
       return json({ error: "Method not allowed" }, 405, env);
     }
 
+    const clanEmblemMatch = url.pathname.match(/^\/v1\/clans\/([^/]+)\/emblem$/);
+    if (clanEmblemMatch) {
+      const requestedClanId = decodeURIComponent(clanEmblemMatch[1]);
+      if (!validClanId(requestedClanId)) {
+        return json({ error: "Invalid clan id." }, 400, env);
+      }
+
+      if (!env.BUCKET) {
+        return json({ error: "R2 binding BUCKET is not connected." }, 503, env);
+      }
+
+      const key = clanEmblemKey(requestedClanId);
+
+      if (request.method === "GET") {
+        const object = await env.BUCKET.get(key);
+        if (!object) return json({ error: "Clan emblem not found." }, 404, env);
+
+        const headers = new Headers(cors(env));
+        object.writeHttpMetadata(headers);
+        headers.set("etag", object.httpEtag);
+        headers.set("Cache-Control", "public, max-age=60");
+        return new Response(object.body, { status: 200, headers });
+      }
+
+      if (request.method === "PUT") {
+        const owner = await requireClanOwner(request, env, requestedClanId);
+        if (owner.error) return json({ error: owner.error }, owner.status, env);
+
+        const type = String(request.headers.get("content-type") || "")
+          .toLowerCase()
+          .split(";")[0]
+          .trim();
+        const allowed = ["image/png", "image/jpeg", "image/webp"];
+        if (!allowed.includes(type)) {
+          return json({ error: "Use a PNG, JPG, or WebP image." }, 415, env);
+        }
+
+        const declaredLength = Number(request.headers.get("content-length") || 0);
+        if (declaredLength > 2 * 1024 * 1024) {
+          return json({ error: "Clan emblem must be 2 MB or smaller." }, 413, env);
+        }
+
+        const bytes = await request.arrayBuffer();
+        if (!bytes.byteLength || bytes.byteLength > 2 * 1024 * 1024) {
+          return json({ error: "Clan emblem must be between 1 byte and 2 MB." }, 413, env);
+        }
+
+        await env.BUCKET.put(key, bytes, {
+          httpMetadata: {
+            contentType: type,
+            cacheControl: "public, max-age=60",
+          },
+          customMetadata: {
+            clanId: requestedClanId,
+            ownerId: owner.user.id,
+            uploadedAt: String(Date.now()),
+          },
+        });
+
+        return json({
+          ok: true,
+          emblemUrl: "/v1/clans/" + encodeURIComponent(requestedClanId) + "/emblem",
+        }, 200, env);
+      }
+
+      if (request.method === "DELETE") {
+        const owner = await requireClanOwner(request, env, requestedClanId);
+        if (owner.error) return json({ error: owner.error }, owner.status, env);
+        await env.BUCKET.delete(key);
+        return json({ ok: true }, 200, env);
+      }
+
+      return json({ error: "Method not allowed" }, 405, env);
+    }
+
     if (url.pathname === "/v1/clans" && request.method === "GET") {
       return json(await clanSnapshot(env, url.searchParams.get("playerId")), 200, env);
     }
@@ -541,6 +640,9 @@ export default {
           ]);
         } else {
           await env.DB.prepare("DELETE FROM clans WHERE id = ?1").bind(membership.clan_id).run();
+          if (env.BUCKET) {
+            await env.BUCKET.delete(clanEmblemKey(membership.clan_id)).catch(() => {});
+          }
         }
       } else {
         await env.DB.prepare(
