@@ -60,9 +60,10 @@ export async function loadClans(playerId) {
   return clanRequest("/v1/clans?playerId=" + encodeURIComponent(playerId), { method: "GET" });
 }
 
-export async function createClan(playerId, name, tag, companyValue, trophies) {
+export async function createClan(playerId, name, tag, companyValue, trophies, accessToken) {
   return clanRequest("/v1/clans", {
     method: "POST",
+    headers: accessToken ? { Authorization: "Bearer " + accessToken } : {},
     body: JSON.stringify({
       playerId,
       name,
