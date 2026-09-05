@@ -8,30 +8,79 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deepforge-live-cloud-test
+  cancel-in-progress: true
+
 jobs:
   live-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
-      - name: Verify production game API path
+      - name: Verify production DEEPFORGE flows
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://digitbox.pages.dev"
 
-          echo "===== $BASE/v1/health ====="
-          STATUS="$(curl -sS --max-time 20 -o /tmp/health.txt -w "%{http_code}" "$BASE/v1/health" || true)"
-          HEALTH="$(cat /tmp/health.txt 2>/dev/null || true)"
-          echo "HTTP $STATUS"
-          echo "$HEALTH"
-          test "$STATUS" = "200"
-          HEALTH="$HEALTH" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("HEALTH","")); sys.exit(0 if d.get("ok") is True and d.get("d1") is True else 1)'
+          echo "Waiting for API v7 deployment..."
+          READY=0
+          for i in $(seq 1 100); do
+            HEALTH="$(curl -sS --max-time 15 "$BASE/v1/health" || true)"
+            if HEALTH="$HEALTH" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("HEALTH","{}")); sys.exit(0 if d.get("ok") is True and d.get("d1") is True and int(d.get("apiVersion",0)) >= 7 else 1)' 2>/dev/null; then
+              echo "Backend ready: $HEALTH"
+              READY=1
+              break
+            fi
+            echo "Attempt $i: ${HEALTH:-no response}"
+            sleep 5
+          done
+          test "$READY" = "1"
 
-          echo "===== $BASE/api/deepforge/v1/health?deep=1 ====="
-          STATUS="$(curl -sS --max-time 20 -o /tmp/deep.txt -w "%{http_code}" "$BASE/api/deepforge/v1/health?deep=1" || true)"
-          DEEP="$(cat /tmp/deep.txt 2>/dev/null || true)"
-          echo "HTTP $STATUS"
-          echo "$DEEP"
-          DEEP="$DEEP" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("DEEP","")); ok=(d.get("d1") is True and d.get("auth") is True and int(d.get("apiVersion",0)) >= 6); sys.exit(0 if ok else 1)'
+          EMAIL="deepforge-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.invalid"
+          PASSWORD="DfCi-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-A9x!"
+          DISPLAY="CI Miner ${GITHUB_RUN_ID}"
+          TOKEN=""
 
-          echo "DEEPFORGE core Cloudflare API is working. R2 status is reported above separately."
+          cleanup() {
+            if [ -n "${TOKEN:-}" ]; then
+              curl -sS -X DELETE -H "Authorization: Bearer $TOKEN" "$BASE/v1/auth/account" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+
+          echo "Creating temporary normal account..."
+          SIGNUP_PAYLOAD="$(jq -n --arg email "$EMAIL" --arg password "$PASSWORD" --arg displayName "$DISPLAY" '{email:$email,password:$password,displayName:$displayName}')"
+          SIGNUP="$(curl --fail-with-body -sS -X POST -H "Content-Type: application/json" --data "$SIGNUP_PAYLOAD" "$BASE/v1/auth/signup")"
+          TOKEN="$(SIGNUP="$SIGNUP" python3 -c 'import json,os; print(json.loads(os.environ["SIGNUP"])["token"])')"
+          USER_ID="$(SIGNUP="$SIGNUP" python3 -c 'import json,os; print(json.loads(os.environ["SIGNUP"])["user"]["id"])')"
+
+          echo "Creating temporary clan..."
+          TAG="CI${GITHUB_RUN_ATTEMPT}"
+          CLAN_PAYLOAD="$(jq -n --arg name "CI Test Clan ${GITHUB_RUN_ID}" --arg tag "$TAG" --arg playerId "$USER_ID" '{name:$name,tag:$tag,playerId:$playerId,companyValue:321,trophies:12}')"
+          CLANS="$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data "$CLAN_PAYLOAD" "$BASE/v1/clans")"
+          CLAN_ID="$(CLANS="$CLANS" python3 -c 'import json,os; print(json.loads(os.environ["CLANS"])["myClan"]["id"])')"
+
+          echo "Saving custom D1 clan design..."
+          DESIGN_PAYLOAD="$(jq -n --arg clanId "$CLAN_ID" '{clanId:$clanId,design:{shape:"hex",pattern:"stripe",primary:"#123456",secondary:"#FEDCBA",symbol:"★"}}')"
+          DESIGN="$(curl --fail-with-body -sS -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data "$DESIGN_PAYLOAD" "$BASE/api/deepforge/clan-design")"
+          DESIGN="$DESIGN" python3 -c 'import json,os,sys; d=json.loads(os.environ["DESIGN"]); x=d.get("design",{}); sys.exit(0 if x.get("shape")=="hex" and x.get("pattern")=="stripe" and x.get("symbol")=="★" else 1)'
+
+          echo "Verifying design can be read by everyone..."
+          ALL_DESIGNS="$(curl --fail-with-body -sS "$BASE/api/deepforge/clan-design")"
+          ALL_DESIGNS="$ALL_DESIGNS" CLAN_ID="$CLAN_ID" python3 -c 'import json,os,sys; d=json.loads(os.environ["ALL_DESIGNS"]); sys.exit(0 if os.environ["CLAN_ID"] in d.get("designs",{}) else 1)'
+
+          echo "Deleting temporary account..."
+          curl --fail-with-body -sS -X DELETE -H "Authorization: Bearer $TOKEN" "$BASE/v1/auth/account" >/dev/null
+          OLD_TOKEN="$TOKEN"
+          TOKEN=""
+
+          echo "Confirming deleted session is rejected..."
+          STATUS="$(curl -sS -o /tmp/deleted-me.json -w "%{http_code}" -H "Authorization: Bearer $OLD_TOKEN" "$BASE/v1/auth/me")"
+          test "$STATUS" = "401"
+
+          echo "Confirming solo clan was deleted with the account..."
+          CLAN_STATUS="$(curl -sS "$BASE/v1/clans?playerId=$USER_ID")"
+          CLAN_STATUS="$CLAN_STATUS" CLAN_ID="$CLAN_ID" python3 -c 'import json,os,sys; d=json.loads(os.environ["CLAN_STATUS"]); ids=[x.get("id") for x in d.get("clans",[])]; sys.exit(0 if d.get("myClan") is None and os.environ["CLAN_ID"] not in ids else 1)'
+
+          echo "DEEPFORGE signup, D1 clan design, account deletion, and cleanup all passed."
