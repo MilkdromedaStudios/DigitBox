@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  clanEmblemUrl,
   cloudEnabled,
   cloudLogout,
   createClan,
@@ -11,9 +10,8 @@ import {
   leaveClan,
   loadClans,
   syncClanProfile,
-  uploadClanEmblem,
-  deleteClanEmblem,
 } from "./cloudSync";
+import { ClanBadge, ClanDesignerControl } from "./ClanDesigner";
 
 function minerName(playerId) {
   const id = String(playerId || "");
@@ -24,25 +22,6 @@ function compact(value) {
   return Number(value || 0).toLocaleString();
 }
 
-function ClanEmblem({ clan, version, small }) {
-  const [failed, setFailed] = useState(false);
-  const src = clan && clan.id ? clanEmblemUrl(clan.id, version) : "";
-
-  useEffect(() => {
-    setFailed(false);
-  }, [src]);
-
-  return (
-    <div className={small ? "df-clan-list-emblem" : "df-clan-emblem"}>
-      {src && !failed ? (
-        <img src={src} alt={clan.name + " emblem"} onError={() => setFailed(true)} />
-      ) : (
-        <span>{clan.tag}</span>
-      )}
-    </div>
-  );
-}
-
 export default function ClanScreen({ companyValue, trophies, onNotice, authUser, authLoading, onAuthChanged, onOpenAccount }) {
   const [data, setData] = useState({ myClan: null, clans: [] });
   const [loading, setLoading] = useState(true);
@@ -51,7 +30,6 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [invite, setInvite] = useState("");
-  const [emblemVersion, setEmblemVersion] = useState(0);
   const guestPlayerId = useMemo(() => getOrCreatePlayerId(), []);
   const playerId = authUser && authUser.id ? authUser.id : guestPlayerId;
   const online = cloudEnabled();
@@ -96,9 +74,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
       const next = await action();
       if (next && next.clans) setData(next);
       else await refresh(false);
-      if (success) {
-        onNotice && onNotice(success);
-      }
+      if (success) onNotice && onNotice(success);
     } catch (err) {
       setError(err.message || "Clan action failed.");
     } finally {
@@ -112,26 +88,23 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
       setError("You must log in to create a clan.");
       return;
     }
-
     const accessToken = getCloudAuthToken();
     if (!accessToken) {
       setError("Your Cloudflare login session expired. Log in again.");
       if (onAuthChanged) onAuthChanged(null);
       return;
     }
-
     const cleanName = name.trim();
     const cleanTag = tag.trim().toUpperCase();
-    run(
+    await run(
       "create",
       () => createClan(authUser.id, cleanName, cleanTag, companyValue, trophies, accessToken),
-      "Clan created. Share its invite code with another miner."
-    ).then(() => {
-      if (cleanName && cleanTag) {
-        setName("");
-        setTag("");
-      }
-    });
+      "Clan created. You can customize its emblem now."
+    );
+    if (cleanName && cleanTag) {
+      setName("");
+      setTag("");
+    }
   }
 
   async function handleLogout() {
@@ -149,11 +122,8 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
   function handleJoinCode(event) {
     event.preventDefault();
     const code = invite.trim().toUpperCase();
-    run(
-      "join-code",
-      () => joinClan(playerId, code, companyValue, trophies),
-      "Joined the clan."
-    ).then(() => setInvite(""));
+    run("join-code", () => joinClan(playerId, code, companyValue, trophies), "Joined the clan.")
+      .then(() => setInvite(""));
   }
 
   async function copyCode(code) {
@@ -165,58 +135,13 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
     }
   }
 
-  async function handleEmblemUpload(event, clanId) {
-    const file = event.target.files && event.target.files[0];
-    event.target.value = "";
-    if (!file || busy) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Clan emblem must be 2 MB or smaller.");
-      return;
-    }
-    setBusy("emblem");
-    setError("");
-    try {
-      await uploadClanEmblem(clanId, file);
-      setEmblemVersion(Date.now());
-      onNotice && onNotice("Clan emblem uploaded to Cloudflare R2.");
-    } catch (err) {
-      setError(err.message || "Could not upload clan emblem.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function handleEmblemDelete(clanId) {
-    if (busy) return;
-    setBusy("emblem-delete");
-    setError("");
-    try {
-      await deleteClanEmblem(clanId);
-      setEmblemVersion(Date.now());
-      onNotice && onNotice("Clan emblem removed from R2.");
-    } catch (err) {
-      setError(err.message || "Could not remove clan emblem.");
-    } finally {
-      setBusy("");
-    }
-  }
-
   if (!online) {
     return (
       <div className="df2-screen-scroll df-clan-screen">
         <section className="df-clan-offline">
           <span className="df-kicker">SHARED CLANS</span>
-          <h2>Clans are ready for Cloudflare D1.</h2>
-          <p>
-            The game code now supports real cross-player clans, but the shared feature activates only after
-            the DEEPFORGE Worker/D1 endpoint is connected through <code>NEXT_PUBLIC_DEEPFORGE_API</code>.
-          </p>
-          <div className="df-clan-preview-grid">
-            <article><b>Create a clan</b><span>Name + 2–5 character tag + invite code.</span></article>
-            <article><b>Join friends</b><span>Use their six-character invite code.</span></article>
-            <article><b>Browse clans</b><span>Join public mining clans from the ranking list.</span></article>
-            <article><b>Shared totals</b><span>Members contribute company value and trophies.</span></article>
-          </div>
+          <h2>Clans are offline.</h2>
+          <p>The shared clan backend is unavailable right now.</p>
         </section>
       </div>
     );
@@ -233,7 +158,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
       {myClan ? (
         <section className="df-clan-home">
           <div className="df-clan-banner">
-            <ClanEmblem clan={myClan} version={emblemVersion} />
+            <ClanBadge clan={myClan} />
             <div>
               <span className="df-kicker">YOUR CLAN</span>
               <h2>{myClan.name}</h2>
@@ -253,30 +178,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
             <button onClick={() => copyCode(myClan.inviteCode)}>Copy code</button>
           </div>
 
-          {myClan.role === "owner" && (
-            <div className="df-clan-r2-controls">
-              <div>
-                <small>CLAN EMBLEM · R2</small>
-                <b>PNG, JPG or WebP · max 2 MB</b>
-              </div>
-              <label className="df-clan-upload-button">
-                {busy === "emblem" ? "Uploading…" : "Upload / replace"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  disabled={Boolean(busy)}
-                  onChange={(event) => handleEmblemUpload(event, myClan.id)}
-                />
-              </label>
-              <button
-                type="button"
-                disabled={Boolean(busy)}
-                onClick={() => handleEmblemDelete(myClan.id)}
-              >
-                {busy === "emblem-delete" ? "Removing…" : "Remove"}
-              </button>
-            </div>
-          )}
+          <ClanDesignerControl clan={myClan} authUser={authUser} onNotice={onNotice} />
 
           <div className="df-clan-members">
             <div className="df-clan-section-title">
@@ -312,23 +214,11 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
               <h2>Create your mining crew</h2>
               <label>
                 Clan name
-                <input
-                  value={name}
-                  maxLength={24}
-                  minLength={3}
-                  placeholder="Canyon Mining Co."
-                  onChange={(event) => setName(event.target.value)}
-                />
+                <input value={name} maxLength={24} minLength={3} placeholder="Canyon Mining Co." onChange={(event) => setName(event.target.value)} />
               </label>
               <label>
                 Tag
-                <input
-                  value={tag}
-                  maxLength={5}
-                  minLength={2}
-                  placeholder="CMC"
-                  onChange={(event) => setTag(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-                />
+                <input value={tag} maxLength={5} minLength={2} placeholder="CMC" onChange={(event) => setTag(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
               </label>
               {authLoading ? (
                 <button disabled>Checking login…</button>
@@ -344,16 +234,8 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
                 </>
               ) : (
                 <div className="df-clan-login-prompt">
-                  <div>
-                    <b>Account required</b>
-                    <small>Log in to create and own a clan.</small>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onOpenAccount && onOpenAccount()}
-                  >
-                    Log in
-                  </button>
+                  <div><b>Account required</b><small>Log in to create and own a clan.</small></div>
+                  <button type="button" onClick={() => onOpenAccount && onOpenAccount()}>Log in</button>
                 </div>
               )}
             </form>
@@ -362,16 +244,8 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
               <span className="df-kicker">JOIN A FRIEND</span>
               <h2>Use an invite code</h2>
               <p>Ask another miner for the six-character code shown inside their clan screen.</p>
-              <input
-                className="df-clan-invite-input"
-                value={invite}
-                maxLength={6}
-                placeholder="ABC123"
-                onChange={(event) => setInvite(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-              />
-              <button disabled={Boolean(busy) || invite.length !== 6}>
-                {busy === "join-code" ? "Joining…" : "Join clan"}
-              </button>
+              <input className="df-clan-invite-input" value={invite} maxLength={6} placeholder="ABC123" onChange={(event) => setInvite(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
+              <button disabled={Boolean(busy) || invite.length !== 6}>{busy === "join-code" ? "Joining…" : "Join clan"}</button>
             </form>
           </section>
 
@@ -388,23 +262,22 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
                 {clans.map((clan, index) => (
                   <article key={clan.id}>
                     <span className="df-clan-list-rank">#{index + 1}</span>
-                    <ClanEmblem clan={clan} small />
+                    <ClanBadge clan={clan} small />
                     <div>
                       <b>{clan.name}</b>
                       <small>{clan.memberCount}/30 miners</small>
                     </div>
                     <em>◆ {compact(clan.companyValue)}</em>
                     <strong>🏆 {compact(clan.trophies)}</strong>
-                    <button
-                      disabled={Boolean(busy) || clan.memberCount >= 30}
-                      onClick={() => run(
-                        "join-" + clan.id,
-                        () => joinClanById(playerId, clan.id, companyValue, trophies),
-                        "Joined " + clan.name + "."
-                      )}
-                    >
-                      {busy === "join-" + clan.id ? "Joining…" : clan.memberCount >= 30 ? "Full" : "Join"}
-                    </button>
+                    <div className="df-clan-public-actions">
+                      <ClanDesignerControl clan={clan} authUser={authUser} onNotice={onNotice} compact />
+                      <button
+                        disabled={Boolean(busy) || clan.memberCount >= 30}
+                        onClick={() => run("join-" + clan.id, () => joinClanById(playerId, clan.id, companyValue, trophies), "Joined " + clan.name + ".")}
+                      >
+                        {busy === "join-" + clan.id ? "Joining…" : clan.memberCount >= 30 ? "Full" : "Join"}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -412,6 +285,10 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
           </section>
         </>
       )}
+
+      <style jsx global>{`
+        .df-clan-public-actions{display:flex;align-items:center;gap:6px}.df-clan-public-actions>button{min-width:58px}@media(max-width:620px){.df-clan-public-actions{flex-direction:column}}
+      `}</style>
     </div>
   );
 }
