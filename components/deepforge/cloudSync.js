@@ -12,22 +12,15 @@ function apiRoot() {
     return CONFIGURED_API_ROOT;
   }
   if (typeof window !== "undefined" && window.location) {
-    try {
-      localStorage.removeItem("digitbox-deepforge-api-root-v1");
-    } catch (_) {}
-
+    try { localStorage.removeItem("digitbox-deepforge-api-root-v1"); } catch (_) {}
     const origin = String(window.location.origin || "").replace(/\/$/, "");
     const hostname = String(window.location.hostname || "").toLowerCase();
-
     if (
       hostname === "digitbox.pages.dev" ||
       hostname.endsWith(".digitbox.pages.dev") ||
       hostname === "localhost" ||
       hostname === "127.0.0.1"
-    ) {
-      return origin;
-    }
-
+    ) return origin;
     return CLOUDFLARE_PAGES_ROOT;
   }
   return CLOUDFLARE_PAGES_ROOT;
@@ -36,9 +29,7 @@ function apiRoot() {
 const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
 const AUTH_KEY = "digitbox-deepforge-auth-v1";
 
-export function cloudEnabled() {
-  return true;
-}
+export function cloudEnabled() { return true; }
 
 export function getOrCreatePlayerId() {
   if (typeof window === "undefined") return "server";
@@ -58,9 +49,7 @@ export function getCloudAuthToken() {
   try {
     const raw = JSON.parse(localStorage.getItem(AUTH_KEY) || "null");
     return raw && raw.token ? String(raw.token) : "";
-  } catch (_) {
-    return "";
-  }
+  } catch (_) { return ""; }
 }
 
 function storeCloudAuth(payload) {
@@ -104,13 +93,9 @@ export async function checkCloudBackend() {
     cache: "no-store",
   });
   const type = String(response.headers.get("content-type") || "");
-  if (!type.includes("application/json")) {
-    throw new Error("DEEPFORGE API is not deployed on this host.");
-  }
+  if (!type.includes("application/json")) throw new Error("DEEPFORGE API is not deployed on this host.");
   const body = await response.json().catch(() => ({}));
-  if (!response.ok || !body.ok) {
-    throw new Error(body.error || "DEEPFORGE D1 health check failed.");
-  }
+  if (!response.ok || !body.ok) throw new Error(body.error || "DEEPFORGE D1 health check failed.");
   return body;
 }
 
@@ -159,6 +144,17 @@ export async function cloudLogout() {
   }
 }
 
+export async function deleteCloudAccount() {
+  const token = getCloudAuthToken();
+  if (!token) throw new Error("You are not logged in.");
+  const payload = await authRequest("/v1/auth/account", {
+    method: "DELETE",
+    headers: { Authorization: "Bearer " + token },
+  });
+  clearCloudAuth();
+  return payload;
+}
+
 export async function loadCloudSave(playerId) {
   const root = apiRoot();
   if (!root || !playerId) return null;
@@ -187,7 +183,6 @@ export async function saveCloudSave(playerId, payload) {
   return response.json();
 }
 
-
 async function clanRequest(path, options) {
   const root = apiRoot();
   if (!root) throw new Error("Cloudflare API is unavailable.");
@@ -208,8 +203,7 @@ export function clanEmblemUrl(clanId, version) {
   if (!clanId) return "";
   const root = apiRoot();
   if (!root) return "";
-  return root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem" +
-    (version ? "?v=" + encodeURIComponent(version) : "");
+  return root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem" + (version ? "?v=" + encodeURIComponent(version) : "");
 }
 
 export async function uploadClanEmblem(clanId, file) {
@@ -218,18 +212,11 @@ export async function uploadClanEmblem(clanId, file) {
   if (!root) throw new Error("Cloudflare API is unavailable.");
   if (!token) throw new Error("Log in before changing the clan emblem.");
   if (!file) throw new Error("Choose an image first.");
-
-  const response = await fetch(
-    root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem",
-    {
-      method: "PUT",
-      headers: {
-        Authorization: "Bearer " + token,
-        "Content-Type": file.type || "application/octet-stream",
-      },
-      body: file,
-    }
-  );
+  const response = await fetch(root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem", {
+    method: "PUT",
+    headers: { Authorization: "Bearer " + token, "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || ("Emblem upload failed: " + response.status));
   return body;
@@ -240,17 +227,10 @@ export async function deleteClanEmblem(clanId) {
   const token = getCloudAuthToken();
   if (!root) throw new Error("Cloudflare API is unavailable.");
   if (!token) throw new Error("Log in before changing the clan emblem.");
-
-  const response = await fetch(
-    root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem",
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: "Bearer " + token,
-        Accept: "application/json",
-      },
-    }
-  );
+  const response = await fetch(root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem", {
+    method: "DELETE",
+    headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || ("Emblem delete failed: " + response.status));
   return body;
@@ -264,37 +244,21 @@ export async function createClan(playerId, name, tag, companyValue, trophies, ac
   return clanRequest("/v1/clans", {
     method: "POST",
     headers: accessToken ? { Authorization: "Bearer " + accessToken } : {},
-    body: JSON.stringify({
-      playerId,
-      name,
-      tag,
-      companyValue: Number(companyValue) || 0,
-      trophies: Number(trophies) || 0,
-    }),
+    body: JSON.stringify({ playerId, name, tag, companyValue: Number(companyValue) || 0, trophies: Number(trophies) || 0 }),
   });
 }
 
 export async function joinClan(playerId, code, companyValue, trophies) {
   return clanRequest("/v1/clans/join", {
     method: "POST",
-    body: JSON.stringify({
-      playerId,
-      code,
-      companyValue: Number(companyValue) || 0,
-      trophies: Number(trophies) || 0,
-    }),
+    body: JSON.stringify({ playerId, code, companyValue: Number(companyValue) || 0, trophies: Number(trophies) || 0 }),
   });
 }
 
 export async function joinClanById(playerId, clanId, companyValue, trophies) {
   return clanRequest("/v1/clans/join", {
     method: "POST",
-    body: JSON.stringify({
-      playerId,
-      clanId,
-      companyValue: Number(companyValue) || 0,
-      trophies: Number(trophies) || 0,
-    }),
+    body: JSON.stringify({ playerId, clanId, companyValue: Number(companyValue) || 0, trophies: Number(trophies) || 0 }),
   });
 }
 
@@ -308,10 +272,6 @@ export async function leaveClan(playerId) {
 export async function syncClanProfile(playerId, companyValue, trophies) {
   return clanRequest("/v1/clans/profile", {
     method: "PUT",
-    body: JSON.stringify({
-      playerId,
-      companyValue: Number(companyValue) || 0,
-      trophies: Number(trophies) || 0,
-    }),
+    body: JSON.stringify({ playerId, companyValue: Number(companyValue) || 0, trophies: Number(trophies) || 0 }),
   });
 }
