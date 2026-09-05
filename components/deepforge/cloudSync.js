@@ -69,6 +69,25 @@ async function authRequest(path, options) {
   return body;
 }
 
+export async function checkCloudBackend() {
+  const root = apiRoot();
+  if (!root) return { ok: false, d1: false, r2: false };
+  const response = await fetch(root + "/v1/health", {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const type = String(response.headers.get("content-type") || "");
+  if (!type.includes("application/json")) {
+    throw new Error("DEEPFORGE API is not deployed on this host.");
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body.ok) {
+    throw new Error(body.error || "DEEPFORGE D1 health check failed.");
+  }
+  return body;
+}
+
 export async function cloudSignup(email, password, displayName) {
   const payload = await authRequest("/v1/auth/signup", {
     method: "POST",
@@ -121,7 +140,11 @@ export async function loadCloudSave(playerId) {
     method: "GET",
     headers: { Accept: "application/json" },
   });
-  if (response.status === 404) return null;
+  if (response.status === 404) {
+    const type = String(response.headers.get("content-type") || "");
+    if (type.includes("application/json")) return null;
+    throw new Error("DEEPFORGE API route is missing on this host.");
+  }
   if (!response.ok) throw new Error("Cloud load failed: " + response.status);
   return response.json();
 }
