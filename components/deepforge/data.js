@@ -43,6 +43,7 @@ export const INITIAL = {
   trophies: 100,
   blocksMined: 0,
   research: 0,
+  researchTech: { drilling: 0, processing: 0, survey: 0, tactics: 0 },
   boostCharges: 0,
   buildings: { refinery: 0, workshop: 0, academy: 0, walls: 0 },
 };
