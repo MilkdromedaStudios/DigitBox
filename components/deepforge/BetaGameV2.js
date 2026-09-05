@@ -1,21 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import InfiniteWorld from "./InfiniteWorld";
 import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
-import { RESOURCE_TYPES, nearestResource } from "./world";
+import {
+  RESOURCE_TYPES,
+  addDigCircle,
+  depositsHitByCircle,
+  emptyWorldChanges,
+  markDepositMined,
+  normalizeWorldChanges,
+  surfaceHeight,
+} from "./world";
 import { cloudEnabled, getOrCreatePlayerId, loadCloudSave, saveCloudSave } from "./cloudSync";
 
-const DEFAULT_PLAYER = { x: 0.5, y: 0.5 };
+const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 
 function normalizeSave(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const player = raw.player && Number.isFinite(raw.player.x) && Number.isFinite(raw.player.y)
+  const isContinuousWorld = Number(raw.version) >= 3;
+  const player = isContinuousWorld && raw.player && Number.isFinite(raw.player.x) && Number.isFinite(raw.player.y)
     ? raw.player
     : DEFAULT_PLAYER;
   return {
     updatedAt: Number(raw.updatedAt) || 0,
-    player: player,
-    game: raw.game ? { ...INITIAL, ...raw.game, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) } } : INITIAL,
-    worldChanges: raw.worldChanges && typeof raw.worldChanges === "object" ? raw.worldChanges : {},
+    player,
+    game: raw.game
+      ? { ...INITIAL, ...raw.game, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) } }
+      : INITIAL,
+    worldChanges: isContinuousWorld ? normalizeWorldChanges(raw.worldChanges) : emptyWorldChanges(),
   };
 }
 
@@ -59,6 +70,7 @@ function WorldScreen(props) {
         onPosition={props.onPosition}
         onDrill={props.onDrill}
         paused={props.paused}
+        drillRadius={props.drillRadius}
       />
 
       <div className="df2-world-overlay">
@@ -165,7 +177,7 @@ function LabScreen(props) {
 export default function BetaGameV2() {
   const [player, setPlayer] = useState(DEFAULT_PLAYER);
   const [game, setGame] = useState(INITIAL);
-  const [worldChanges, setWorldChanges] = useState({});
+  const [worldChanges, setWorldChanges] = useState(emptyWorldChanges);
   const [tab, setTab] = useState("world");
   const [notice, setNotice] = useState("Drag anywhere on the dirt to move your miner.");
   const [challenge, setChallenge] = useState(null);
@@ -178,6 +190,7 @@ export default function BetaGameV2() {
   const lastCloudSaveRef = useRef(0);
 
   const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);
+  const drillRadius = 0.7 + Math.min(0.42, drillDamage * 0.055);
   const refineryMult = 1 + (game.buildings.refinery || 0) * 0.12;
   const academyBonus = game.buildings.academy || 0;
   const cityDefense = game.armor * 15 + (game.buildings.walls || 0) * 18;
@@ -219,7 +232,7 @@ export default function BetaGameV2() {
   useEffect(function () {
     if (!loaded) return undefined;
     const timer = setTimeout(function () {
-      const payload = { version: 2, updatedAt: Date.now(), player: player, game: game, worldChanges: worldChanges };
+      const payload = { version: 3, updatedAt: Date.now(), player: player, game: game, worldChanges: normalizeWorldChanges(worldChanges) };
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(payload)); } catch (_) {}
       if (cloudEnabled() && Date.now() - lastCloudSaveRef.current > 3500) {
         lastCloudSaveRef.current = Date.now();
@@ -230,34 +243,54 @@ export default function BetaGameV2() {
     return function () { clearTimeout(timer); };
   }, [player, game, worldChanges, loaded]);
 
-  function drill(position) {
+  function drill(excavation) {
     if (challenge || tab !== "world") return;
-    if (game.cargoCount >= game.cargoMax) { setNotice("Cargo cart is full. Sell before mining more."); return; }
-    const target = nearestResource(position.x, position.y, worldChanges, 1.8);
-    if (!target) { setNotice("No ore in reach. Walk closer to a rock with visible mineral veins."); return; }
-    const damage = (target.change && target.change.damage ? target.change.damage : 0) + drillDamage;
-    if (damage < target.resource.hp) {
-      setWorldChanges(function (current) { return { ...current, [target.key]: { damage: damage } }; });
-      setNotice(target.resource.name + " rock: " + damage + "/" + target.resource.hp + " broken.");
+
+    const radius = Number(excavation.radius) || drillRadius;
+    const circle = {
+      x: Number(excavation.x),
+      y: Number(excavation.y),
+      r: radius,
+    };
+
+    const hits = depositsHitByCircle(circle.x, circle.y, circle.r, worldChanges);
+    if (hits.length && game.cargoCount >= game.cargoMax) {
+      setNotice("Cargo cart is full. Sell ore before cutting into this deposit.");
       return;
     }
-    const type = target.resourceType;
-    const nextCount = game.blocksMined + 1;
-    setWorldChanges(function (current) { return { ...current, [target.key]: { mined: true, minedAt: Date.now() } }; });
-    setGame(function (g) {
-      return { ...g, cargo: { ...g.cargo, [type]: (g.cargo[type] || 0) + 1 }, cargoCount: g.cargoCount + 1, blocksMined: g.blocksMined + 1, research: g.research + (type === "crystal" || type === "relic" ? 1 : 0) };
-    });
-    setNotice("Mined " + target.resource.name + ".");
-    if (nextCount % 7 === 0) { setChallenge(challengeFor(nextCount + Math.floor(position.x + position.y))); setChallengeResult(null); }
-  }
 
-  useEffect(function () {
-    function keydown(event) {
-      if ((event.key === " " || event.code === "Space") && tab === "world" && !challenge) { event.preventDefault(); drill(player); }
+    let nextChanges = addDigCircle(worldChanges, circle);
+    let collected = null;
+
+    if (hits.length) {
+      collected = hits[0];
+      nextChanges = markDepositMined(nextChanges, collected.id);
     }
-    window.addEventListener("keydown", keydown);
-    return function () { window.removeEventListener("keydown", keydown); };
-  }, [player, tab, challenge, worldChanges, game.cargoCount, game.cargoMax, game.blocksMined, drillDamage]);
+
+    setWorldChanges(nextChanges);
+
+    if (collected) {
+      const type = collected.type;
+      const nextCount = game.blocksMined + 1;
+      setGame(function (g) {
+        return {
+          ...g,
+          cargo: { ...g.cargo, [type]: (g.cargo[type] || 0) + 1 },
+          cargoCount: g.cargoCount + 1,
+          blocksMined: g.blocksMined + 1,
+          research: g.research + (type === "quartz" || type === "gold" ? 1 : 0),
+        };
+      });
+      setNotice("Exposed and collected " + collected.resource.name + " from the rock.");
+      if (nextCount % 7 === 0) {
+        setChallenge(challengeFor(nextCount + Math.floor(circle.x + circle.y)));
+        setChallengeResult(null);
+      }
+    } else {
+      const depth = circle.y - surfaceHeight(circle.x);
+      setNotice(depth < 5.5 ? "Excavated a round cut through soil." : depth < 22 ? "Excavated a round cut through compact earth." : "Cut a round section of bedrock.");
+    }
+  }
 
   function sellCargo() {
     if (!game.cargoCount) { setNotice("Cargo cart is empty."); return; }
@@ -312,7 +345,7 @@ export default function BetaGameV2() {
   function closeChallenge() { setChallenge(null); setChallengeResult(null); }
   function reset() {
     if (typeof window !== "undefined" && !window.confirm("Reset DEEPFORGE beta progress?")) return;
-    setPlayer(DEFAULT_PLAYER); setGame(INITIAL); setWorldChanges({}); setNotice("New mining company founded.");
+    setPlayer(DEFAULT_PLAYER); setGame(INITIAL); setWorldChanges(emptyWorldChanges()); setNotice("New mining company founded on fresh ground.");
     try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
   }
 
@@ -335,7 +368,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} drillDamage={drillDamage} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
         {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
         {tab === "league" && <LeagueScreen selectedRival={selectedRival} setSelectedRival={setSelectedRival} raid={raid} raidLog={raidLog} leaderboard={leaderboard} />}
         {tab === "lab" && <LabScreen game={game} openChallenge={openChallenge} />}
