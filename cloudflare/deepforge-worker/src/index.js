@@ -1,1 +1,50 @@
-function cors(env) {\n  return {\n    "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "https://digitbox.dev",\n    "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",\n    "Access-Control-Allow-Headers": "Content-Type",\n    "Cache-Control": "no-store",\n  };\n}\n\nfunction json(body, status, env) {\n  return new Response(JSON.stringify(body), { status: status || 200, headers: { ...cors(env), "Content-Type": "application/json" } });\n}\n\nexport default {\n  async fetch(request, env) {\n    const url = new URL(request.url);\n    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(env) });\n    if (!url.pathname.startsWith("/v1/save/")) return json({ error: "Not found" }, 404, env);\n\n    const playerId = decodeURIComponent(url.pathname.slice("/v1/save/".length));\n    if (!/^[a-zA-Z0-9_-]{8,96}$/.test(playerId)) return json({ error: "Invalid player id" }, 400, env);\n\n    if (request.method === "GET") {\n      const row = await env.DB.prepare("SELECT data, updated_at FROM player_saves WHERE player_id = ?1").bind(playerId).first();\n      if (!row) return json({ error: "Not found" }, 404, env);\n      let data = null;\n      try { data = JSON.parse(row.data); } catch (_) { return json({ error: "Corrupt save" }, 500, env); }\n      return json({ data: data, updatedAt: row.updated_at }, 200, env);\n    }\n\n    if (request.method === "PUT") {\n      const length = Number(request.headers.get("content-length") || 0);\n      if (length > 1000000) return json({ error: "Save too large" }, 413, env);\n      let data;\n      try { data = await request.json(); } catch (_) { return json({ error: "Invalid JSON" }, 400, env); }\n      if (!data || typeof data !== "object") return json({ error: "Invalid save" }, 400, env);\n      const serialized = JSON.stringify(data);\n      if (serialized.length > 1000000) return json({ error: "Save too large" }, 413, env);\n      const updatedAt = Number(data.updatedAt) || Date.now();\n      await env.DB.prepare(\n        "INSERT INTO player_saves (player_id, data, updated_at) VALUES (?1, ?2, ?3) " +\n        "ON CONFLICT(player_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at " +\n        "WHERE excluded.updated_at >= player_saves.updated_at"\n      ).bind(playerId, serialized, updatedAt).run();\n      return json({ ok: true, updatedAt: updatedAt }, 200, env);\n    }\n\n    return json({ error: "Method not allowed" }, 405, env);\n  },\n};\n
+function cors(env) {
+  return {
+    "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "https://digitbox.dev",
+    "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Cache-Control": "no-store",
+  };
+}
+
+function json(body, status, env) {
+  return new Response(JSON.stringify(body), { status: status || 200, headers: { ...cors(env), "Content-Type": "application/json" } });
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(env) });
+    if (!url.pathname.startsWith("/v1/save/")) return json({ error: "Not found" }, 404, env);
+
+    const playerId = decodeURIComponent(url.pathname.slice("/v1/save/".length));
+    if (!/^[a-zA-Z0-9_-]{8,96}$/.test(playerId)) return json({ error: "Invalid player id" }, 400, env);
+
+    if (request.method === "GET") {
+      const row = await env.DB.prepare("SELECT data, updated_at FROM player_saves WHERE player_id = ?1").bind(playerId).first();
+      if (!row) return json({ error: "Not found" }, 404, env);
+      let data = null;
+      try { data = JSON.parse(row.data); } catch (_) { return json({ error: "Corrupt save" }, 500, env); }
+      return json({ data: data, updatedAt: row.updated_at }, 200, env);
+    }
+
+    if (request.method === "PUT") {
+      const length = Number(request.headers.get("content-length") || 0);
+      if (length > 1000000) return json({ error: "Save too large" }, 413, env);
+      let data;
+      try { data = await request.json(); } catch (_) { return json({ error: "Invalid JSON" }, 400, env); }
+      if (!data || typeof data !== "object") return json({ error: "Invalid save" }, 400, env);
+      const serialized = JSON.stringify(data);
+      if (serialized.length > 1000000) return json({ error: "Save too large" }, 413, env);
+      const updatedAt = Number(data.updatedAt) || Date.now();
+      await env.DB.prepare(
+        "INSERT INTO player_saves (player_id, data, updated_at) VALUES (?1, ?2, ?3) " +
+        "ON CONFLICT(player_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at " +
+        "WHERE excluded.updated_at >= player_saves.updated_at"
+      ).bind(playerId, serialized, updatedAt).run();
+      return json({ ok: true, updatedAt: updatedAt }, 200, env);
+    }
+
+    return json({ error: "Method not allowed" }, 405, env);
+  },
+};
