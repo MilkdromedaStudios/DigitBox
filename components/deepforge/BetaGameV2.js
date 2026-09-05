@@ -12,7 +12,7 @@ import {
   normalizeWorldChanges,
   surfaceHeight,
 } from "./world";
-import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
+import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getCloudApiRoot, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, setCloudApiRoot, syncClanProfile } from "./cloudSync";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 
@@ -251,6 +251,7 @@ export default function BetaGameV2() {
   const [accountName, setAccountName] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState("");
+  const [backendUrl, setBackendUrl] = useState("");
   const [cloudStatus, setCloudStatus] = useState(cloudEnabled() ? "D1 connecting" : "D1-ready · local save");
   const playerIdRef = useRef(null);
   const lastCloudSaveRef = useRef(0);
@@ -290,6 +291,12 @@ export default function BetaGameV2() {
     }
     loadAuth();
     return function () { mounted = false; };
+  }, []);
+
+  useEffect(function () {
+    if (typeof window !== "undefined") {
+      setBackendUrl(getCloudApiRoot());
+    }
   }, []);
 
   useEffect(function () {
@@ -488,6 +495,29 @@ export default function BetaGameV2() {
     });
   }
 
+  async function connectBackend(event) {
+    event.preventDefault();
+    const root = setCloudApiRoot(backendUrl);
+    setBackendUrl(root);
+    setAccountError("");
+    if (!root) {
+      setAccountError("Enter your Cloudflare Pages URL.");
+      return;
+    }
+
+    setAccountBusy(true);
+    try {
+      const health = await checkCloudBackend();
+      if (!health || !health.d1) throw new Error("D1 is not available on that Pages project.");
+      setCloudStatus(health.r2 ? "D1 + R2 connected" : "D1 connected");
+      setNotice("Cloudflare backend connected.");
+    } catch (error) {
+      setAccountError(error && error.message ? error.message : "Could not connect to Cloudflare Pages.");
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
   async function submitAccount(event) {
     event.preventDefault();
     if (accountBusy) return;
@@ -638,6 +668,23 @@ export default function BetaGameV2() {
                   <h2>{accountMode === "signup" ? "Create your miner account" : "Log in"}</h2>
                   <p>{accountMode === "signup" ? "Create one account for clans and future cloud progress." : "Continue with your DEEPFORGE account."}</p>
                 </div>
+                {accountError && /API|backend|D1|host|Cloudflare/i.test(accountError) && (
+                  <form className="df2-backend-connect" onSubmit={connectBackend}>
+                    <div>
+                      <small>BACKEND CONNECTION</small>
+                      <b>Cloudflare Pages URL</b>
+                      <p>Paste the <code>https://...pages.dev</code> URL for the Pages project that has your <b>DB</b> and <b>BUCKET</b> bindings.</p>
+                    </div>
+                    <input
+                      value={backendUrl}
+                      placeholder="https://your-project.pages.dev"
+                      onChange={function (event) { setBackendUrl(event.target.value); }}
+                    />
+                    <button disabled={accountBusy || !backendUrl.trim()}>
+                      {accountBusy ? "Checking…" : "Connect"}
+                    </button>
+                  </form>
+                )}
                 <form className="df2-account-form" onSubmit={submitAccount}>
                   {accountMode === "signup" && (
                     <label>
