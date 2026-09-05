@@ -233,6 +233,65 @@ async function authenticatedD1User(request, env) {
   return { user: publicUser(row), tokenHash };
 }
 
+async function authSelfTest(env) {
+  const suffix = randomHex(8);
+  const userId = "user_health_" + suffix;
+  const email = "health-" + suffix + "@example.invalid";
+  const password = "DfHealth-" + suffix + "-A9x!";
+  const salt = randomHex(16);
+  const hash = await passwordHash(password, salt);
+  const now = Date.now();
+
+  try {
+    await env.DB.prepare(
+      "INSERT INTO users (id, email, display_name, password_hash, password_salt, created_at) " +
+      "VALUES (?1, ?2, 'Health Check', ?3, ?4, ?5)"
+    ).bind(userId, email, hash, salt, now).run();
+
+    const row = await env.DB.prepare(
+      "SELECT id, email, display_name, password_hash, password_salt FROM users WHERE email = ?1"
+    ).bind(email).first();
+    if (!row || row.id !== userId) throw new Error("Auth self-test user lookup failed.");
+
+    const verifyHash = await passwordHash(password, row.password_salt);
+    if (!constantTimeEqual(verifyHash, row.password_hash)) {
+      throw new Error("Auth self-test password verification failed.");
+    }
+
+    const session = await createSession(env, userId);
+    const tokenHash = await sha256Hex(session.token);
+    const sessionRow = await env.DB.prepare(
+      "SELECT u.id FROM auth_sessions s JOIN users u ON u.id = s.user_id " +
+      "WHERE s.token_hash = ?1 AND s.expires_at > ?2"
+    ).bind(tokenHash, Date.now()).first();
+    if (!sessionRow || sessionRow.id !== userId) {
+      throw new Error("Auth self-test session lookup failed.");
+    }
+
+    return true;
+  } finally {
+    await env.DB.prepare("DELETE FROM auth_sessions WHERE user_id = ?1").bind(userId).run().catch(() => {});
+    await env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(userId).run().catch(() => {});
+  }
+}
+
+async function r2SelfTest(env) {
+  if (!env.BUCKET) return false;
+  const key = "health/" + randomHex(8) + ".txt";
+  try {
+    await env.BUCKET.put(key, "deepforge-ok", {
+      httpMetadata: { contentType: "text/plain" },
+    });
+    const object = await env.BUCKET.get(key);
+    if (!object) throw new Error("R2 self-test read failed.");
+    const text = await object.text();
+    if (text !== "deepforge-ok") throw new Error("R2 self-test content mismatch.");
+    return true;
+  } finally {
+    await env.BUCKET.delete(key).catch(() => {});
+  }
+}
+
 function inviteCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = new Uint8Array(6);
@@ -350,19 +409,27 @@ const deepforgeWorker = {
     if (url.pathname === "/v1/health" && request.method === "GET") {
       try {
         const probe = await env.DB.prepare("SELECT 1 AS ok").first();
+        const deep = url.searchParams.get("deep") === "1";
+        const auth = deep ? await authSelfTest(env) : null;
+        const r2 = deep ? await r2SelfTest(env) : Boolean(env.BUCKET);
+        const ok = Boolean(probe && Number(probe.ok) === 1) && (!deep || (auth && r2));
         return json({
-          ok: Boolean(probe && Number(probe.ok) === 1),
+          ok,
           d1: true,
-          r2: Boolean(env.BUCKET),
-          apiVersion: 4,
+          r2,
+          auth: deep ? Boolean(auth) : undefined,
+          deep,
+          apiVersion: 5,
           project: "digitbox",
-        }, 200, env);
+        }, ok ? 200 : 500, env);
       } catch (error) {
         return json({
           ok: false,
-          d1: false,
+          d1: Boolean(env.DB),
           r2: Boolean(env.BUCKET),
-          apiVersion: 4,
+          auth: false,
+          deep: url.searchParams.get("deep") === "1",
+          apiVersion: 5,
           project: "digitbox",
           error: error && error.message ? error.message : String(error),
         }, 500, env);
