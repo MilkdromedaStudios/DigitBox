@@ -1,1 +1,20 @@
-import Head from "next/head";\nimport BetaGameV2 from "../components/deepforge/BetaGameV2";\n\nexport default function BetaPage() {\n  return (\n    <>\n      <Head>\n        <title>DigitBox Beta</title>\n        <meta name="description" content="Private DigitBox mining game beta." />\n        <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />\n        <meta name="googlebot" content="noindex,nofollow,noarchive,nosnippet" />\n        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />\n        <meta name="theme-color" content="#2d251d" />\n      </Head>\n      <main className="df-beta-page">\n        <BetaGameV2 />\n      </main>\n    </>\n  );\n}\n
+import Head from "next/head";
+import BetaGameV2 from "../components/deepforge/BetaGameV2";
+
+export default function BetaPage() {
+  return (
+    <>
+      <Head>
+        <title>DigitBox Beta</title>
+        <meta name="description" content="Private DigitBox mining game beta." />
+        <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
+        <meta name="googlebot" content="noindex,nofollow,noarchive,nosnippet" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+        <meta name="theme-color" content="#2d251d" />
+      </Head>
+      <main className="df-beta-page">
+        <BetaGameV2 />
+      </main>
+    </>
+  );
+}
