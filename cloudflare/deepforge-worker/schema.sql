@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS player_saves (\n  player_id TEXT PRIMARY KEY,\n  data TEXT NOT NULL,\n  updated_at INTEGER NOT NULL\n);\n\nCREATE INDEX IF NOT EXISTS idx_player_saves_updated_at\n  ON player_saves(updated_at);\n
