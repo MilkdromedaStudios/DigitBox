@@ -303,6 +303,24 @@ export default {
       }, 500, env);
     }
 
+    if (url.pathname === "/v1/health" && request.method === "GET") {
+      try {
+        const probe = await env.DB.prepare("SELECT 1 AS ok").first();
+        return json({
+          ok: Boolean(probe && Number(probe.ok) === 1),
+          d1: true,
+          r2: Boolean(env.BUCKET),
+        }, 200, env);
+      } catch (error) {
+        return json({
+          ok: false,
+          d1: false,
+          r2: Boolean(env.BUCKET),
+          error: error && error.message ? error.message : String(error),
+        }, 500, env);
+      }
+    }
+
     if (url.pathname === "/v1/auth/signup" && request.method === "POST") {
       let body;
       try {
