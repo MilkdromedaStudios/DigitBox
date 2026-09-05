@@ -1474,3 +1474,161 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+
+/* ===== DEEPFORGE account button / D1 auth modal ===== */
+.df2-header-right {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.df2-account-button {
+  min-width: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid rgba(224,203,167,.15);
+  border-radius: 10px;
+  color: #e1d2bb;
+  background: rgba(17,14,11,.28);
+  cursor: pointer;
+  font-weight: 900;
+}
+.df2-account-button:hover {
+  border-color: rgba(213,183,119,.42);
+  background: rgba(213,183,119,.08);
+}
+.df2-account-button span {
+  color: #c3a05e;
+  font-size: .75rem;
+}
+.df2-account-button.logged-in span {
+  color: #8fb47a;
+  text-shadow: 0 0 8px rgba(143,180,122,.35);
+}
+.df2-account-button b {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .68rem;
+}
+
+.df2-account-modal > section {
+  width: min(440px,100%);
+}
+.df2-account-form {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 8px;
+}
+.df2-account-form label {
+  display: grid;
+  gap: 5px;
+  color: #c8baa6;
+  font-size: .68rem;
+  font-weight: 800;
+}
+.df2-account-form input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(233,214,183,.15);
+  border-radius: 8px;
+  outline: none;
+  padding: 9px 10px;
+  color: #f0e5d4;
+  background: rgba(18,14,10,.34);
+}
+.df2-account-form input:focus {
+  border-color: #c3a05e;
+  box-shadow: 0 0 0 2px rgba(195,160,94,.11);
+}
+.df2-account-submit,
+.df2-account-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: #b99a5c;
+  color: #251c13;
+  font-weight: 900;
+  cursor: pointer;
+}
+.df2-account-submit:disabled,
+.df2-account-actions button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+.df2-account-switch,
+.df2-account-close {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  color: #a99a86;
+  background: transparent;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: .68rem;
+}
+.df2-account-actions {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  margin: 14px 0 5px !important;
+}
+.df2-account-actions .danger {
+  color: #f1d7cd;
+  background: #8e4f3d;
+}
+.df2-account-modal aside.bad {
+  margin: 3px 0;
+  padding: 8px;
+  border-radius: 7px;
+  color: #f0cfc3;
+  background: rgba(150,65,48,.22);
+  border: 1px solid rgba(208,108,81,.2);
+  font-size: .7rem;
+}
+
+@media (max-width: 820px) {
+  .df2-header-right {
+    min-width: 0;
+    align-items: flex-start;
+  }
+  .df2-account-button {
+    min-width: 82px;
+    padding: 6px 8px;
+  }
+  .df2-account-button b {
+    max-width: 92px;
+    font-size: .58rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .df2-header {
+    position: relative;
+    padding-right: 92px;
+  }
+  .df2-header-right {
+    display: contents;
+  }
+  .df2-stats {
+    width: 100%;
+  }
+  .df2-account-button {
+    position: absolute;
+    top: max(8px,env(safe-area-inset-top));
+    right: 8px;
+    min-width: 76px;
+    max-width: 84px;
+    min-height: 34px;
+  }
+  .df2-account-button b {
+    max-width: 58px;
+  }
+  .df2-account-button span {
+    display: none;
+  }
+}
