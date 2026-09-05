@@ -67,7 +67,7 @@ export function chunkKey(cx, cy) {
 }
 
 export function emptyWorldChanges() {
-  return { cuts: {}, mined: {}, ladders: {} };
+  return { cuts: {}, mined: {} };
 }
 
 export function normalizeWorldChanges(raw) {
@@ -77,7 +77,6 @@ export function normalizeWorldChanges(raw) {
     return {
       cuts: raw.cuts || {},
       mined: raw.mined || {},
-      ladders: raw.ladders || {},
     };
   }
 
@@ -109,7 +108,7 @@ export function addDigCircle(changes, circle) {
     }
   }
 
-  return { cuts: nextCuts, mined: current.mined, ladders: current.ladders };
+  return { cuts: nextCuts, mined: current.mined };
 }
 
 export function cutsNear(changes, minX, minY, maxX, maxY) {
@@ -254,59 +253,6 @@ export function markDepositMined(changes, depositId) {
   return {
     cuts: current.cuts,
     mined: { ...current.mined, [depositId]: true },
-    ladders: current.ladders,
   };
 }
 
-
-export function addLadder(changes, ladder) {
-  const current = normalizeWorldChanges(changes);
-  const cx = Math.floor(ladder.x / CHUNK_SIZE);
-  const cy = Math.floor(ladder.y / CHUNK_SIZE);
-  const key = chunkKey(cx, cy);
-  const list = current.ladders[key] ? current.ladders[key].slice() : [];
-  const snapped = {
-    x: Number((Math.round(ladder.x * 4) / 4).toFixed(2)),
-    y: Number((Math.round(ladder.y * 4) / 4).toFixed(2)),
-    h: Number((ladder.h || 1.5).toFixed(2)),
-  };
-  const duplicate = list.some((item) => Math.abs(item.x - snapped.x) < 0.18 && Math.abs(item.y - snapped.y) < 0.3);
-  if (!duplicate) list.push(snapped);
-  return {
-    cuts: current.cuts,
-    mined: current.mined,
-    ladders: { ...current.ladders, [key]: list.slice(-220) },
-  };
-}
-
-export function laddersNear(changes, minX, minY, maxX, maxY) {
-  const current = normalizeWorldChanges(changes);
-  const result = [];
-  const minCx = Math.floor(minX / CHUNK_SIZE) - 1;
-  const maxCx = Math.floor(maxX / CHUNK_SIZE) + 1;
-  const minCy = Math.floor(minY / CHUNK_SIZE) - 1;
-  const maxCy = Math.floor(maxY / CHUNK_SIZE) + 1;
-  for (let cy = minCy; cy <= maxCy; cy += 1) {
-    for (let cx = minCx; cx <= maxCx; cx += 1) {
-      const list = current.ladders[chunkKey(cx, cy)] || [];
-      for (const ladder of list) {
-        if (
-          ladder.x >= minX - 1 &&
-          ladder.x <= maxX + 1 &&
-          ladder.y + ladder.h / 2 >= minY - 1 &&
-          ladder.y - ladder.h / 2 <= maxY + 1
-        ) result.push(ladder);
-      }
-    }
-  }
-  return result;
-}
-
-export function ladderAt(x, y, changes) {
-  const nearby = laddersNear(changes, x - 0.7, y - 1.1, x + 0.7, y + 1.1);
-  return nearby.find((ladder) =>
-    Math.abs(x - ladder.x) <= 0.52 &&
-    y >= ladder.y - ladder.h / 2 - 0.45 &&
-    y <= ladder.y + ladder.h / 2 + 0.45
-  ) || null;
-}
