@@ -85,6 +85,18 @@ export async function joinClan(playerId, code, companyValue, trophies) {
   });
 }
 
+export async function joinClanById(playerId, clanId, companyValue, trophies) {
+  return clanRequest("/v1/clans/join", {
+    method: "POST",
+    body: JSON.stringify({
+      playerId,
+      clanId,
+      companyValue: Number(companyValue) || 0,
+      trophies: Number(trophies) || 0,
+    }),
+  });
+}
+
 export async function leaveClan(playerId) {
   return clanRequest("/v1/clans/leave", {
     method: "POST",
