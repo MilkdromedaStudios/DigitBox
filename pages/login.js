@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useRouter } from "next/router";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +36,9 @@ export default function LoginPage() {
         setMessage(error.message);
       } else {
         setMessage("Logged in successfully.");
+        const requested = typeof router.query.next === "string" ? router.query.next : "/";
+        const safeNext = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+        router.replace(safeNext);
       }
     } else {
       const { error } = await supabase.auth.signUp({
