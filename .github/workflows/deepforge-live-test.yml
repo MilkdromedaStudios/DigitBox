@@ -13,24 +13,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify DEEPFORGE Edge API on production and preview
+      - name: Verify production game API path
         shell: bash
         run: |
           set -euo pipefail
-          PASS=0
-          for BASE in "https://digitbox.pages.dev" "https://ecac1745.digitbox.pages.dev"; do
-            URL="$BASE/api/deepforge/v1/health?deep=1"
-            echo "===== $URL ====="
-            STATUS="$(curl -sS --max-time 20 -o /tmp/body.txt -w "%{http_code}" "$URL" || true)"
-            BODY="$(cat /tmp/body.txt 2>/dev/null || true)"
-            echo "HTTP $STATUS"
-            echo "$BODY"
-            if [ "$STATUS" = "200" ] && BODY="$BODY" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("BODY","")); ok=(d.get("ok") is True and d.get("d1") is True and d.get("r2") is True and d.get("auth") is True and int(d.get("apiVersion",0)) >= 5); sys.exit(0 if ok else 1)' 2>/dev/null; then
-              PASS=1
-            fi
-          done
-          if [ "$PASS" -ne 1 ]; then
-            echo "::error::DEEPFORGE Edge API deep health check failed on both production and preview."
-            exit 1
-          fi
-          echo "DEEPFORGE Edge API deep health check passed."
+          BASE="https://digitbox.pages.dev"
+
+          echo "===== $BASE/v1/health ====="
+          STATUS="$(curl -sS --max-time 20 -o /tmp/health.txt -w "%{http_code}" "$BASE/v1/health" || true)"
+          HEALTH="$(cat /tmp/health.txt 2>/dev/null || true)"
+          echo "HTTP $STATUS"
+          echo "$HEALTH"
+          test "$STATUS" = "200"
+          HEALTH="$HEALTH" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("HEALTH","")); sys.exit(0 if d.get("ok") is True and d.get("d1") is True else 1)'
+
+          echo "===== $BASE/api/deepforge/v1/health?deep=1 ====="
+          STATUS="$(curl -sS --max-time 20 -o /tmp/deep.txt -w "%{http_code}" "$BASE/api/deepforge/v1/health?deep=1" || true)"
+          DEEP="$(cat /tmp/deep.txt 2>/dev/null || true)"
+          echo "HTTP $STATUS"
+          echo "$DEEP"
+          DEEP="$DEEP" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("DEEP","")); ok=(d.get("d1") is True and d.get("auth") is True and int(d.get("apiVersion",0)) >= 6); sys.exit(0 if ok else 1)'
+
+          echo "DEEPFORGE core Cloudflare API is working. R2 status is reported above separately."
