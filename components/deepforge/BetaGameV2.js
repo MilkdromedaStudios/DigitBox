@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import InfiniteWorld from "./InfiniteWorld";
+import ClanScreen from "./ClanScreen";
 import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
 import {
   RESOURCE_TYPES,
@@ -11,7 +12,7 @@ import {
   normalizeWorldChanges,
   surfaceHeight,
 } from "./world";
-import { cloudEnabled, getOrCreatePlayerId, loadCloudSave, saveCloudSave } from "./cloudSync";
+import { cloudEnabled, getOrCreatePlayerId, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 
@@ -241,7 +242,12 @@ export default function BetaGameV2() {
       if (cloudEnabled() && Date.now() - lastCloudSaveRef.current > 3500) {
         lastCloudSaveRef.current = Date.now();
         setCloudStatus("D1 saving");
-        saveCloudSave(playerIdRef.current, payload).then(function () { setCloudStatus("D1 synced"); }).catch(function () { setCloudStatus("D1 offline · local save"); });
+        saveCloudSave(playerIdRef.current, payload)
+          .then(function () {
+            setCloudStatus("D1 synced");
+            return syncClanProfile(playerIdRef.current, companyValue, game.trophies).catch(function () {});
+          })
+          .catch(function () { setCloudStatus("D1 offline · local save"); });
       }
     }, 650);
     return function () { clearTimeout(timer); };
@@ -403,7 +409,7 @@ export default function BetaGameV2() {
       </header>
 
       <nav className="df2-tabs">
-        {[["world","⛏ Mine"],["empire","🏚 Town"],["league","⚔ League"],["lab","📐 Learn"]].map(function (item) {
+        {[["world","⛏ Mine"],["empire","🏚 Town"],["clan","👥 Clans"],["league","⚔ League"],["lab","📐 Learn"]].map(function (item) {
           return <button key={item[0]} className={tab === item[0] ? "active" : ""} onClick={function () { setTab(item[0]); }}>{item[1]}</button>;
         })}
       </nav>
@@ -412,6 +418,7 @@ export default function BetaGameV2() {
       <main className="df2-stage">
         {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} onPlaceLadder={placeLadder} paused={Boolean(challenge)} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} buyLadders={buyLadders} />}
         {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
+        {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} />}
         {tab === "league" && <LeagueScreen selectedRival={selectedRival} setSelectedRival={setSelectedRival} raid={raid} raidLog={raidLog} leaderboard={leaderboard} />}
         {tab === "lab" && <LabScreen game={game} openChallenge={openChallenge} />}
       </main>
