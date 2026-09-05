@@ -1958,3 +1958,117 @@
   .df2-account-copy small { display: none; }
   .df2-account-copy b { max-width: 54px; font-size: .58rem; }
 }
+
+
+/* ===== Clan emblems stored in Cloudflare R2 ===== */
+.df-clan-emblem,
+.df-clan-list-emblem {
+  overflow: hidden;
+  position: relative;
+}
+.df-clan-emblem img,
+.df-clan-list-emblem img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.df-clan-emblem > span,
+.df-clan-list-emblem > span {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.df-clan-list-emblem {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(224,195,137,.18);
+  border-radius: 9px;
+  color: #e1c680;
+  background: linear-gradient(180deg,rgba(180,145,78,.18),rgba(87,67,39,.16));
+  font-size: .5rem;
+  font-weight: 950;
+  letter-spacing: .05em;
+}
+.df-clan-r2-controls {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(142,174,122,.14);
+  border-radius: 10px;
+  background: rgba(70,94,61,.09);
+}
+.df-clan-r2-controls > div {
+  min-width: 0;
+}
+.df-clan-r2-controls small {
+  display: block;
+  color: #8faa7e;
+  font-size: .5rem;
+  letter-spacing: .1em;
+  font-weight: 900;
+}
+.df-clan-r2-controls b {
+  display: block;
+  margin-top: 2px;
+  color: #b9ad9a;
+  font-size: .6rem;
+  font-weight: 700;
+}
+.df-clan-upload-button,
+.df-clan-r2-controls > button {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(231,210,177,.12);
+  border-radius: 7px;
+  color: #e1d1b9;
+  background: rgba(255,255,255,.035);
+  cursor: pointer;
+  font-size: .62rem;
+  font-weight: 850;
+}
+.df-clan-upload-button {
+  background: rgba(116,142,90,.18);
+  border-color: rgba(147,177,119,.18);
+}
+.df-clan-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.df-clan-r2-controls > button {
+  color: #d5a693;
+  background: rgba(119,58,42,.1);
+}
+.df-clan-r2-controls button:disabled,
+.df-clan-upload-button:has(input:disabled) {
+  opacity: .5;
+  cursor: default;
+}
+
+@media (max-width:720px) {
+  .df-clan-r2-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .df-clan-r2-controls > div {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width:480px) {
+  .df-clan-list-emblem {
+    width: 38px;
+    height: 38px;
+  }
+}
