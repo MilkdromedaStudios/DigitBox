@@ -39,3 +39,66 @@ export async function saveCloudSave(playerId, payload) {
   if (!response.ok) throw new Error("Cloud save failed: " + response.status);
   return response.json();
 }
+
+
+async function clanRequest(path, options) {
+  if (!API_ROOT) throw new Error("Cloudflare D1 is not connected.");
+  const response = await fetch(API_ROOT + path, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...((options && options.headers) || {}),
+    },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || ("Clan request failed: " + response.status));
+  return body;
+}
+
+export async function loadClans(playerId) {
+  return clanRequest("/v1/clans?playerId=" + encodeURIComponent(playerId), { method: "GET" });
+}
+
+export async function createClan(playerId, name, tag, companyValue, trophies) {
+  return clanRequest("/v1/clans", {
+    method: "POST",
+    body: JSON.stringify({
+      playerId,
+      name,
+      tag,
+      companyValue: Number(companyValue) || 0,
+      trophies: Number(trophies) || 0,
+    }),
+  });
+}
+
+export async function joinClan(playerId, code, companyValue, trophies) {
+  return clanRequest("/v1/clans/join", {
+    method: "POST",
+    body: JSON.stringify({
+      playerId,
+      code,
+      companyValue: Number(companyValue) || 0,
+      trophies: Number(trophies) || 0,
+    }),
+  });
+}
+
+export async function leaveClan(playerId) {
+  return clanRequest("/v1/clans/leave", {
+    method: "POST",
+    body: JSON.stringify({ playerId }),
+  });
+}
+
+export async function syncClanProfile(playerId, companyValue, trophies) {
+  return clanRequest("/v1/clans/profile", {
+    method: "PUT",
+    body: JSON.stringify({
+      playerId,
+      companyValue: Number(companyValue) || 0,
+      trophies: Number(trophies) || 0,
+    }),
+  });
+}
