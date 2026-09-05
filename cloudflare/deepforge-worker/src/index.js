@@ -394,6 +394,14 @@ export default {
   async fetch(request, env) {
     env = normalizeBindings(env, request);
     const url = new URL(request.url);
+
+    if (!url.pathname.startsWith("/v1/")) {
+      if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
+        return env.ASSETS.fetch(request);
+      }
+      return json({ error: "Not found" }, 404, env);
+    }
+
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors(env) });
     }
@@ -826,14 +834,6 @@ export default {
       ).run();
 
       return json({ ok: true }, 200, env);
-    }
-
-    if (
-      !url.pathname.startsWith("/v1/") &&
-      env.ASSETS &&
-      typeof env.ASSETS.fetch === "function"
-    ) {
-      return env.ASSETS.fetch(request);
     }
 
     return json({ error: "Not found" }, 404, env);
