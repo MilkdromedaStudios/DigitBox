@@ -15,7 +15,7 @@ concurrency:
 jobs:
   live-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - name: Verify live Cloudflare D1 auth and R2
         shell: bash
@@ -23,14 +23,7 @@ jobs:
           set -euo pipefail
           URL="https://digitbox.pages.dev/v1/health?deep=1"
           echo "Checking $URL"
-          for i in $(seq 1 120); do
-            BODY="$(curl -sS --max-time 10 "$URL" || true)"
-            if BODY="$BODY" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("BODY","")); ok=(d.get("ok") is True and d.get("d1") is True and d.get("r2") is True and d.get("auth") is True and d.get("deep") is True and int(d.get("apiVersion",0)) >= 5 and d.get("project") == "digitbox"); print(json.dumps(d,sort_keys=True)); sys.exit(0 if ok else 1)' 2>/dev/null; then
-              echo "DEEPFORGE live Cloudflare test passed."
-              exit 0
-            fi
-            echo "Attempt $i: ${BODY:-no response}"
-            sleep 5
-          done
-          echo "::error::DEEPFORGE live Cloudflare test did not pass."
-          exit 1
+          BODY="$(curl -sS --max-time 20 "$URL")"
+          echo "Response: $BODY"
+          BODY="$BODY" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("BODY","")); ok=(d.get("ok") is True and d.get("d1") is True and d.get("r2") is True and d.get("auth") is True and d.get("deep") is True and int(d.get("apiVersion",0)) >= 5 and d.get("project") == "digitbox"); sys.exit(0 if ok else 1)'
+          echo "DEEPFORGE live Cloudflare test passed."
