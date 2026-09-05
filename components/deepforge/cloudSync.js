@@ -11,7 +11,7 @@ const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
 const AUTH_KEY = "digitbox-deepforge-auth-v1";
 
 export function cloudEnabled() {
-  return Boolean(CONFIGURED_API_ROOT || (typeof window !== "undefined" && window.location && window.location.origin));
+  return true;
 }
 
 export function getOrCreatePlayerId() {
