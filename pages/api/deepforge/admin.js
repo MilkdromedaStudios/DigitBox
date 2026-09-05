@@ -40,21 +40,31 @@ async function ensureAdminTables(DB) {
   ]);
 }
 
+async function repairOwnerId(DB) {
+  await ensureAdminTables(DB);
+  const canonical = await DB.prepare(
+    "SELECT id FROM users WHERE lower(display_name) = 'numberstring' ORDER BY created_at ASC LIMIT 1"
+  ).first();
+  if (!canonical) return "";
+  await DB.prepare(
+    "INSERT INTO deepforge_config (key, value) VALUES ('owner_user_id', ?1) " +
+    "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).bind(canonical.id).run();
+  return String(canonical.id);
+}
+
 async function ownerId(DB) {
-  const row = await DB.prepare("SELECT value FROM deepforge_config WHERE key = 'owner_user_id'").first();
-  return row ? String(row.value) : "";
+  return repairOwnerId(DB);
 }
 
 async function requireOwner(request, DB) {
   await ensureAdminTables(DB);
   const user = await authUser(request, DB);
   if (!user) return { error: "Log in required.", status: 401 };
-  let id = await ownerId(DB);
-  if (!id && user.display_name === "Numberstring") {
-    await DB.prepare("INSERT OR IGNORE INTO deepforge_config (key, value) VALUES ('owner_user_id', ?1)").bind(user.id).run();
-    id = await ownerId(DB);
+  const id = await repairOwnerId(DB);
+  if (!id || id !== user.id || String(user.display_name).toLowerCase() !== "numberstring") {
+    return { error: "Numberstring owner access required.", status: 403 };
   }
-  if (id !== user.id) return { error: "Numberstring owner access required.", status: 403 };
   return { user };
 }
 
