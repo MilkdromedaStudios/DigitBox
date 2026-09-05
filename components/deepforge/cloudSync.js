@@ -155,6 +155,58 @@ async function clanRequest(path, options) {
   return body;
 }
 
+export function clanEmblemUrl(clanId, version) {
+  if (!clanId) return "";
+  const root = apiRoot();
+  if (!root) return "";
+  return root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem" +
+    (version ? "?v=" + encodeURIComponent(version) : "");
+}
+
+export async function uploadClanEmblem(clanId, file) {
+  const root = apiRoot();
+  const token = getCloudAuthToken();
+  if (!root) throw new Error("Cloudflare API is unavailable.");
+  if (!token) throw new Error("Log in before changing the clan emblem.");
+  if (!file) throw new Error("Choose an image first.");
+
+  const response = await fetch(
+    root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem",
+    {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: file,
+    }
+  );
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || ("Emblem upload failed: " + response.status));
+  return body;
+}
+
+export async function deleteClanEmblem(clanId) {
+  const root = apiRoot();
+  const token = getCloudAuthToken();
+  if (!root) throw new Error("Cloudflare API is unavailable.");
+  if (!token) throw new Error("Log in before changing the clan emblem.");
+
+  const response = await fetch(
+    root + "/v1/clans/" + encodeURIComponent(clanId) + "/emblem",
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer " + token,
+        Accept: "application/json",
+      },
+    }
+  );
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || ("Emblem delete failed: " + response.status));
+  return body;
+}
+
 export async function loadClans(playerId) {
   return clanRequest("/v1/clans?playerId=" + encodeURIComponent(playerId), { method: "GET" });
 }
