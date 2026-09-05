@@ -173,9 +173,12 @@ async function r2SelfTest(env) {
 export default async function handler(request) {
   const incoming = new URL(request.url);
   const prefix = "/api/deepforge";
-  if (!incoming.pathname.startsWith(prefix)) return json({ error: "Invalid DEEPFORGE API route." }, 400);
+  if (incoming.pathname.startsWith(prefix)) {
+    incoming.pathname = incoming.pathname.slice(prefix.length) || "/";
+  } else if (!incoming.pathname.startsWith("/v1/")) {
+    return json({ error: "Invalid DEEPFORGE API route." }, 400);
+  }
 
-  incoming.pathname = incoming.pathname.slice(prefix.length) || "/";
   const env = findBindings(process.env);
 
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: json({}).headers });
