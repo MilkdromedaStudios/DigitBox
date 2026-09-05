@@ -354,12 +354,16 @@ export default {
           ok: Boolean(probe && Number(probe.ok) === 1),
           d1: true,
           r2: Boolean(env.BUCKET),
+          apiVersion: 4,
+          project: "digitbox",
         }, 200, env);
       } catch (error) {
         return json({
           ok: false,
           d1: false,
           r2: Boolean(env.BUCKET),
+          apiVersion: 4,
+          project: "digitbox",
           error: error && error.message ? error.message : String(error),
         }, 500, env);
       }
@@ -441,6 +445,26 @@ export default {
       if (!authResult.error) {
         await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?1").bind(authResult.tokenHash).run();
       }
+      return json({ ok: true }, 200, env);
+    }
+
+    if (url.pathname === "/v1/auth/account" && request.method === "DELETE") {
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+
+      const membership = await env.DB.prepare(
+        "SELECT clan_id FROM clan_members WHERE player_id = ?1"
+      ).bind(authResult.user.id).first();
+
+      if (membership) {
+        return json({ error: "Leave your clan before deleting this account." }, 409, env);
+      }
+
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM auth_sessions WHERE user_id = ?1").bind(authResult.user.id),
+        env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(authResult.user.id),
+      ]);
+
       return json({ ok: true }, 200, env);
     }
 
