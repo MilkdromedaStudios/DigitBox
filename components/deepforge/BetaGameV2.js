@@ -12,7 +12,7 @@ import {
   normalizeWorldChanges,
   surfaceHeight,
 } from "./world";
-import { cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
+import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 
@@ -293,6 +293,20 @@ export default function BetaGameV2() {
   }, []);
 
   useEffect(function () {
+    let mounted = true;
+    checkCloudBackend()
+      .then(function (health) {
+        if (!mounted) return;
+        setCloudStatus(health && health.r2 ? "D1 + R2 connected" : "D1 connected");
+      })
+      .catch(function (error) {
+        if (!mounted) return;
+        setCloudStatus("Cloud backend missing");
+      });
+    return function () { mounted = false; };
+  }, []);
+
+  useEffect(function () {
     let cancelled = false;
     const playerId = getOrCreatePlayerId();
     playerIdRef.current = playerId;
@@ -477,14 +491,15 @@ export default function BetaGameV2() {
   async function submitAccount(event) {
     event.preventDefault();
     if (accountBusy) return;
-    if (!cloudEnabled()) {
-      setAccountError("Cloudflare D1 is not connected yet.");
-      return;
-    }
 
     setAccountBusy(true);
     setAccountError("");
     try {
+      const health = await checkCloudBackend();
+      if (!health || !health.d1) {
+        throw new Error("Cloudflare D1 backend is unavailable.");
+      }
+
       const result = accountMode === "signup"
         ? await cloudSignup(accountEmail.trim(), accountPassword, accountName.trim())
         : await cloudLogin(accountEmail.trim(), accountPassword);
