@@ -4,6 +4,8 @@ import {
   cutsNear,
   groundMaterialAt,
   isSolidAt,
+  ladderAt,
+  laddersNear,
   noise,
   normalizeWorldChanges,
   oreDepositsNear,
@@ -368,6 +370,61 @@ function collides(x, y, changes) {
   return samples.some(([ox, oy]) => isSolidAt(x + ox, y + oy, changes));
 }
 
+function drawLadder(ctx, ladder, cameraX, cameraY, ppu, width, height) {
+  const cx = worldToScreenX(ladder.x, cameraX, ppu, width);
+  const top = worldToScreenY(ladder.y - ladder.h / 2, cameraY, ppu, height);
+  const bottom = worldToScreenY(ladder.y + ladder.h / 2, cameraY, ppu, height);
+  const halfWidth = clamp(ppu * 0.25, 9, 15);
+  const railWidth = clamp(ppu * 0.065, 2.3, 4.2);
+
+  ctx.save();
+  ctx.lineCap = "round";
+
+  // Soft shadow onto the back wall.
+  ctx.strokeStyle = "rgba(12,9,6,.35)";
+  ctx.lineWidth = railWidth + 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - halfWidth + 2, top + 2);
+  ctx.lineTo(cx - halfWidth + 2, bottom + 2);
+  ctx.moveTo(cx + halfWidth + 2, top + 2);
+  ctx.lineTo(cx + halfWidth + 2, bottom + 2);
+  ctx.stroke();
+
+  const rail = ctx.createLinearGradient(cx - halfWidth, 0, cx + halfWidth, 0);
+  rail.addColorStop(0, "#5f3b20");
+  rail.addColorStop(0.45, "#9a6535");
+  rail.addColorStop(0.72, "#b37a43");
+  rail.addColorStop(1, "#644022");
+  ctx.strokeStyle = rail;
+  ctx.lineWidth = railWidth;
+  ctx.beginPath();
+  ctx.moveTo(cx - halfWidth, top);
+  ctx.lineTo(cx - halfWidth, bottom);
+  ctx.moveTo(cx + halfWidth, top);
+  ctx.lineTo(cx + halfWidth, bottom);
+  ctx.stroke();
+
+  const rungGap = clamp(ppu * 0.28, 10, 16);
+  ctx.strokeStyle = "#a66f3b";
+  ctx.lineWidth = clamp(ppu * 0.055, 2, 3.5);
+  for (let y = top + rungGap * 0.55; y < bottom; y += rungGap) {
+    ctx.beginPath();
+    ctx.moveTo(cx - halfWidth + 1, y);
+    ctx.lineTo(cx + halfWidth - 1, y);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(222,170,104,.34)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - halfWidth + 3, y - 1);
+    ctx.lineTo(cx + halfWidth - 3, y - 1);
+    ctx.stroke();
+    ctx.strokeStyle = "#a66f3b";
+    ctx.lineWidth = clamp(ppu * 0.055, 2, 3.5);
+  }
+  ctx.restore();
+}
+
 function drawMiner(ctx, x, y, facing, moving, ppu, light, sunAngle) {
   const scale = clamp(ppu / 44, 0.9, 1.35);
   const bob = moving ? Math.sin(performance.now() / 90) * 1.4 : 0;
@@ -480,6 +537,8 @@ export default function InfiniteWorld(props) {
   const changesRef = useRef(normalizeWorldChanges(props.worldChanges));
   const positionCbRef = useRef(props.onPosition);
   const drillCbRef = useRef(props.onDrill);
+  const ladderCbRef = useRef(props.onPlaceLadder);
+  const ladderCountRef = useRef(props.ladderCount || 0);
   const pausedRef = useRef(props.paused);
   const drillTimerRef = useRef(null);
   const lastReportRef = useRef(0);
@@ -491,6 +550,8 @@ export default function InfiniteWorld(props) {
   useEffect(() => { changesRef.current = normalizeWorldChanges(props.worldChanges); }, [props.worldChanges]);
   useEffect(() => { positionCbRef.current = props.onPosition; }, [props.onPosition]);
   useEffect(() => { drillCbRef.current = props.onDrill; }, [props.onDrill]);
+  useEffect(() => { ladderCbRef.current = props.onPlaceLadder; }, [props.onPlaceLadder]);
+  useEffect(() => { ladderCountRef.current = props.ladderCount || 0; }, [props.ladderCount]);
   useEffect(() => { pausedRef.current = props.paused; }, [props.paused]);
   useEffect(() => { drillRadiusRef.current = props.drillRadius || 0.78; }, [props.drillRadius]);
 
@@ -510,6 +571,10 @@ export default function InfiniteWorld(props) {
       if (event.code === "Space" && !event.repeat) {
         event.preventDefault();
         fireDrill();
+      }
+      if (event.key.toLowerCase() === "e" && !event.repeat) {
+        event.preventDefault();
+        placeLadder();
       }
     }
     function up(event) {
@@ -548,6 +613,22 @@ export default function InfiniteWorld(props) {
       aimX: ax,
       aimY: ay,
     });
+  }
+
+  function placeLadder() {
+    if (pausedRef.current || !ladderCbRef.current || ladderCountRef.current <= 0) return;
+    const p = playerRef.current;
+    ladderCbRef.current({
+      x: p.x,
+      y: p.y + 0.22,
+      h: 1.55,
+    });
+  }
+
+  function placeLadderButton(event) {
+    event.stopPropagation();
+    event.preventDefault();
+    placeLadder();
   }
 
   function startDrilling(event) {
@@ -635,12 +716,15 @@ export default function InfiniteWorld(props) {
         if (inputX < -0.08) facingRef.current = -1;
         else if (inputX > 0.08) facingRef.current = 1;
 
-        if (underground && !collides(p.x, p.y, changes)) {
-          // In excavated shafts/tunnels the joystick can climb/swim through the
-          // cavity slowly, keeping touch controls usable without ladders yet.
-          v.y += inputY * 13 * dt;
-          v.y *= Math.pow(0.9, dt * 30);
-          v.y += 4.8 * dt;
+        const activeLadder = ladderAt(p.x, p.y, changes);
+        if (activeLadder) {
+          // A ladder cancels gravity and gives deliberate vertical movement.
+          // Gently pull the miner toward the rails so touch climbing feels stable.
+          const snap = clamp(activeLadder.x - p.x, -dt * 2.4, dt * 2.4);
+          p.x += snap;
+          v.y += (inputY * 3.35 - v.y) * Math.min(1, dt * 14);
+          v.x *= Math.pow(0.82, dt * 25);
+          groundedRef.current = false;
         } else {
           if (inputY < -0.42 && groundedRef.current) {
             v.y = -6.3;
@@ -778,6 +862,13 @@ export default function InfiniteWorld(props) {
         ctx.closePath();
         ctx.fillStyle = "rgba(238,137,72," + (day.sunset * 0.11) + ")";
         ctx.fill();
+      }
+
+      // Wooden ladder segments live inside excavated space and are drawn before
+      // the miner/lighting so they receive the same cave darkness.
+      const visibleLadders = laddersNear(changesNow, minWorldX - 2, minWorldY - 2, maxWorldX + 2, maxWorldY + 2);
+      for (const ladder of visibleLadders) {
+        drawLadder(ctx, ladder, cameraX, cameraY, ppu, width, height);
       }
 
       // Excavation rims receive soft occlusion shadows rather than block outlines.
@@ -918,6 +1009,16 @@ export default function InfiniteWorld(props) {
         )}
 
         <button
+          className="df-ladder-action"
+          onPointerDown={placeLadderButton}
+          aria-label="Place wooden ladder"
+          disabled={(props.ladderCount || 0) <= 0}
+        >
+          <span>🪜</span>
+          <b>{props.ladderCount || 0}</b>
+        </button>
+
+        <button
           className="df-drill-action"
           onPointerDown={startDrilling}
           onPointerUp={stopDrilling}
@@ -929,7 +1030,7 @@ export default function InfiniteWorld(props) {
           <b>DIG</b>
         </button>
 
-        <div className="df-world-tip">Drag anywhere to move · hold DIG to carve round tunnels</div>
+        <div className="df-world-tip">Drag to move · hold DIG · 🪜 places ladder · E on keyboard</div>
       </div>
     </div>
   );
