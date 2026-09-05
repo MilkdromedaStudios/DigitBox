@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import "../styles/global.css";
 import "../styles/login.css";
 import "../styles/motion.css";
+import "../frontier-pages/styles/deepforge.css";
 import Layout from "../components/Layout";
 import PageTransition from "../components/PageTransition";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
@@ -29,8 +30,6 @@ export default function MyApp({ Component, pageProps, router }) {
   const cleanPath = String(router?.asPath || "").split(/[?#]/, 1)[0];
   const isAppGPT = router?.pathname === "/appgpt" || cleanPath === "/appgpt" || cleanPath === "/appgpt/";
 
-  // AppGPT is a standalone product surface. Never wrap it in DigitBox's
-  // header, navigation, content container, footer, or page transition UI.
   if (isAppGPT) {
     return <Component {...pageProps} />;
   }
