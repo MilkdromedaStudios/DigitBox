@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { supabase } from "../../lib/supabaseClient";
 import { useEffect, useMemo, useState } from "react";
 import {
   cloudEnabled,
@@ -19,7 +21,7 @@ function compact(value) {
   return Number(value || 0).toLocaleString();
 }
 
-export default function ClanScreen({ companyValue, trophies, onNotice }) {
+export default function ClanScreen({ companyValue, trophies, onNotice, authUser, authLoading }) {
   const [data, setData] = useState({ myClan: null, clans: [] });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -27,7 +29,8 @@ export default function ClanScreen({ companyValue, trophies, onNotice }) {
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [invite, setInvite] = useState("");
-  const playerId = useMemo(() => getOrCreatePlayerId(), []);
+  const guestPlayerId = useMemo(() => getOrCreatePlayerId(), []);
+  const playerId = authUser && authUser.id ? authUser.id : guestPlayerId;
   const online = cloudEnabled();
 
   async function refresh(showLoading) {
@@ -80,13 +83,30 @@ export default function ClanScreen({ companyValue, trophies, onNotice }) {
     }
   }
 
-  function handleCreate(event) {
+  async function handleCreate(event) {
     event.preventDefault();
+    if (!authUser || !supabase) {
+      setError("You must log in to create a clan.");
+      return;
+    }
+
+    const sessionResult = await supabase.auth.getSession();
+    const accessToken =
+      sessionResult &&
+      sessionResult.data &&
+      sessionResult.data.session &&
+      sessionResult.data.session.access_token;
+
+    if (!accessToken) {
+      setError("Your login session expired. Please log in again.");
+      return;
+    }
+
     const cleanName = name.trim();
     const cleanTag = tag.trim().toUpperCase();
     run(
       "create",
-      () => createClan(playerId, cleanName, cleanTag, companyValue, trophies),
+      () => createClan(authUser.id, cleanName, cleanTag, companyValue, trophies, accessToken),
       "Clan created. Share its invite code with another miner."
     ).then(() => {
       if (cleanName && cleanTag) {
@@ -219,9 +239,17 @@ export default function ClanScreen({ companyValue, trophies, onNotice }) {
                   onChange={(event) => setTag(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
                 />
               </label>
-              <button disabled={Boolean(busy) || name.trim().length < 3 || tag.trim().length < 2}>
-                {busy === "create" ? "Creating…" : "Create clan"}
-              </button>
+              {authLoading ? (
+                <button disabled>Checking login…</button>
+              ) : authUser ? (
+                <button disabled={Boolean(busy) || name.trim().length < 3 || tag.trim().length < 2}>
+                  {busy === "create" ? "Creating…" : "Create clan"}
+                </button>
+              ) : (
+                <Link className="df-clan-login-required" href="/login?next=/beta">
+                  Log in to create a clan
+                </Link>
+              )}
             </form>
 
             <form onSubmit={handleJoinCode}>
