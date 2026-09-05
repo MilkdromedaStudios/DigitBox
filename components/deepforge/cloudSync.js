@@ -2,7 +2,15 @@ const CONFIGURED_API_ROOT = (process.env.NEXT_PUBLIC_DEEPFORGE_API || "").replac
 const CLOUDFLARE_PAGES_ROOT = "https://digitbox.pages.dev";
 
 function apiRoot() {
-  if (CONFIGURED_API_ROOT) return CONFIGURED_API_ROOT;
+  if (
+    CONFIGURED_API_ROOT &&
+    (
+      /^https:\/\/(?:[a-z0-9-]+\.)?digitbox\.pages\.dev$/i.test(CONFIGURED_API_ROOT) ||
+      /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(CONFIGURED_API_ROOT)
+    )
+  ) {
+    return CONFIGURED_API_ROOT;
+  }
   if (typeof window !== "undefined" && window.location) {
     try {
       localStorage.removeItem("digitbox-deepforge-api-root-v1");
