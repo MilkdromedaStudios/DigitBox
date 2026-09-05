@@ -1,5 +1,6 @@
 const API_ROOT = (process.env.NEXT_PUBLIC_DEEPFORGE_API || "").replace(/\/$/, "");
 const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
+const AUTH_KEY = "digitbox-deepforge-auth-v1";
 
 export function cloudEnabled() {
   return Boolean(API_ROOT);
@@ -16,6 +17,92 @@ export function getOrCreatePlayerId() {
     localStorage.setItem(PLAYER_KEY, id);
   }
   return id;
+}
+
+export function getCloudAuthToken() {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = JSON.parse(localStorage.getItem(AUTH_KEY) || "null");
+    return raw && raw.token ? String(raw.token) : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function storeCloudAuth(payload) {
+  if (typeof window === "undefined") return payload;
+  if (payload && payload.token && payload.user) {
+    localStorage.setItem(AUTH_KEY, JSON.stringify({
+      token: payload.token,
+      user: payload.user,
+      expiresAt: payload.expiresAt || 0,
+    }));
+  }
+  return payload;
+}
+
+export function clearCloudAuth() {
+  if (typeof window !== "undefined") localStorage.removeItem(AUTH_KEY);
+}
+
+async function authRequest(path, options) {
+  if (!API_ROOT) throw new Error("Cloudflare D1 is not connected.");
+  const response = await fetch(API_ROOT + path, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...((options && options.headers) || {}),
+    },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || ("Auth request failed: " + response.status));
+  return body;
+}
+
+export async function cloudSignup(email, password, displayName) {
+  const payload = await authRequest("/v1/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password, displayName }),
+  });
+  return storeCloudAuth(payload);
+}
+
+export async function cloudLogin(email, password) {
+  const payload = await authRequest("/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  return storeCloudAuth(payload);
+}
+
+export async function loadCloudAuth() {
+  const token = getCloudAuthToken();
+  if (!token) return null;
+  try {
+    const payload = await authRequest("/v1/auth/me", {
+      method: "GET",
+      headers: { Authorization: "Bearer " + token },
+    });
+    return payload && payload.user ? payload.user : null;
+  } catch (_) {
+    clearCloudAuth();
+    return null;
+  }
+}
+
+export async function cloudLogout() {
+  const token = getCloudAuthToken();
+  try {
+    if (token) {
+      await authRequest("/v1/auth/logout", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token },
+      });
+    }
+  } finally {
+    clearCloudAuth();
+  }
 }
 
 export async function loadCloudSave(playerId) {
