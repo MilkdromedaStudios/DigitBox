@@ -2106,3 +2106,80 @@
   font-weight: 900;
   cursor: pointer;
 }
+
+
+/* Cloudflare Pages backend connector shown only when API health fails */
+.df2-backend-connect {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  gap: 8px !important;
+  margin: 10px 18px 2px !important;
+  padding: 11px !important;
+  border: 1px solid rgba(105,159,199,.2);
+  border-radius: 10px;
+  background: rgba(45,83,109,.12);
+}
+.df2-backend-connect > div {
+  grid-column: 1 / -1;
+  display: block !important;
+}
+.df2-backend-connect small {
+  display: block;
+  color: #8cb6d1;
+  font-size: .48rem;
+  letter-spacing: .12em;
+  font-weight: 950;
+}
+.df2-backend-connect b {
+  display: block;
+  margin-top: 2px;
+  color: #d7e3e9;
+  font-size: .7rem;
+}
+.df2-backend-connect p {
+  margin: 4px 0 0;
+  color: #93a5af;
+  font-size: .59rem;
+  line-height: 1.4;
+}
+.df2-backend-connect code {
+  color: #b7d7e8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.df2-backend-connect input {
+  min-width: 0;
+  height: 38px;
+  border: 1px solid rgba(129,176,205,.2);
+  border-radius: 8px;
+  outline: none;
+  padding: 0 9px;
+  color: #e8f0f4;
+  background: rgba(15,27,34,.36);
+  font-size: .65rem;
+}
+.df2-backend-connect input:focus {
+  border-color: rgba(136,188,220,.55);
+  box-shadow: 0 0 0 3px rgba(101,160,196,.08);
+}
+.df2-backend-connect > button {
+  min-width: 82px;
+  border: 0;
+  border-radius: 8px;
+  color: #17232a;
+  background: #8eb7cb;
+  font-size: .64rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+.df2-backend-connect > button:disabled {
+  opacity: .5;
+  cursor: default;
+}
+@media (max-width:480px) {
+  .df2-backend-connect {
+    grid-template-columns: 1fr !important;
+  }
+  .df2-backend-connect > button {
+    min-height: 38px;
+  }
+}
