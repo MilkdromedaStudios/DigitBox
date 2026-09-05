@@ -7,9 +7,14 @@ const nextConfig = {
   },
   async rewrites() {
     return {
-      // AppGPT must be the top-level document, not a DigitBox page wrapped in
-      // Layout. beforeFiles makes this win before normal Next.js page routing.
       beforeFiles: [
+        // DEEPFORGE keeps its public API at /v1/*, but Cloudflare's
+        // Next-on-Pages adapter reliably deploys the backend as an Edge API
+        // route. Keep this rewrite internal so players never see or configure
+        // a backend URL.
+        { source: "/v1/:path*", destination: "/api/deepforge/v1/:path*" },
+        // AppGPT must be the top-level document, not a DigitBox page wrapped in
+        // Layout. beforeFiles makes this win before normal Next.js page routing.
         { source: "/appgpt", destination: "/appgpt/index.html" },
       ],
       afterFiles: [
