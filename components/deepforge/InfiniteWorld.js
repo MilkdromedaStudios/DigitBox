@@ -505,6 +505,23 @@ export default function InfiniteWorld(props) {
   }, [props.player.x, props.player.y]);
 
   useEffect(() => {
+    if (!Number.isFinite(props.player.x) || !Number.isFinite(props.player.y)) return;
+    playerRef.current = { x: props.player.x, y: props.player.y };
+    velocityRef.current = { x: 0, y: 0 };
+    moveRef.current = { x: 0, y: 0 };
+    aimRef.current = { x: 0, y: 1 };
+    pointerRef.current = null;
+    groundedRef.current = false;
+    facingRef.current = 1;
+    lastReportRef.current = 0;
+    setJoystick({ visible: false, x: 0, y: 0, dx: 0, dy: 0 });
+    const spawnChunk = chunkFor(props.player.x, props.player.y);
+    const nextHud = { chunkX: spawnChunk.x, chunkY: spawnChunk.y, depth: 0, time: "DAY" };
+    hudRef.current = nextHud;
+    setHud(nextHud);
+  }, [props.resetKey]);
+
+  useEffect(() => {
     function down(event) {
       keysRef.current[event.key.toLowerCase()] = true;
       if (event.code === "Space" && !event.repeat) {
