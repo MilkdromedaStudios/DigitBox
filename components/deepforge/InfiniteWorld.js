@@ -45,7 +45,7 @@ function colorMix(a, b, t) {
 }
 
 function daylightState(now) {
-  const phase = ((now % DAY_MS) / DAY_MS + 0.18) % 1;
+  const phase = ((now % DAY_MS) / DAY_MS + 0.5) % 1;
   const angle = phase * Math.PI * 2 - Math.PI / 2;
   const sunHeight = Math.sin(angle);
   const light = clamp((sunHeight + 0.18) / 0.95, 0.06, 1);
@@ -723,7 +723,8 @@ export default function InfiniteWorld(props) {
       ctx.fill();
 
       // Continuous geological layers.
-      fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 0, 5.5, "#735334", "#5d4029");
+      fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 0, 0.24, "#678f3e", "#496d31");
+      fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 0.24, 5.5, "#735334", "#5d4029");
       fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 5.5, 13, "#5c412e", "#493428");
       fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 13, 22, "#4e4033", "#3f352c");
       const deepestNeeded = Math.max(
