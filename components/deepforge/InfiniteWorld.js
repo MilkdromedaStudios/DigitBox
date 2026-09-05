@@ -429,38 +429,38 @@ function drawMiner(ctx, x, y, facing, moving, ppu, light, sunAngle) {
 
 function drawLighting(ctx, width, height, playerScreenX, playerScreenY, depth, dayLight) {
   const underground = clamp((depth - 1.2) / 14, 0, 1);
-  const darkness = underground * (0.72 - dayLight * 0.12);
+  const darkness = underground * (0.74 - dayLight * 0.12);
   if (darkness <= 0.01) return;
 
-  const overlay = document.createElement("canvas");
-  overlay.width = Math.max(1, Math.floor(width));
-  overlay.height = Math.max(1, Math.floor(height));
-  const octx = overlay.getContext("2d");
-  octx.fillStyle = "rgba(3,5,5," + darkness + ")";
-  octx.fillRect(0, 0, width, height);
+  const lampRadius = 125 + underground * 70;
+  const darknessField = ctx.createRadialGradient(
+    playerScreenX,
+    playerScreenY - 10,
+    28,
+    playerScreenX,
+    playerScreenY - 10,
+    lampRadius
+  );
+  darknessField.addColorStop(0, "rgba(3,5,5," + (darkness * 0.06) + ")");
+  darknessField.addColorStop(0.42, "rgba(3,5,5," + (darkness * 0.22) + ")");
+  darknessField.addColorStop(1, "rgba(3,5,5," + darkness + ")");
+  ctx.fillStyle = darknessField;
+  ctx.fillRect(0, 0, width, height);
 
-  octx.globalCompositeOperation = "destination-out";
-  const lampRadius = 115 + underground * 55;
-  const lamp = octx.createRadialGradient(playerScreenX, playerScreenY - 8, 18, playerScreenX, playerScreenY - 8, lampRadius);
-  lamp.addColorStop(0, "rgba(0,0,0,.95)");
-  lamp.addColorStop(0.32, "rgba(0,0,0,.72)");
-  lamp.addColorStop(1, "rgba(0,0,0,0)");
-  octx.fillStyle = lamp;
-  octx.beginPath();
-  octx.arc(playerScreenX, playerScreenY - 8, lampRadius, 0, Math.PI * 2);
-  octx.fill();
-
-  ctx.drawImage(overlay, 0, 0, width, height);
-
-  if (underground > 0.12) {
-    const glow = ctx.createRadialGradient(playerScreenX + 8, playerScreenY - 20, 0, playerScreenX + 8, playerScreenY - 20, 48);
-    glow.addColorStop(0, "rgba(255,229,150,.2)");
-    glow.addColorStop(1, "rgba(255,205,105,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(playerScreenX + 8, playerScreenY - 20, 48, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  const glow = ctx.createRadialGradient(
+    playerScreenX + 9,
+    playerScreenY - 21,
+    0,
+    playerScreenX + 9,
+    playerScreenY - 21,
+    58
+  );
+  glow.addColorStop(0, "rgba(255,232,161," + (0.15 + underground * 0.13) + ")");
+  glow.addColorStop(1, "rgba(255,205,105,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(playerScreenX + 9, playerScreenY - 21, 58, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 export default function InfiniteWorld(props) {
@@ -484,12 +484,15 @@ export default function InfiniteWorld(props) {
   const drillTimerRef = useRef(null);
   const lastReportRef = useRef(0);
   const [joystick, setJoystick] = useState({ visible: false, x: 0, y: 0, dx: 0, dy: 0 });
-  const [hud, setHud] = useState({ chunkX: 0, chunkY: 0, depth: 0, time: "DAY" });
+  const hudRef = useRef({ chunkX: 0, chunkY: 0, depth: 0, time: "DAY" });
+  const [hud, setHud] = useState(hudRef.current);
+  const drillRadiusRef = useRef(props.drillRadius || 0.78);
 
   useEffect(() => { changesRef.current = normalizeWorldChanges(props.worldChanges); }, [props.worldChanges]);
   useEffect(() => { positionCbRef.current = props.onPosition; }, [props.onPosition]);
   useEffect(() => { drillCbRef.current = props.onDrill; }, [props.onDrill]);
   useEffect(() => { pausedRef.current = props.paused; }, [props.paused]);
+  useEffect(() => { drillRadiusRef.current = props.drillRadius || 0.78; }, [props.drillRadius]);
 
   useEffect(() => {
     if (Number.isFinite(props.player.x) && Number.isFinite(props.player.y)) {
@@ -529,12 +532,13 @@ export default function InfiniteWorld(props) {
     const normalized = Math.sqrt(aim.x * aim.x + aim.y * aim.y) || 1;
     const ax = aim.x / normalized;
     const ay = aim.y / normalized;
-    const distance = 0.86 + (props.drillRadius || 0.78) * 0.38;
+    const radius = drillRadiusRef.current;
+    const distance = 0.86 + radius * 0.38;
 
     drillCbRef.current({
       x: p.x + ax * distance,
       y: p.y + ay * distance,
-      radius: props.drillRadius || 0.78,
+      radius,
       aimX: ax,
       aimY: ay,
     });
@@ -775,12 +779,14 @@ export default function InfiniteWorld(props) {
         depth: Math.max(0, depth),
         time: day.light > 0.72 ? "DAY" : day.light > 0.28 ? "GOLDEN HOUR" : "NIGHT",
       };
+      const previousHud = hudRef.current;
       if (
-        nextHud.chunkX !== hud.chunkX ||
-        nextHud.chunkY !== hud.chunkY ||
-        Math.abs(nextHud.depth - hud.depth) > 0.5 ||
-        nextHud.time !== hud.time
+        nextHud.chunkX !== previousHud.chunkX ||
+        nextHud.chunkY !== previousHud.chunkY ||
+        Math.abs(nextHud.depth - previousHud.depth) > 0.5 ||
+        nextHud.time !== previousHud.time
       ) {
+        hudRef.current = nextHud;
         setHud(nextHud);
       }
 
