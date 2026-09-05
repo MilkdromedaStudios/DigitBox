@@ -15,19 +15,19 @@ export const ORES = {
 };
 
 export const BUILDINGS = [
-  { key: "refinery", name: "Refinery", icon: "⚙", desc: "+12% sale value per level", base: 160 },
-  { key: "workshop", name: "Workshop", icon: "🔧", desc: "+1 drill damage every 2 levels", base: 190 },
-  { key: "academy", name: "Academy", icon: "▣", desc: "Engineer boosts last longer", base: 230 },
-  { key: "walls", name: "City Walls", icon: "▥", desc: "+18 defense per level", base: 260 },
+  { key: "refinery", name: "Ore Mill", icon: "⚙", desc: "+12% ore sale value per level", base: 160 },
+  { key: "workshop", name: "Machine Shop", icon: "🔧", desc: "+1 mining power every 2 levels", base: 190 },
+  { key: "academy", name: "Survey Office", icon: "📐", desc: "Engineering boosts last longer", base: 230 },
+  { key: "walls", name: "Claim Fence", icon: "▥", desc: "+18 claim defense per level", base: 260 },
 ];
 
 export const RIVALS = [
-  { name: "QuartzCrew", trophies: 118, power: 58, city: "Dusthaven" },
-  { name: "IronWarden", trophies: 176, power: 76, city: "Forgepoint" },
-  { name: "NovaMiner", trophies: 238, power: 96, city: "Star Quarry" },
-  { name: "DeepByte", trophies: 315, power: 122, city: "Hex Basin" },
-  { name: "CoreRunner", trophies: 402, power: 150, city: "Magma Grid" },
-  { name: "SkyFoundry", trophies: 520, power: 184, city: "Cobalt City" },
+  { name: "Quartz Creek Co.", trophies: 118, power: 58, city: "Dust Creek" },
+  { name: "Red Ridge Mining", trophies: 176, power: 76, city: "Red Ridge" },
+  { name: "Pine Quarry", trophies: 238, power: 96, city: "Pine Hollow" },
+  { name: "Deep Shaft Co.", trophies: 315, power: 122, city: "Black Basin" },
+  { name: "Copper Trail", trophies: 402, power: 150, city: "Copper Trail" },
+  { name: "Highland Works", trophies: 520, power: 184, city: "Highland Camp" },
 ];
 
 export const INITIAL = {
@@ -80,15 +80,15 @@ export function createWorld() {
 export function challengeFor(seed) {
   const challenges = [
     {
-      title: "Refinery ratio",
-      text: "Your alloy needs copper : iron in a 3 : 2 ratio. If you load 18 copper, how much iron keeps the ratio exact?",
+      title: "Ore-mill ratio",
+      text: "A sorting batch uses copper : iron in a 3 : 2 ratio. If you load 18 copper samples, how many iron samples keep the ratio exact?",
       choices: ["10", "12", "15", "27"],
       answer: "12",
       explain: "18 ÷ 3 = 6 groups. Iron needs 2 groups: 6 × 2 = 12.",
     },
     {
-      title: "Drill calibration",
-      text: "The drill controller reads 4x + 6 = 34. What value of x should the controller use?",
+      title: "Pump calibration",
+      text: "A water pump gauge follows 4x + 6 = 34. What value of x gives the correct setting?",
       choices: ["5", "6", "7", "10"],
       answer: "7",
       explain: "Subtract 6: 4x = 28. Divide by 4: x = 7.",
@@ -101,18 +101,18 @@ export function challengeFor(seed) {
       explain: "Area = length × width = 14 × 9 = 126 m².",
     },
     {
-      title: "Power grid",
-      text: "Four generators each output 75 MW. The city uses 230 MW. How much spare capacity remains?",
-      choices: ["30 MW", "70 MW", "130 MW", "300 MW"],
-      answer: "70 MW",
-      explain: "4 × 75 = 300 MW total. 300 − 230 = 70 MW spare.",
+      title: "Hauling schedule",
+      text: "Four trucks can each haul 75 kg in this test run. The mill needs 230 kg. How much carrying capacity remains?",
+      choices: ["30 kg", "70 kg", "130 kg", "300 kg"],
+      answer: "70 kg",
+      explain: "4 × 75 = 300 kg total. 300 − 230 = 70 kg spare.",
     },
     {
-      title: "Raid telemetry",
-      text: "A rival shield drops from 160 to 104. What percent of the original shield was destroyed?",
+      title: "Claim survey",
+      text: "A rival claim has 160 marked fence posts and 56 are removed. What percent of the original posts were removed?",
       choices: ["35%", "44%", "56%", "65%"],
       answer: "35%",
-      explain: "160 − 104 = 56. Then 56 ÷ 160 = 0.35 = 35%.",
+      explain: "56 ÷ 160 = 0.35 = 35%.",
     },
   ];
   return challenges[Math.abs(Number(seed) || 0) % challenges.length];
