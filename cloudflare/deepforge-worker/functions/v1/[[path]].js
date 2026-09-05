@@ -1,9 +1,52 @@
 function cors(env) {
   return {
-    "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "https://digitbox.dev",
+    "Access-Control-Allow-Origin": env.__requestOrigin || env.ALLOWED_ORIGIN || "https://digitbox.dev",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Cache-Control": "no-store",
+    "Vary": "Origin",
+  };
+}
+
+function normalizeBindings(env, request) {
+  let db = env && env.DB ? env.DB : null;
+  let bucket = env && env.BUCKET ? env.BUCKET : null;
+
+  if (env) {
+    for (const value of Object.values(env)) {
+      if (!db && value && typeof value.prepare === "function" && typeof value.batch === "function") {
+        db = value;
+      }
+      if (
+        !bucket &&
+        value &&
+        typeof value.get === "function" &&
+        typeof value.put === "function" &&
+        typeof value.delete === "function" &&
+        typeof value.prepare !== "function"
+      ) {
+        bucket = value;
+      }
+    }
+  }
+
+  const origin = request && request.headers ? request.headers.get("Origin") : "";
+  const allowedOrigin =
+    origin &&
+    (
+      origin === "https://digitbox.dev" ||
+      origin === "https://www.digitbox.dev" ||
+      /^https:\/\/[a-z0-9-]+\.digitbox\.pages\.dev$/i.test(origin) ||
+      origin === "https://digitbox.pages.dev"
+    )
+      ? origin
+      : "";
+
+  return {
+    ...(env || {}),
+    DB: db,
+    BUCKET: bucket,
+    __requestOrigin: allowedOrigin,
   };
 }
 
@@ -289,6 +332,7 @@ async function clanSnapshot(env, playerId) {
 
 const deepforgeWorker = {
   async fetch(request, env) {
+    env = normalizeBindings(env, request);
     const url = new URL(request.url);
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors(env) });
