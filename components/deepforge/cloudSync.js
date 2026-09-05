@@ -1,9 +1,17 @@
-const API_ROOT = (process.env.NEXT_PUBLIC_DEEPFORGE_API || "").replace(/\/$/, "");
+const CONFIGURED_API_ROOT = (process.env.NEXT_PUBLIC_DEEPFORGE_API || "").replace(/\/$/, "");
+
+function apiRoot() {
+  if (CONFIGURED_API_ROOT) return CONFIGURED_API_ROOT;
+  if (typeof window !== "undefined" && window.location && window.location.origin) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return "";
+}
 const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
 const AUTH_KEY = "digitbox-deepforge-auth-v1";
 
 export function cloudEnabled() {
-  return Boolean(API_ROOT);
+  return Boolean(CONFIGURED_API_ROOT || (typeof window !== "undefined" && window.location && window.location.origin));
 }
 
 export function getOrCreatePlayerId() {
@@ -46,8 +54,9 @@ export function clearCloudAuth() {
 }
 
 async function authRequest(path, options) {
-  if (!API_ROOT) throw new Error("Cloudflare D1 is not connected.");
-  const response = await fetch(API_ROOT + path, {
+  const root = apiRoot();
+  if (!root) throw new Error("Cloudflare API is unavailable.");
+  const response = await fetch(root + path, {
     ...options,
     headers: {
       Accept: "application/json",
@@ -106,8 +115,9 @@ export async function cloudLogout() {
 }
 
 export async function loadCloudSave(playerId) {
-  if (!API_ROOT || !playerId) return null;
-  const response = await fetch(API_ROOT + "/v1/save/" + encodeURIComponent(playerId), {
+  const root = apiRoot();
+  if (!root || !playerId) return null;
+  const response = await fetch(root + "/v1/save/" + encodeURIComponent(playerId), {
     method: "GET",
     headers: { Accept: "application/json" },
   });
@@ -117,8 +127,9 @@ export async function loadCloudSave(playerId) {
 }
 
 export async function saveCloudSave(playerId, payload) {
-  if (!API_ROOT || !playerId) return null;
-  const response = await fetch(API_ROOT + "/v1/save/" + encodeURIComponent(playerId), {
+  const root = apiRoot();
+  if (!root || !playerId) return null;
+  const response = await fetch(root + "/v1/save/" + encodeURIComponent(playerId), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -129,8 +140,9 @@ export async function saveCloudSave(playerId, payload) {
 
 
 async function clanRequest(path, options) {
-  if (!API_ROOT) throw new Error("Cloudflare D1 is not connected.");
-  const response = await fetch(API_ROOT + path, {
+  const root = apiRoot();
+  if (!root) throw new Error("Cloudflare API is unavailable.");
+  const response = await fetch(root + path, {
     ...options,
     headers: {
       Accept: "application/json",
