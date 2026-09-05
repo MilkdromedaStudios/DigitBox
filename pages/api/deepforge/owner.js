@@ -42,18 +42,25 @@ async function ensureOwnerTable(DB) {
   ).run();
 }
 
-async function ownerStatus(DB, user) {
+async function repairNumberstringOwner(DB) {
   await ensureOwnerTable(DB);
-  let row = await DB.prepare("SELECT value FROM deepforge_config WHERE key = 'owner_user_id'").first();
+  const canonical = await DB.prepare(
+    "SELECT id FROM users WHERE lower(display_name) = 'numberstring' ORDER BY created_at ASC LIMIT 1"
+  ).first();
 
-  if (!row && user && user.display_name === "Numberstring") {
-    await DB.prepare(
-      "INSERT OR IGNORE INTO deepforge_config (key, value) VALUES ('owner_user_id', ?1)"
-    ).bind(user.id).run();
-    row = await DB.prepare("SELECT value FROM deepforge_config WHERE key = 'owner_user_id'").first();
-  }
+  if (!canonical) return "";
 
-  return Boolean(user && row && row.value === user.id);
+  await DB.prepare(
+    "INSERT INTO deepforge_config (key, value) VALUES ('owner_user_id', ?1) " +
+    "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).bind(canonical.id).run();
+
+  return String(canonical.id);
+}
+
+async function ownerStatus(DB, user) {
+  const ownerId = await repairNumberstringOwner(DB);
+  return Boolean(user && ownerId && ownerId === user.id);
 }
 
 export default async function handler(request) {
