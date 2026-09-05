@@ -726,7 +726,11 @@ export default function InfiniteWorld(props) {
       fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 0, 5.5, "#735334", "#5d4029");
       fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 5.5, 13, "#5c412e", "#493428");
       fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 13, 22, "#4e4033", "#3f352c");
-      fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 22, 200, "#50514e", "#303230");
+      const deepestNeeded = Math.max(
+        90,
+        maxWorldY - Math.min(surfaceHeight(minWorldX), surfaceHeight(maxWorldX)) + 24
+      );
+      fillLayer(groundCtx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 22, deepestNeeded, "#50514e", "#303230");
 
       drawGroundTexture(groundCtx, minWorldX, minWorldY, maxWorldX, maxWorldY, cameraX, cameraY, ppu, width, height);
 
@@ -755,6 +759,25 @@ export default function InfiniteWorld(props) {
       groundCtx.restore();
 
       ctx.drawImage(groundCanvas, 0, 0, width, height);
+
+      // Sunlight affects the actual ground, not only the sky. At night the
+      // surface cools toward blue; at golden hour it picks up warm low-angle light.
+      surfacePath(ctx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 0);
+      ctx.lineTo(width, height);
+      ctx.lineTo(0, height);
+      ctx.closePath();
+      if (day.light < 0.96) {
+        ctx.fillStyle = "rgba(11,20,34," + ((1 - day.light) * 0.48) + ")";
+        ctx.fill();
+      }
+      if (day.sunset > 0.04) {
+        surfacePath(ctx, minWorldX, maxWorldX, cameraX, cameraY, ppu, width, height, 0);
+        ctx.lineTo(width, height);
+        ctx.lineTo(0, height);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(238,137,72," + (day.sunset * 0.11) + ")";
+        ctx.fill();
+      }
 
       // Excavation rims receive soft occlusion shadows rather than block outlines.
       for (const cut of visibleCuts) {
