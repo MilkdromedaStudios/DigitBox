@@ -1,1 +1,359 @@
-import { useEffect, useMemo, useRef, useState } from "react";\nimport InfiniteWorld from "./InfiniteWorld";\nimport { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";\nimport { RESOURCE_TYPES, nearestResource } from "./world";\nimport { cloudEnabled, getOrCreatePlayerId, loadCloudSave, saveCloudSave } from "./cloudSync";\n\nconst DEFAULT_PLAYER = { x: 0.5, y: 0.5 };\n\nfunction normalizeSave(raw) {\n  if (!raw || typeof raw !== "object") return null;\n  const player = raw.player && Number.isFinite(raw.player.x) && Number.isFinite(raw.player.y)\n    ? raw.player\n    : DEFAULT_PLAYER;\n  return {\n    updatedAt: Number(raw.updatedAt) || 0,\n    player: player,\n    game: raw.game ? { ...INITIAL, ...raw.game, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) } } : INITIAL,\n    worldChanges: raw.worldChanges && typeof raw.worldChanges === "object" ? raw.worldChanges : {},\n  };\n}\n\nfunction Stat(props) {\n  return <div className="df2-stat"><span>{props.icon}</span><b>{props.value}</b><small>{props.label}</small></div>;\n}\n\nfunction RigPanel(props) {\n  const game = props.game;\n  const items = [\n    ["drill", "⛏", "Pick & drill", props.drillDamage + " power"],\n    ["cargoMax", "▰", "Cargo cart", game.cargoMax + " capacity"],\n    ["armor", "🛡", "Work gear", game.maxHp + " protection"],\n    ["blaster", "⚔", "Raid gear", "level " + game.blaster],\n  ];\n  return (\n    <div className="df2-rig-panel">\n      <div className="df2-panel-title"><b>MINING RIG</b><span>upgrade with ore money</span></div>\n      <div className="df2-upgrade-grid">\n        {items.map(function (item) {\n          const key = item[0];\n          return (\n            <button key={key} onClick={function () { props.upgradeGear(key); }}>\n              <span>{item[1]}</span><b>{item[2]}</b><small>{item[3]}</small>\n              <em>{"$" + props.gearCost(key).toLocaleString()}</em>\n            </button>\n          );\n        })}\n      </div>\n    </div>\n  );\n}\n\nfunction WorldScreen(props) {\n  const game = props.game;\n  return (\n    <div className="df2-world-screen">\n      <InfiniteWorld\n        player={props.player}\n        worldChanges={props.worldChanges}\n        onPosition={props.onPosition}\n        onDrill={props.onDrill}\n        paused={props.paused}\n      />\n\n      <div className="df2-world-overlay">\n        <div className="df2-cargo-strip">\n          <b>CARGO {game.cargoCount}/{game.cargoMax}</b>\n          <div>\n            {Object.keys(game.cargo).length === 0 && <small>Find ore in the dirt.</small>}\n            {Object.entries(game.cargo).map(function (entry) {\n              const type = entry[0];\n              return <span key={type}>{RESOURCE_TYPES[type] ? RESOURCE_TYPES[type].icon : "◆"} {entry[1]}</span>;\n            })}\n          </div>\n          <button onClick={props.sellCargo}>SELL</button>\n        </div>\n        <RigPanel game={game} drillDamage={props.drillDamage} gearCost={props.gearCost} upgradeGear={props.upgradeGear} />\n      </div>\n    </div>\n  );\n}\n\nfunction EmpireScreen(props) {\n  return (\n    <div className="df2-screen-scroll">\n      <div className="df2-town-hero">\n        <div className="df2-town-land">\n          <span className="df2-mine-mouth">MINE</span>\n          <i className="df2-building b1" /><i className="df2-building b2" /><i className="df2-building b3" />\n          <i className="df2-road" />\n        </div>\n        <div><span className="df-kicker">YOUR MINING TOWN</span><h2>Dust Creek</h2><p>Turn ore into a working mining company and town.</p></div>\n      </div>\n      <div className="df2-building-grid">\n        {BUILDINGS.map(function (building) {\n          const level = props.game.buildings[building.key] || 0;\n          const cost = props.buildingCost(building);\n          return (\n            <article key={building.key}>\n              <span>{building.icon}</span>\n              <div><small>LEVEL {level}</small><b>{building.name}</b><p>{building.desc}</p></div>\n              <button onClick={function () { props.upgradeBuilding(building); }}>{"$" + cost.toLocaleString()}</button>\n            </article>\n          );\n        })}\n      </div>\n    </div>\n  );\n}\n\nfunction LeagueScreen(props) {\n  return (\n    <div className="df2-screen-scroll df2-league">\n      <section>\n        <span className="df-kicker">MINING LEAGUE</span><h2>Rival companies</h2>\n        <p>Prototype rivals are simulated company snapshots.</p>\n        <div className="df2-rivals">\n          {RIVALS.map(function (rival, index) {\n            return (\n              <button key={rival.name} className={props.selectedRival === index ? "active" : ""} onClick={function () { props.setSelectedRival(index); }}>\n                <span>{rival.name.slice(0, 2).toUpperCase()}</span>\n                <div><b>{rival.name}</b><small>{rival.city}</small></div>\n                <em>🏆 {rival.trophies}</em>\n              </button>\n            );\n          })}\n        </div>\n        <button className="df2-raid" onClick={props.raid}>Raid {RIVALS[props.selectedRival].name}</button>\n        <div className="df2-raid-log">{props.raidLog}</div>\n      </section>\n      <section>\n        <span className="df-kicker">RANKINGS</span><h2>Bronze claim</h2>\n        <div className="df2-ranking">\n          {props.leaderboard.map(function (entry, index) {\n            return <div key={entry.name} className={entry.npc ? "" : "you"}><span>#{index + 1}</span><b>{entry.name}</b><em>{entry.trophies} 🏆</em></div>;\n          })}\n        </div>\n      </section>\n    </div>\n  );\n}\n\nfunction LabScreen(props) {\n  return (\n    <div className="df2-screen-scroll">\n      <div className="df2-lab-hero">\n        <div>📐</div>\n        <section><span className="df-kicker">ENGINEERING SHED</span><h2>Learn because the mine needs it.</h2><p>Math improves production, surveying, construction, and raids.</p></section>\n      </div>\n      <div className="df2-lab-stats">\n        <Stat icon="📘" value={props.game.research} label="research" />\n        <Stat icon="⚡" value={props.game.boostCharges} label="boosts" />\n        <Stat icon="⛏" value={props.game.blocksMined} label="ore mined" />\n      </div>\n      <button className="df2-challenge-button" onClick={props.openChallenge}>Start engineering challenge</button>\n      <div className="df2-learning">\n        <article><b>Ratios</b><p>Mix alloys and refinery batches.</p></article>\n        <article><b>Algebra</b><p>Calibrate machines and production rates.</p></article>\n        <article><b>Geometry</b><p>Plan shafts, lots, roads, and buildings.</p></article>\n        <article><b>Percent</b><p>Work with profit, efficiency, and damage.</p></article>\n      </div>\n    </div>\n  );\n}\n\nexport default function BetaGameV2() {\n  const [player, setPlayer] = useState(DEFAULT_PLAYER);\n  const [game, setGame] = useState(INITIAL);\n  const [worldChanges, setWorldChanges] = useState({});\n  const [tab, setTab] = useState("world");\n  const [notice, setNotice] = useState("Drag anywhere on the dirt to move your miner.");\n  const [challenge, setChallenge] = useState(null);\n  const [challengeResult, setChallengeResult] = useState(null);\n  const [selectedRival, setSelectedRival] = useState(0);\n  const [raidLog, setRaidLog] = useState("Scout the league, upgrade, then challenge another mining company.");\n  const [loaded, setLoaded] = useState(false);\n  const [cloudStatus, setCloudStatus] = useState(cloudEnabled() ? "D1 connecting" : "D1-ready · local save");\n  const playerIdRef = useRef(null);\n  const lastCloudSaveRef = useRef(0);\n\n  const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);\n  const refineryMult = 1 + (game.buildings.refinery || 0) * 0.12;\n  const academyBonus = game.buildings.academy || 0;\n  const cityDefense = game.armor * 15 + (game.buildings.walls || 0) * 18;\n  const raidPower = game.blaster * 22 + game.drill * 8 + Math.floor(game.trophies / 20);\n  const companyValue = Math.round(game.coins + game.blocksMined * 4 + game.trophies * 5 + Object.values(game.buildings).reduce(function (a, b) { return a + b; }, 0) * 180);\n  const leaderboard = useMemo(function () {\n    return RIVALS.map(function (rival) { return { name: rival.name, trophies: rival.trophies, npc: true }; })\n      .concat([{ name: "YOU", trophies: game.trophies, npc: false }])\n      .sort(function (a, b) { return b.trophies - a.trophies; });\n  }, [game.trophies]);\n\n  useEffect(function () {\n    let cancelled = false;\n    const playerId = getOrCreatePlayerId();\n    playerIdRef.current = playerId;\n    let local = null;\n    try {\n      local = normalizeSave(JSON.parse(localStorage.getItem(SAVE_KEY) || "null"));\n      if (local) { setPlayer(local.player); setGame(local.game); setWorldChanges(local.worldChanges); }\n    } catch (_) {}\n\n    async function loadRemote() {\n      if (!cloudEnabled()) { setLoaded(true); return; }\n      try {\n        const response = await loadCloudSave(playerId);\n        if (cancelled) return;\n        const remote = normalizeSave(response && response.data ? response.data : response);\n        if (remote && (!local || remote.updatedAt > local.updatedAt)) {\n          setPlayer(remote.player); setGame(remote.game); setWorldChanges(remote.worldChanges); setNotice("Cloudflare D1 save loaded.");\n        }\n        setCloudStatus("D1 connected");\n      } catch (_) { if (!cancelled) setCloudStatus("D1 offline · local save"); }\n      if (!cancelled) setLoaded(true);\n    }\n    loadRemote();\n    return function () { cancelled = true; };\n  }, []);\n\n  useEffect(function () {\n    if (!loaded) return undefined;\n    const timer = setTimeout(function () {\n      const payload = { version: 2, updatedAt: Date.now(), player: player, game: game, worldChanges: worldChanges };\n      try { localStorage.setItem(SAVE_KEY, JSON.stringify(payload)); } catch (_) {}\n      if (cloudEnabled() && Date.now() - lastCloudSaveRef.current > 3500) {\n        lastCloudSaveRef.current = Date.now();\n        setCloudStatus("D1 saving");\n        saveCloudSave(playerIdRef.current, payload).then(function () { setCloudStatus("D1 synced"); }).catch(function () { setCloudStatus("D1 offline · local save"); });\n      }\n    }, 650);\n    return function () { clearTimeout(timer); };\n  }, [player, game, worldChanges, loaded]);\n\n  function drill(position) {\n    if (challenge || tab !== "world") return;\n    if (game.cargoCount >= game.cargoMax) { setNotice("Cargo cart is full. Sell before mining more."); return; }\n    const target = nearestResource(position.x, position.y, worldChanges, 1.8);\n    if (!target) { setNotice("No ore in reach. Walk closer to a rock with visible mineral veins."); return; }\n    const damage = (target.change && target.change.damage ? target.change.damage : 0) + drillDamage;\n    if (damage < target.resource.hp) {\n      setWorldChanges(function (current) { return { ...current, [target.key]: { damage: damage } }; });\n      setNotice(target.resource.name + " rock: " + damage + "/" + target.resource.hp + " broken.");\n      return;\n    }\n    const type = target.resourceType;\n    const nextCount = game.blocksMined + 1;\n    setWorldChanges(function (current) { return { ...current, [target.key]: { mined: true, minedAt: Date.now() } }; });\n    setGame(function (g) {\n      return { ...g, cargo: { ...g.cargo, [type]: (g.cargo[type] || 0) + 1 }, cargoCount: g.cargoCount + 1, blocksMined: g.blocksMined + 1, research: g.research + (type === "crystal" || type === "relic" ? 1 : 0) };\n    });\n    setNotice("Mined " + target.resource.name + ".");\n    if (nextCount % 7 === 0) { setChallenge(challengeFor(nextCount + Math.floor(position.x + position.y))); setChallengeResult(null); }\n  }\n\n  useEffect(function () {\n    function keydown(event) {\n      if ((event.key === " " || event.code === "Space") && tab === "world" && !challenge) { event.preventDefault(); drill(player); }\n    }\n    window.addEventListener("keydown", keydown);\n    return function () { window.removeEventListener("keydown", keydown); };\n  }, [player, tab, challenge, worldChanges, game.cargoCount, game.cargoMax, game.blocksMined, drillDamage]);\n\n  function sellCargo() {\n    if (!game.cargoCount) { setNotice("Cargo cart is empty."); return; }\n    let raw = 0;\n    Object.entries(game.cargo).forEach(function (entry) { raw += (RESOURCE_TYPES[entry[0]] ? RESOURCE_TYPES[entry[0]].value : 1) * entry[1]; });\n    const payout = Math.round(raw * refineryMult * (game.boostCharges > 0 ? 1.25 : 1));\n    setGame(function (g) { return { ...g, coins: g.coins + payout, cargo: {}, cargoCount: 0, boostCharges: Math.max(0, g.boostCharges - (g.boostCharges > 0 ? 1 : 0)) }; });\n    setNotice("Sold ore for $" + payout.toLocaleString() + ".");\n  }\n\n  function gearCost(key) {\n    const base = key === "drill" ? 130 : key === "cargoMax" ? 110 : key === "armor" ? 150 : 180;\n    const level = key === "cargoMax" ? Math.max(1, Math.round((game.cargoMax - 10) / 8)) : game[key];\n    return Math.round(base * Math.pow(1.65, level - 1));\n  }\n\n  function upgradeGear(key) {\n    const cost = gearCost(key);\n    if (game.coins < cost) { setNotice("Need $" + cost.toLocaleString() + "."); return; }\n    setGame(function (g) { return { ...g, coins: g.coins - cost, [key]: key === "cargoMax" ? g.cargoMax + 8 : g[key] + 1, maxHp: key === "armor" ? g.maxHp + 15 : g.maxHp, hp: key === "armor" ? g.hp + 15 : g.hp }; });\n    setNotice("Upgrade installed.");\n  }\n\n  function buildingCost(building) { return Math.round(building.base * Math.pow(1.8, game.buildings[building.key] || 0)); }\n  function upgradeBuilding(building) {\n    const cost = buildingCost(building);\n    if (game.coins < cost) { setNotice("Need $" + cost.toLocaleString() + " for " + building.name + "."); return; }\n    setGame(function (g) { return { ...g, coins: g.coins - cost, buildings: { ...g.buildings, [building.key]: (g.buildings[building.key] || 0) + 1 } }; });\n    setNotice(building.name + " upgraded.");\n  }\n\n  function openChallenge() { setChallenge(challengeFor(game.research + game.blocksMined + Math.floor(player.x + player.y))); setChallengeResult(null); }\n  function answerChallenge(choice) {\n    const correct = choice === challenge.answer;\n    setChallengeResult({ correct: correct, text: correct ? "Correct. +" + (4 + academyBonus) + " production boosts." : "Not quite. " + challenge.explain });\n    if (correct) setGame(function (g) { return { ...g, boostCharges: g.boostCharges + 4 + academyBonus, research: g.research + 1 }; });\n  }\n  function raid() { setChallenge({ ...challengeFor(game.trophies + selectedRival + game.blocksMined), raid: true }); setChallengeResult(null); }\n  function answerRaid(choice) {\n    const correct = choice === challenge.answer;\n    const rival = RIVALS[selectedRival];\n    const attack = raidPower * (correct ? 1.25 : 0.92) + Math.floor(Math.random() * 16);\n    const defense = rival.power + Math.floor(Math.random() * 20);\n    const win = attack >= defense;\n    const delta = win ? 22 + selectedRival * 3 : -(8 + selectedRival * 2);\n    const reward = win ? 110 + selectedRival * 55 : 0;\n    setChallengeResult({ correct: correct, text: (correct ? "Survey math gave +25% raid power. " : "Bad calculation reduced raid power. ") + challenge.explain });\n    setGame(function (g) { return { ...g, trophies: Math.max(0, g.trophies + delta), coins: g.coins + reward }; });\n    setRaidLog(win ? "Won the claim. +" + delta + " trophies and $" + reward + "." : "The rival held the claim. " + delta + " trophies.");\n  }\n\n  function closeChallenge() { setChallenge(null); setChallengeResult(null); }\n  function reset() {\n    if (typeof window !== "undefined" && !window.confirm("Reset DEEPFORGE beta progress?")) return;\n    setPlayer(DEFAULT_PLAYER); setGame(INITIAL); setWorldChanges({}); setNotice("New mining company founded.");\n    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}\n  }\n\n  return (\n    <div className="df2-shell">\n      <header className="df2-header">\n        <div><span>PRIVATE BETA</span><h1>DEEPFORGE</h1><p>Mine the dirt. Build the town. Own the claim.</p></div>\n        <div className="df2-stats">\n          <Stat icon="$" value={game.coins.toLocaleString()} label="cash" />\n          <Stat icon="🏆" value={game.trophies} label="rank" />\n          <Stat icon="◆" value={companyValue.toLocaleString()} label="company" />\n        </div>\n      </header>\n\n      <nav className="df2-tabs">\n        {[["world","⛏ Mine"],["empire","🏚 Town"],["league","⚔ League"],["lab","📐 Learn"]].map(function (item) {\n          return <button key={item[0]} className={tab === item[0] ? "active" : ""} onClick={function () { setTab(item[0]); }}>{item[1]}</button>;\n        })}\n      </nav>\n\n      <div className="df2-notice">{notice}</div>\n      <main className="df2-stage">\n        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} drillDamage={drillDamage} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}\n        {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}\n        {tab === "league" && <LeagueScreen selectedRival={selectedRival} setSelectedRival={setSelectedRival} raid={raid} raidLog={raidLog} leaderboard={leaderboard} />}\n        {tab === "lab" && <LabScreen game={game} openChallenge={openChallenge} />}\n      </main>\n\n      <footer className="df2-footer"><span>{cloudStatus}</span><span>{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>\n\n      {challenge && (\n        <div className="df2-modal">\n          <section>\n            <span>{challenge.raid ? "CLAIM SURVEY" : "ENGINEERING JOB"}</span>\n            <h2>{challenge.title}</h2><p>{challenge.text}</p>\n            <div>{challenge.choices.map(function (choice) { return <button key={choice} disabled={Boolean(challengeResult)} onClick={function () { challenge.raid ? answerRaid(choice) : answerChallenge(choice); }}>{choice}</button>; })}</div>\n            {challengeResult && <aside className={challengeResult.correct ? "good" : "bad"}>{challengeResult.text}</aside>}\n            {challengeResult && <button className="close" onClick={closeChallenge}>Back to mine</button>}\n          </section>\n        </div>\n      )}\n    </div>\n  );\n}\n
+import { useEffect, useMemo, useRef, useState } from "react";
+import InfiniteWorld from "./InfiniteWorld";
+import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
+import { RESOURCE_TYPES, nearestResource } from "./world";
+import { cloudEnabled, getOrCreatePlayerId, loadCloudSave, saveCloudSave } from "./cloudSync";
+
+const DEFAULT_PLAYER = { x: 0.5, y: 0.5 };
+
+function normalizeSave(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const player = raw.player && Number.isFinite(raw.player.x) && Number.isFinite(raw.player.y)
+    ? raw.player
+    : DEFAULT_PLAYER;
+  return {
+    updatedAt: Number(raw.updatedAt) || 0,
+    player: player,
+    game: raw.game ? { ...INITIAL, ...raw.game, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) } } : INITIAL,
+    worldChanges: raw.worldChanges && typeof raw.worldChanges === "object" ? raw.worldChanges : {},
+  };
+}
+
+function Stat(props) {
+  return <div className="df2-stat"><span>{props.icon}</span><b>{props.value}</b><small>{props.label}</small></div>;
+}
+
+function RigPanel(props) {
+  const game = props.game;
+  const items = [
+    ["drill", "⛏", "Pick & drill", props.drillDamage + " power"],
+    ["cargoMax", "▰", "Cargo cart", game.cargoMax + " capacity"],
+    ["armor", "🛡", "Work gear", game.maxHp + " protection"],
+    ["blaster", "⚔", "Raid gear", "level " + game.blaster],
+  ];
+  return (
+    <div className="df2-rig-panel">
+      <div className="df2-panel-title"><b>MINING RIG</b><span>upgrade with ore money</span></div>
+      <div className="df2-upgrade-grid">
+        {items.map(function (item) {
+          const key = item[0];
+          return (
+            <button key={key} onClick={function () { props.upgradeGear(key); }}>
+              <span>{item[1]}</span><b>{item[2]}</b><small>{item[3]}</small>
+              <em>{"$" + props.gearCost(key).toLocaleString()}</em>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WorldScreen(props) {
+  const game = props.game;
+  return (
+    <div className="df2-world-screen">
+      <InfiniteWorld
+        player={props.player}
+        worldChanges={props.worldChanges}
+        onPosition={props.onPosition}
+        onDrill={props.onDrill}
+        paused={props.paused}
+      />
+
+      <div className="df2-world-overlay">
+        <div className="df2-cargo-strip">
+          <b>CARGO {game.cargoCount}/{game.cargoMax}</b>
+          <div>
+            {Object.keys(game.cargo).length === 0 && <small>Find ore in the dirt.</small>}
+            {Object.entries(game.cargo).map(function (entry) {
+              const type = entry[0];
+              return <span key={type}>{RESOURCE_TYPES[type] ? RESOURCE_TYPES[type].icon : "◆"} {entry[1]}</span>;
+            })}
+          </div>
+          <button onClick={props.sellCargo}>SELL</button>
+        </div>
+        <RigPanel game={game} drillDamage={props.drillDamage} gearCost={props.gearCost} upgradeGear={props.upgradeGear} />
+      </div>
+    </div>
+  );
+}
+
+function EmpireScreen(props) {
+  return (
+    <div className="df2-screen-scroll">
+      <div className="df2-town-hero">
+        <div className="df2-town-land">
+          <span className="df2-mine-mouth">MINE</span>
+          <i className="df2-building b1" /><i className="df2-building b2" /><i className="df2-building b3" />
+          <i className="df2-road" />
+        </div>
+        <div><span className="df-kicker">YOUR MINING TOWN</span><h2>Dust Creek</h2><p>Turn ore into a working mining company and town.</p></div>
+      </div>
+      <div className="df2-building-grid">
+        {BUILDINGS.map(function (building) {
+          const level = props.game.buildings[building.key] || 0;
+          const cost = props.buildingCost(building);
+          return (
+            <article key={building.key}>
+              <span>{building.icon}</span>
+              <div><small>LEVEL {level}</small><b>{building.name}</b><p>{building.desc}</p></div>
+              <button onClick={function () { props.upgradeBuilding(building); }}>{"$" + cost.toLocaleString()}</button>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LeagueScreen(props) {
+  return (
+    <div className="df2-screen-scroll df2-league">
+      <section>
+        <span className="df-kicker">MINING LEAGUE</span><h2>Rival companies</h2>
+        <p>Prototype rivals are simulated company snapshots.</p>
+        <div className="df2-rivals">
+          {RIVALS.map(function (rival, index) {
+            return (
+              <button key={rival.name} className={props.selectedRival === index ? "active" : ""} onClick={function () { props.setSelectedRival(index); }}>
+                <span>{rival.name.slice(0, 2).toUpperCase()}</span>
+                <div><b>{rival.name}</b><small>{rival.city}</small></div>
+                <em>🏆 {rival.trophies}</em>
+              </button>
+            );
+          })}
+        </div>
+        <button className="df2-raid" onClick={props.raid}>Raid {RIVALS[props.selectedRival].name}</button>
+        <div className="df2-raid-log">{props.raidLog}</div>
+      </section>
+      <section>
+        <span className="df-kicker">RANKINGS</span><h2>Bronze claim</h2>
+        <div className="df2-ranking">
+          {props.leaderboard.map(function (entry, index) {
+            return <div key={entry.name} className={entry.npc ? "" : "you"}><span>#{index + 1}</span><b>{entry.name}</b><em>{entry.trophies} 🏆</em></div>;
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function LabScreen(props) {
+  return (
+    <div className="df2-screen-scroll">
+      <div className="df2-lab-hero">
+        <div>📐</div>
+        <section><span className="df-kicker">ENGINEERING SHED</span><h2>Learn because the mine needs it.</h2><p>Math improves production, surveying, construction, and raids.</p></section>
+      </div>
+      <div className="df2-lab-stats">
+        <Stat icon="📘" value={props.game.research} label="research" />
+        <Stat icon="⚡" value={props.game.boostCharges} label="boosts" />
+        <Stat icon="⛏" value={props.game.blocksMined} label="ore mined" />
+      </div>
+      <button className="df2-challenge-button" onClick={props.openChallenge}>Start engineering challenge</button>
+      <div className="df2-learning">
+        <article><b>Ratios</b><p>Mix alloys and refinery batches.</p></article>
+        <article><b>Algebra</b><p>Calibrate machines and production rates.</p></article>
+        <article><b>Geometry</b><p>Plan shafts, lots, roads, and buildings.</p></article>
+        <article><b>Percent</b><p>Work with profit, efficiency, and damage.</p></article>
+      </div>
+    </div>
+  );
+}
+
+export default function BetaGameV2() {
+  const [player, setPlayer] = useState(DEFAULT_PLAYER);
+  const [game, setGame] = useState(INITIAL);
+  const [worldChanges, setWorldChanges] = useState({});
+  const [tab, setTab] = useState("world");
+  const [notice, setNotice] = useState("Drag anywhere on the dirt to move your miner.");
+  const [challenge, setChallenge] = useState(null);
+  const [challengeResult, setChallengeResult] = useState(null);
+  const [selectedRival, setSelectedRival] = useState(0);
+  const [raidLog, setRaidLog] = useState("Scout the league, upgrade, then challenge another mining company.");
+  const [loaded, setLoaded] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState(cloudEnabled() ? "D1 connecting" : "D1-ready · local save");
+  const playerIdRef = useRef(null);
+  const lastCloudSaveRef = useRef(0);
+
+  const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);
+  const refineryMult = 1 + (game.buildings.refinery || 0) * 0.12;
+  const academyBonus = game.buildings.academy || 0;
+  const cityDefense = game.armor * 15 + (game.buildings.walls || 0) * 18;
+  const raidPower = game.blaster * 22 + game.drill * 8 + Math.floor(game.trophies / 20);
+  const companyValue = Math.round(game.coins + game.blocksMined * 4 + game.trophies * 5 + Object.values(game.buildings).reduce(function (a, b) { return a + b; }, 0) * 180);
+  const leaderboard = useMemo(function () {
+    return RIVALS.map(function (rival) { return { name: rival.name, trophies: rival.trophies, npc: true }; })
+      .concat([{ name: "YOU", trophies: game.trophies, npc: false }])
+      .sort(function (a, b) { return b.trophies - a.trophies; });
+  }, [game.trophies]);
+
+  useEffect(function () {
+    let cancelled = false;
+    const playerId = getOrCreatePlayerId();
+    playerIdRef.current = playerId;
+    let local = null;
+    try {
+      local = normalizeSave(JSON.parse(localStorage.getItem(SAVE_KEY) || "null"));
+      if (local) { setPlayer(local.player); setGame(local.game); setWorldChanges(local.worldChanges); }
+    } catch (_) {}
+
+    async function loadRemote() {
+      if (!cloudEnabled()) { setLoaded(true); return; }
+      try {
+        const response = await loadCloudSave(playerId);
+        if (cancelled) return;
+        const remote = normalizeSave(response && response.data ? response.data : response);
+        if (remote && (!local || remote.updatedAt > local.updatedAt)) {
+          setPlayer(remote.player); setGame(remote.game); setWorldChanges(remote.worldChanges); setNotice("Cloudflare D1 save loaded.");
+        }
+        setCloudStatus("D1 connected");
+      } catch (_) { if (!cancelled) setCloudStatus("D1 offline · local save"); }
+      if (!cancelled) setLoaded(true);
+    }
+    loadRemote();
+    return function () { cancelled = true; };
+  }, []);
+
+  useEffect(function () {
+    if (!loaded) return undefined;
+    const timer = setTimeout(function () {
+      const payload = { version: 2, updatedAt: Date.now(), player: player, game: game, worldChanges: worldChanges };
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(payload)); } catch (_) {}
+      if (cloudEnabled() && Date.now() - lastCloudSaveRef.current > 3500) {
+        lastCloudSaveRef.current = Date.now();
+        setCloudStatus("D1 saving");
+        saveCloudSave(playerIdRef.current, payload).then(function () { setCloudStatus("D1 synced"); }).catch(function () { setCloudStatus("D1 offline · local save"); });
+      }
+    }, 650);
+    return function () { clearTimeout(timer); };
+  }, [player, game, worldChanges, loaded]);
+
+  function drill(position) {
+    if (challenge || tab !== "world") return;
+    if (game.cargoCount >= game.cargoMax) { setNotice("Cargo cart is full. Sell before mining more."); return; }
+    const target = nearestResource(position.x, position.y, worldChanges, 1.8);
+    if (!target) { setNotice("No ore in reach. Walk closer to a rock with visible mineral veins."); return; }
+    const damage = (target.change && target.change.damage ? target.change.damage : 0) + drillDamage;
+    if (damage < target.resource.hp) {
+      setWorldChanges(function (current) { return { ...current, [target.key]: { damage: damage } }; });
+      setNotice(target.resource.name + " rock: " + damage + "/" + target.resource.hp + " broken.");
+      return;
+    }
+    const type = target.resourceType;
+    const nextCount = game.blocksMined + 1;
+    setWorldChanges(function (current) { return { ...current, [target.key]: { mined: true, minedAt: Date.now() } }; });
+    setGame(function (g) {
+      return { ...g, cargo: { ...g.cargo, [type]: (g.cargo[type] || 0) + 1 }, cargoCount: g.cargoCount + 1, blocksMined: g.blocksMined + 1, research: g.research + (type === "crystal" || type === "relic" ? 1 : 0) };
+    });
+    setNotice("Mined " + target.resource.name + ".");
+    if (nextCount % 7 === 0) { setChallenge(challengeFor(nextCount + Math.floor(position.x + position.y))); setChallengeResult(null); }
+  }
+
+  useEffect(function () {
+    function keydown(event) {
+      if ((event.key === " " || event.code === "Space") && tab === "world" && !challenge) { event.preventDefault(); drill(player); }
+    }
+    window.addEventListener("keydown", keydown);
+    return function () { window.removeEventListener("keydown", keydown); };
+  }, [player, tab, challenge, worldChanges, game.cargoCount, game.cargoMax, game.blocksMined, drillDamage]);
+
+  function sellCargo() {
+    if (!game.cargoCount) { setNotice("Cargo cart is empty."); return; }
+    let raw = 0;
+    Object.entries(game.cargo).forEach(function (entry) { raw += (RESOURCE_TYPES[entry[0]] ? RESOURCE_TYPES[entry[0]].value : 1) * entry[1]; });
+    const payout = Math.round(raw * refineryMult * (game.boostCharges > 0 ? 1.25 : 1));
+    setGame(function (g) { return { ...g, coins: g.coins + payout, cargo: {}, cargoCount: 0, boostCharges: Math.max(0, g.boostCharges - (g.boostCharges > 0 ? 1 : 0)) }; });
+    setNotice("Sold ore for $" + payout.toLocaleString() + ".");
+  }
+
+  function gearCost(key) {
+    const base = key === "drill" ? 130 : key === "cargoMax" ? 110 : key === "armor" ? 150 : 180;
+    const level = key === "cargoMax" ? Math.max(1, Math.round((game.cargoMax - 10) / 8)) : game[key];
+    return Math.round(base * Math.pow(1.65, level - 1));
+  }
+
+  function upgradeGear(key) {
+    const cost = gearCost(key);
+    if (game.coins < cost) { setNotice("Need $" + cost.toLocaleString() + "."); return; }
+    setGame(function (g) { return { ...g, coins: g.coins - cost, [key]: key === "cargoMax" ? g.cargoMax + 8 : g[key] + 1, maxHp: key === "armor" ? g.maxHp + 15 : g.maxHp, hp: key === "armor" ? g.hp + 15 : g.hp }; });
+    setNotice("Upgrade installed.");
+  }
+
+  function buildingCost(building) { return Math.round(building.base * Math.pow(1.8, game.buildings[building.key] || 0)); }
+  function upgradeBuilding(building) {
+    const cost = buildingCost(building);
+    if (game.coins < cost) { setNotice("Need $" + cost.toLocaleString() + " for " + building.name + "."); return; }
+    setGame(function (g) { return { ...g, coins: g.coins - cost, buildings: { ...g.buildings, [building.key]: (g.buildings[building.key] || 0) + 1 } }; });
+    setNotice(building.name + " upgraded.");
+  }
+
+  function openChallenge() { setChallenge(challengeFor(game.research + game.blocksMined + Math.floor(player.x + player.y))); setChallengeResult(null); }
+  function answerChallenge(choice) {
+    const correct = choice === challenge.answer;
+    setChallengeResult({ correct: correct, text: correct ? "Correct. +" + (4 + academyBonus) + " production boosts." : "Not quite. " + challenge.explain });
+    if (correct) setGame(function (g) { return { ...g, boostCharges: g.boostCharges + 4 + academyBonus, research: g.research + 1 }; });
+  }
+  function raid() { setChallenge({ ...challengeFor(game.trophies + selectedRival + game.blocksMined), raid: true }); setChallengeResult(null); }
+  function answerRaid(choice) {
+    const correct = choice === challenge.answer;
+    const rival = RIVALS[selectedRival];
+    const attack = raidPower * (correct ? 1.25 : 0.92) + Math.floor(Math.random() * 16);
+    const defense = rival.power + Math.floor(Math.random() * 20);
+    const win = attack >= defense;
+    const delta = win ? 22 + selectedRival * 3 : -(8 + selectedRival * 2);
+    const reward = win ? 110 + selectedRival * 55 : 0;
+    setChallengeResult({ correct: correct, text: (correct ? "Survey math gave +25% raid power. " : "Bad calculation reduced raid power. ") + challenge.explain });
+    setGame(function (g) { return { ...g, trophies: Math.max(0, g.trophies + delta), coins: g.coins + reward }; });
+    setRaidLog(win ? "Won the claim. +" + delta + " trophies and $" + reward + "." : "The rival held the claim. " + delta + " trophies.");
+  }
+
+  function closeChallenge() { setChallenge(null); setChallengeResult(null); }
+  function reset() {
+    if (typeof window !== "undefined" && !window.confirm("Reset DEEPFORGE beta progress?")) return;
+    setPlayer(DEFAULT_PLAYER); setGame(INITIAL); setWorldChanges({}); setNotice("New mining company founded.");
+    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+  }
+
+  return (
+    <div className="df2-shell">
+      <header className="df2-header">
+        <div><span>PRIVATE BETA</span><h1>DEEPFORGE</h1><p>Mine the dirt. Build the town. Own the claim.</p></div>
+        <div className="df2-stats">
+          <Stat icon="$" value={game.coins.toLocaleString()} label="cash" />
+          <Stat icon="🏆" value={game.trophies} label="rank" />
+          <Stat icon="◆" value={companyValue.toLocaleString()} label="company" />
+        </div>
+      </header>
+
+      <nav className="df2-tabs">
+        {[["world","⛏ Mine"],["empire","🏚 Town"],["league","⚔ League"],["lab","📐 Learn"]].map(function (item) {
+          return <button key={item[0]} className={tab === item[0] ? "active" : ""} onClick={function () { setTab(item[0]); }}>{item[1]}</button>;
+        })}
+      </nav>
+
+      <div className="df2-notice">{notice}</div>
+      <main className="df2-stage">
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} drillDamage={drillDamage} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
+        {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
+        {tab === "league" && <LeagueScreen selectedRival={selectedRival} setSelectedRival={setSelectedRival} raid={raid} raidLog={raidLog} leaderboard={leaderboard} />}
+        {tab === "lab" && <LabScreen game={game} openChallenge={openChallenge} />}
+      </main>
+
+      <footer className="df2-footer"><span>{cloudStatus}</span><span>{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>
+
+      {challenge && (
+        <div className="df2-modal">
+          <section>
+            <span>{challenge.raid ? "CLAIM SURVEY" : "ENGINEERING JOB"}</span>
+            <h2>{challenge.title}</h2><p>{challenge.text}</p>
+            <div>{challenge.choices.map(function (choice) { return <button key={choice} disabled={Boolean(challengeResult)} onClick={function () { challenge.raid ? answerRaid(choice) : answerChallenge(choice); }}>{choice}</button>; })}</div>
+            {challengeResult && <aside className={challengeResult.correct ? "good" : "bad"}>{challengeResult.text}</aside>}
+            {challengeResult && <button className="close" onClick={closeChallenge}>Back to mine</button>}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
