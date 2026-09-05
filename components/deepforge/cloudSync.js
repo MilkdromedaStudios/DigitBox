@@ -1,14 +1,28 @@
 const CONFIGURED_API_ROOT = (process.env.NEXT_PUBLIC_DEEPFORGE_API || "").replace(/\/$/, "");
+const CLOUDFLARE_PAGES_ROOT = "https://digitbox.pages.dev";
 
 function apiRoot() {
   if (CONFIGURED_API_ROOT) return CONFIGURED_API_ROOT;
-  if (typeof window !== "undefined" && window.location && window.location.origin) {
+  if (typeof window !== "undefined" && window.location) {
     try {
       localStorage.removeItem("digitbox-deepforge-api-root-v1");
     } catch (_) {}
-    return window.location.origin.replace(/\/$/, "");
+
+    const origin = String(window.location.origin || "").replace(/\/$/, "");
+    const hostname = String(window.location.hostname || "").toLowerCase();
+
+    if (
+      hostname === "digitbox.pages.dev" ||
+      hostname.endsWith(".digitbox.pages.dev") ||
+      hostname === "localhost" ||
+      hostname === "127.0.0.1"
+    ) {
+      return origin;
+    }
+
+    return CLOUDFLARE_PAGES_ROOT;
   }
-  return "";
+  return CLOUDFLARE_PAGES_ROOT;
 }
 
 const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
