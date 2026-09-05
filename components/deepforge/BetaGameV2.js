@@ -26,9 +26,13 @@ function normalizeSave(raw) {
     player,
     game: raw.game
       ? (function () {
-          const clean = { ...raw.game };
-          delete clean.ladders;
-          return { ...INITIAL, ...clean, buildings: { ...INITIAL.buildings, ...(clean.buildings || {}) } };
+          const clean = Object.keys(INITIAL).reduce(function (acc, key) {
+            if (key !== "buildings" && Object.prototype.hasOwnProperty.call(raw.game, key)) {
+              acc[key] = raw.game[key];
+            }
+            return acc;
+          }, {});
+          return { ...INITIAL, ...clean, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) } };
         })()
       : INITIAL,
     worldChanges: isContinuousWorld ? normalizeWorldChanges(raw.worldChanges) : emptyWorldChanges(),
