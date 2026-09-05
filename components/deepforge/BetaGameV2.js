@@ -491,7 +491,23 @@ export default function BetaGameV2() {
     setTab("world");
     setResetKey(function (value) { return value + 1; });
     setNotice("Progress reset. Miner returned to the surface.");
-    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+    const resetPayload = {
+      version: 3,
+      updatedAt: Date.now(),
+      player: spawn,
+      game: INITIAL,
+      worldChanges: emptyWorldChanges(),
+    };
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(resetPayload));
+    } catch (_) {}
+    if (cloudEnabled() && playerIdRef.current) {
+      lastCloudSaveRef.current = Date.now();
+      setCloudStatus("D1 saving");
+      saveCloudSave(playerIdRef.current, resetPayload)
+        .then(function () { setCloudStatus("D1 synced"); })
+        .catch(function () { setCloudStatus("D1 offline · local save"); });
+    }
   }
 
   return (
