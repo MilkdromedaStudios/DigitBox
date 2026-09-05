@@ -2,7 +2,7 @@ function cors(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "https://digitbox.dev",
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Cache-Control": "no-store",
   };
 }
@@ -20,6 +20,33 @@ function validPlayerId(value) {
 
 function cleanName(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+async function authenticatedSupabaseUser(request, env) {
+  const auth = request.headers.get("Authorization") || "";
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return { error: "Log in before creating a clan.", status: 401 };
+
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+    return { error: "Clan login verification is not configured.", status: 503 };
+  }
+
+  const response = await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/auth/v1/user", {
+    method: "GET",
+    headers: {
+      Authorization: "Bearer " + match[1],
+      apikey: env.SUPABASE_ANON_KEY,
+    },
+  });
+
+  if (!response.ok) return { error: "Your login session is invalid or expired.", status: 401 };
+
+  const user = await response.json().catch(() => null);
+  if (!user || !validPlayerId(user.id)) {
+    return { error: "Could not verify your DigitBox account.", status: 401 };
+  }
+
+  return { user };
 }
 
 function inviteCode() {
@@ -153,6 +180,9 @@ export default {
     }
 
     if (url.pathname === "/v1/clans" && request.method === "POST") {
+      const authResult = await authenticatedSupabaseUser(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+
       let body;
       try {
         body = await request.json();
@@ -160,7 +190,7 @@ export default {
         return json({ error: "Invalid JSON" }, 400, env);
       }
 
-      const playerId = body.playerId;
+      const playerId = authResult.user.id;
       const name = cleanName(body.name);
       const tag = cleanName(body.tag).toUpperCase();
 
