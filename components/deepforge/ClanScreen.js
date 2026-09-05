@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  clanEmblemUrl,
   cloudEnabled,
   cloudLogin,
   cloudLogout,
@@ -12,6 +13,8 @@ import {
   leaveClan,
   loadClans,
   syncClanProfile,
+  uploadClanEmblem,
+  deleteClanEmblem,
 } from "./cloudSync";
 
 function minerName(playerId) {
@@ -21,6 +24,25 @@ function minerName(playerId) {
 
 function compact(value) {
   return Number(value || 0).toLocaleString();
+}
+
+function ClanEmblem({ clan, version, small }) {
+  const [failed, setFailed] = useState(false);
+  const src = clan && clan.id ? clanEmblemUrl(clan.id, version) : "";
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  return (
+    <div className={small ? "df-clan-list-emblem" : "df-clan-emblem"}>
+      {src && !failed ? (
+        <img src={src} alt={clan.name + " emblem"} onError={() => setFailed(true)} />
+      ) : (
+        <span>{clan.tag}</span>
+      )}
+    </div>
+  );
 }
 
 export default function ClanScreen({ companyValue, trophies, onNotice, authUser, authLoading, onAuthChanged }) {
@@ -35,6 +57,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authDisplayName, setAuthDisplayName] = useState("");
+  const [emblemVersion, setEmblemVersion] = useState(0);
   const guestPlayerId = useMemo(() => getOrCreatePlayerId(), []);
   const playerId = authUser && authUser.id ? authUser.id : guestPlayerId;
   const online = cloudEnabled();
@@ -167,6 +190,42 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
     }
   }
 
+  async function handleEmblemUpload(event, clanId) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file || busy) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Clan emblem must be 2 MB or smaller.");
+      return;
+    }
+    setBusy("emblem");
+    setError("");
+    try {
+      await uploadClanEmblem(clanId, file);
+      setEmblemVersion(Date.now());
+      onNotice && onNotice("Clan emblem uploaded to Cloudflare R2.");
+    } catch (err) {
+      setError(err.message || "Could not upload clan emblem.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handleEmblemDelete(clanId) {
+    if (busy) return;
+    setBusy("emblem-delete");
+    setError("");
+    try {
+      await deleteClanEmblem(clanId);
+      setEmblemVersion(Date.now());
+      onNotice && onNotice("Clan emblem removed from R2.");
+    } catch (err) {
+      setError(err.message || "Could not remove clan emblem.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (!online) {
     return (
       <div className="df2-screen-scroll df-clan-screen">
@@ -199,7 +258,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
       {myClan ? (
         <section className="df-clan-home">
           <div className="df-clan-banner">
-            <div className="df-clan-emblem">{myClan.tag}</div>
+            <ClanEmblem clan={myClan} version={emblemVersion} />
             <div>
               <span className="df-kicker">YOUR CLAN</span>
               <h2>{myClan.name}</h2>
@@ -218,6 +277,31 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
             </div>
             <button onClick={() => copyCode(myClan.inviteCode)}>Copy code</button>
           </div>
+
+          {myClan.role === "owner" && (
+            <div className="df-clan-r2-controls">
+              <div>
+                <small>CLAN EMBLEM · R2</small>
+                <b>PNG, JPG or WebP · max 2 MB</b>
+              </div>
+              <label className="df-clan-upload-button">
+                {busy === "emblem" ? "Uploading…" : "Upload / replace"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  disabled={Boolean(busy)}
+                  onChange={(event) => handleEmblemUpload(event, myClan.id)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => handleEmblemDelete(myClan.id)}
+              >
+                {busy === "emblem-delete" ? "Removing…" : "Remove"}
+              </button>
+            </div>
+          )}
 
           <div className="df-clan-members">
             <div className="df-clan-section-title">
@@ -353,7 +437,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
                 {clans.map((clan, index) => (
                   <article key={clan.id}>
                     <span className="df-clan-list-rank">#{index + 1}</span>
-                    <span className="df-clan-list-tag">{clan.tag}</span>
+                    <ClanEmblem clan={clan} small />
                     <div>
                       <b>{clan.name}</b>
                       <small>{clan.memberCount}/30 miners</small>
