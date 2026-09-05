@@ -44,6 +44,7 @@ export const INITIAL = {
   blocksMined: 0,
   research: 0,
   boostCharges: 0,
+  ladders: 12,
   buildings: { refinery: 0, workshop: 0, academy: 0, walls: 0 },
 };
 
