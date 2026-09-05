@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
 import InfiniteWorld from "./InfiniteWorld";
 import ClanScreen from "./ClanScreen";
 import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
@@ -80,6 +81,7 @@ function WorldScreen(props) {
         onDrill={props.onDrill}
         paused={props.paused}
         drillRadius={props.drillRadius}
+        resetKey={props.resetKey}
       />
 
       <div className="df2-world-overlay">
@@ -194,6 +196,9 @@ export default function BetaGameV2() {
   const [selectedRival, setSelectedRival] = useState(0);
   const [raidLog, setRaidLog] = useState("Scout the league, upgrade, then challenge another mining company.");
   const [loaded, setLoaded] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+  const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [cloudStatus, setCloudStatus] = useState(cloudEnabled() ? "D1 connecting" : "D1-ready · local save");
   const playerIdRef = useRef(null);
   const lastCloudSaveRef = useRef(0);
@@ -210,6 +215,33 @@ export default function BetaGameV2() {
       .concat([{ name: "YOU", trophies: game.trophies, npc: false }])
       .sort(function (a, b) { return b.trophies - a.trophies; });
   }, [game.trophies]);
+
+  useEffect(function () {
+    let mounted = true;
+    if (!supabase) {
+      setAuthLoading(false);
+      return function () { mounted = false; };
+    }
+
+    supabase.auth.getUser().then(function (result) {
+      if (!mounted) return;
+      setAuthUser(result.data && result.data.user ? result.data.user : null);
+      setAuthLoading(false);
+    });
+
+    const result = supabase.auth.onAuthStateChange(function (_event, session) {
+      if (!mounted) return;
+      setAuthUser(session && session.user ? session.user : null);
+      setAuthLoading(false);
+    });
+
+    return function () {
+      mounted = false;
+      if (result && result.data && result.data.subscription) {
+        result.data.subscription.unsubscribe();
+      }
+    };
+  }, []);
 
   useEffect(function () {
     let cancelled = false;
@@ -249,13 +281,13 @@ export default function BetaGameV2() {
         saveCloudSave(playerIdRef.current, payload)
           .then(function () {
             setCloudStatus("D1 synced");
-            return syncClanProfile(playerIdRef.current, companyValue, game.trophies).catch(function () {});
+            return syncClanProfile((authUser && authUser.id) || playerIdRef.current, companyValue, game.trophies).catch(function () {});
           })
           .catch(function () { setCloudStatus("D1 offline · local save"); });
       }
     }, 650);
     return function () { clearTimeout(timer); };
-  }, [player, game, worldChanges, loaded]);
+  }, [player, game, worldChanges, loaded, authUser]);
 
   function drill(excavation) {
     if (challenge || tab !== "world") return;
@@ -359,7 +391,15 @@ export default function BetaGameV2() {
   function closeChallenge() { setChallenge(null); setChallengeResult(null); }
   function reset() {
     if (typeof window !== "undefined" && !window.confirm("Reset DEEPFORGE beta progress?")) return;
-    setPlayer(DEFAULT_PLAYER); setGame(INITIAL); setWorldChanges(emptyWorldChanges()); setNotice("New mining company founded on fresh ground.");
+    const spawn = { x: 0, y: surfaceHeight(0) - 0.42 };
+    setPlayer(spawn);
+    setGame(INITIAL);
+    setWorldChanges(emptyWorldChanges());
+    setChallenge(null);
+    setChallengeResult(null);
+    setTab("world");
+    setResetKey(function (value) { return value + 1; });
+    setNotice("Progress reset. Miner returned to the surface.");
     try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
   }
 
@@ -382,9 +422,9 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
         {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
-        {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} />}
+        {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} />}
         {tab === "league" && <LeagueScreen selectedRival={selectedRival} setSelectedRival={setSelectedRival} raid={raid} raidLog={raidLog} leaderboard={leaderboard} />}
         {tab === "lab" && <LabScreen game={game} openChallenge={openChallenge} />}
       </main>
