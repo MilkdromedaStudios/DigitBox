@@ -2,9 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   clanEmblemUrl,
   cloudEnabled,
-  cloudLogin,
   cloudLogout,
-  cloudSignup,
   createClan,
   getCloudAuthToken,
   getOrCreatePlayerId,
@@ -45,7 +43,7 @@ function ClanEmblem({ clan, version, small }) {
   );
 }
 
-export default function ClanScreen({ companyValue, trophies, onNotice, authUser, authLoading, onAuthChanged }) {
+export default function ClanScreen({ companyValue, trophies, onNotice, authUser, authLoading, onAuthChanged, onOpenAccount }) {
   const [data, setData] = useState({ myClan: null, clans: [] });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -53,10 +51,6 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [invite, setInvite] = useState("");
-  const [authMode, setAuthMode] = useState("login");
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authDisplayName, setAuthDisplayName] = useState("");
   const [emblemVersion, setEmblemVersion] = useState(0);
   const guestPlayerId = useMemo(() => getOrCreatePlayerId(), []);
   const playerId = authUser && authUser.id ? authUser.id : guestPlayerId;
@@ -138,25 +132,6 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
         setTag("");
       }
     });
-  }
-
-  async function handleAuth(event) {
-    event.preventDefault();
-    if (busy) return;
-    setBusy("auth");
-    setError("");
-    try {
-      const result = authMode === "signup"
-        ? await cloudSignup(authEmail.trim(), authPassword, authDisplayName.trim())
-        : await cloudLogin(authEmail.trim(), authPassword);
-      if (onAuthChanged) onAuthChanged(result && result.user ? result.user : null);
-      setAuthPassword("");
-      onNotice && onNotice(authMode === "signup" ? "DEEPFORGE account created." : "Logged in to DEEPFORGE.");
-    } catch (err) {
-      setError(err.message || "Cloudflare login failed.");
-    } finally {
-      setBusy("");
-    }
   }
 
   async function handleLogout() {
@@ -368,40 +343,16 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
                   </button>
                 </>
               ) : (
-                <div className="df-clan-inline-auth">
-                  <b>Cloudflare account required to create a clan</b>
-                  <form onSubmit={handleAuth}>
-                    {authMode === "signup" && (
-                      <input
-                        value={authDisplayName}
-                        maxLength={24}
-                        placeholder="Miner name"
-                        onChange={(event) => setAuthDisplayName(event.target.value)}
-                      />
-                    )}
-                    <input
-                      type="email"
-                      value={authEmail}
-                      placeholder="Email"
-                      onChange={(event) => setAuthEmail(event.target.value)}
-                    />
-                    <input
-                      type="password"
-                      value={authPassword}
-                      minLength={8}
-                      placeholder="Password"
-                      onChange={(event) => setAuthPassword(event.target.value)}
-                    />
-                    <button disabled={busy === "auth" || !authEmail.trim() || authPassword.length < 8}>
-                      {busy === "auth" ? "Working…" : authMode === "signup" ? "Create account" : "Log in"}
-                    </button>
-                  </form>
+                <div className="df-clan-login-prompt">
+                  <div>
+                    <b>Account required</b>
+                    <small>Log in to create and own a clan.</small>
+                  </div>
                   <button
                     type="button"
-                    className="df-clan-auth-switch"
-                    onClick={() => setAuthMode(authMode === "signup" ? "login" : "signup")}
+                    onClick={() => onOpenAccount && onOpenAccount()}
                   >
-                    {authMode === "signup" ? "Already have an account? Log in" : "New player? Create an account"}
+                    Log in
                   </button>
                 </div>
               )}
