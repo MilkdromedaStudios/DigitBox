@@ -12,7 +12,7 @@ import {
   normalizeWorldChanges,
   surfaceHeight,
 } from "./world";
-import { cloudEnabled, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
+import { cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 
@@ -244,6 +244,13 @@ export default function BetaGameV2() {
   const [resetKey, setResetKey] = useState(0);
   const [authUser, setAuthUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountMode, setAccountMode] = useState("login");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState("");
   const [cloudStatus, setCloudStatus] = useState(cloudEnabled() ? "D1 connecting" : "D1-ready · local save");
   const playerIdRef = useRef(null);
   const lastCloudSaveRef = useRef(0);
@@ -467,6 +474,48 @@ export default function BetaGameV2() {
     });
   }
 
+  async function submitAccount(event) {
+    event.preventDefault();
+    if (accountBusy) return;
+    if (!cloudEnabled()) {
+      setAccountError("Cloudflare D1 is not connected yet.");
+      return;
+    }
+
+    setAccountBusy(true);
+    setAccountError("");
+    try {
+      const result = accountMode === "signup"
+        ? await cloudSignup(accountEmail.trim(), accountPassword, accountName.trim())
+        : await cloudLogin(accountEmail.trim(), accountPassword);
+      const user = result && result.user ? result.user : null;
+      setAuthUser(user);
+      setAccountPassword("");
+      setAccountOpen(false);
+      setNotice(accountMode === "signup" ? "DEEPFORGE account created and logged in." : "Logged in to DEEPFORGE.");
+    } catch (error) {
+      setAccountError(error && error.message ? error.message : "Could not log in.");
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function signOutAccount() {
+    if (accountBusy) return;
+    setAccountBusy(true);
+    setAccountError("");
+    try {
+      await cloudLogout();
+      setAuthUser(null);
+      setAccountOpen(false);
+      setNotice("Logged out of DEEPFORGE.");
+    } catch (error) {
+      setAccountError(error && error.message ? error.message : "Could not log out.");
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
   function closeChallenge() { setChallenge(null); setChallengeResult(null); }
   function reset() {
     if (typeof window !== "undefined" && !window.confirm("Reset DEEPFORGE beta progress?")) return;
@@ -502,10 +551,19 @@ export default function BetaGameV2() {
     <div className="df2-shell">
       <header className="df2-header">
         <div><span>PRIVATE BETA</span><h1>DEEPFORGE</h1><p>Mine the dirt. Build the town. Own the claim.</p></div>
-        <div className="df2-stats">
-          <Stat icon="$" value={game.coins.toLocaleString()} label="cash" />
-          <Stat icon="🏆" value={game.trophies} label="rank" />
-          <Stat icon="◆" value={companyValue.toLocaleString()} label="company" />
+        <div className="df2-header-right">
+          <div className="df2-stats">
+            <Stat icon="$" value={game.coins.toLocaleString()} label="cash" />
+            <Stat icon="🏆" value={game.trophies} label="rank" />
+            <Stat icon="◆" value={companyValue.toLocaleString()} label="company" />
+          </div>
+          <button
+            className={"df2-account-button" + (authUser ? " logged-in" : "")}
+            onClick={function () { setAccountError(""); setAccountOpen(true); }}
+          >
+            <span>{authUser ? "●" : "♟"}</span>
+            <b>{authLoading ? "Checking…" : authUser ? (authUser.displayName || authUser.email || "Account") : "Log in"}</b>
+          </button>
         </div>
       </header>
 
@@ -525,6 +583,82 @@ export default function BetaGameV2() {
       </main>
 
       <footer className="df2-footer"><span>{cloudStatus}</span><span>{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>
+
+      {accountOpen && (
+        <div className="df2-modal df2-account-modal" onMouseDown={function (event) { if (event.target === event.currentTarget) setAccountOpen(false); }}>
+          <section>
+            <span>DEEPFORGE ACCOUNT · CLOUDFLARE D1</span>
+            {authUser ? (
+              <>
+                <h2>{authUser.displayName || "Miner account"}</h2>
+                <p>{authUser.email}</p>
+                <div className="df2-account-actions">
+                  <button type="button" onClick={function () { setAccountOpen(false); setTab("clan"); }}>Open clans</button>
+                  <button type="button" className="danger" disabled={accountBusy} onClick={signOutAccount}>
+                    {accountBusy ? "Logging out…" : "Log out"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>{accountMode === "signup" ? "Create your miner account" : "Log in"}</h2>
+                <p>Your DEEPFORGE account is stored through the Cloudflare Pages Function + D1 database.</p>
+                <form className="df2-account-form" onSubmit={submitAccount}>
+                  {accountMode === "signup" && (
+                    <label>
+                      Miner name
+                      <input
+                        value={accountName}
+                        maxLength={24}
+                        placeholder="StoneRunner"
+                        onChange={function (event) { setAccountName(event.target.value); }}
+                      />
+                    </label>
+                  )}
+                  <label>
+                    Email
+                    <input
+                      type="email"
+                      required
+                      value={accountEmail}
+                      placeholder="you@example.com"
+                      onChange={function (event) { setAccountEmail(event.target.value); }}
+                    />
+                  </label>
+                  <label>
+                    Password
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      maxLength={128}
+                      value={accountPassword}
+                      placeholder="At least 8 characters"
+                      onChange={function (event) { setAccountPassword(event.target.value); }}
+                    />
+                  </label>
+                  {accountError && <aside className="bad">{accountError}</aside>}
+                  <button className="df2-account-submit" disabled={accountBusy || !accountEmail.trim() || accountPassword.length < 8}>
+                    {accountBusy ? "Working…" : accountMode === "signup" ? "Create account" : "Log in"}
+                  </button>
+                </form>
+                <button
+                  type="button"
+                  className="df2-account-switch"
+                  onClick={function () {
+                    setAccountError("");
+                    setAccountMode(accountMode === "signup" ? "login" : "signup");
+                  }}
+                >
+                  {accountMode === "signup" ? "Already have an account? Log in" : "New miner? Create an account"}
+                </button>
+              </>
+            )}
+            {authUser && accountError && <aside className="bad">{accountError}</aside>}
+            <button className="df2-account-close" type="button" onClick={function () { setAccountOpen(false); }}>Close</button>
+          </section>
+        </div>
+      )}
 
       {challenge && (
         <div className="df2-modal">
