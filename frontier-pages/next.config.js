@@ -9,4 +9,5 @@ module.exports = {
   basePath,
   assetPrefix: basePath || undefined,
   images: { unoptimized: true },
+  eslint: { ignoreDuringBuilds: true },
 };
