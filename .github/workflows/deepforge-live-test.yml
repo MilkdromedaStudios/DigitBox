@@ -25,25 +25,7 @@ jobs:
           echo "Checking $URL"
           for i in $(seq 1 120); do
             BODY="$(curl -sS --max-time 10 "$URL" || true)"
-            if BODY="$BODY" python3 - <<'PY'
-import json, os, sys
-try:
-    data = json.loads(os.environ.get('BODY', ''))
-except Exception:
-    sys.exit(1)
-ok = (
-    data.get('ok') is True
-    and data.get('d1') is True
-    and data.get('r2') is True
-    and data.get('auth') is True
-    and data.get('deep') is True
-    and int(data.get('apiVersion', 0)) >= 5
-    and data.get('project') == 'digitbox'
-)
-print(json.dumps(data, sort_keys=True))
-sys.exit(0 if ok else 1)
-PY
-            then
+            if BODY="$BODY" python3 -c 'import json,os,sys; d=json.loads(os.environ.get("BODY","")); ok=(d.get("ok") is True and d.get("d1") is True and d.get("r2") is True and d.get("auth") is True and d.get("deep") is True and int(d.get("apiVersion",0)) >= 5 and d.get("project") == "digitbox"); print(json.dumps(d,sort_keys=True)); sys.exit(0 if ok else 1)' 2>/dev/null; then
               echo "DEEPFORGE live Cloudflare test passed."
               exit 0
             fi
