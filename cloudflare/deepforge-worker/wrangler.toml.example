@@ -9,6 +9,3 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
 [vars]
 ALLOWED_ORIGIN = "https://digitbox.dev"
-SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
-# Set SUPABASE_ANON_KEY as a Worker secret or deployment variable.
-# Do not commit a real key here.
