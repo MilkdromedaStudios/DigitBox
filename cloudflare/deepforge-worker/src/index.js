@@ -22,31 +22,100 @@ function cleanName(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
-async function authenticatedSupabaseUser(request, env) {
+function bytesToHex(bytes) {
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToBytes(hex) {
+  const clean = String(hex || "");
+  const bytes = new Uint8Array(Math.floor(clean.length / 2));
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function randomHex(size) {
+  const bytes = new Uint8Array(size);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value || "")));
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function passwordHash(password, saltHex) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(String(password || "")),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: hexToBytes(saltHex),
+      iterations: 120000,
+    },
+    key,
+    256
+  );
+  return bytesToHex(new Uint8Array(bits));
+}
+
+function constantTimeEqual(a, b) {
+  const left = String(a || "");
+  const right = String(b || "");
+  if (left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    mismatch |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+function cleanEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function publicUser(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name || row.email.split("@")[0],
+  };
+}
+
+async function createSession(env, userId) {
+  const token = randomHex(32);
+  const tokenHash = await sha256Hex(token);
+  const now = Date.now();
+  const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+  await env.DB.prepare(
+    "INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)"
+  ).bind(tokenHash, userId, now, expiresAt).run();
+  return { token, expiresAt };
+}
+
+async function authenticatedD1User(request, env) {
   const auth = request.headers.get("Authorization") || "";
   const match = auth.match(/^Bearer\s+(.+)$/i);
   if (!match) return { error: "Log in before creating a clan.", status: 401 };
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-    return { error: "Clan login verification is not configured.", status: 503 };
-  }
+  const tokenHash = await sha256Hex(match[1]);
+  const now = Date.now();
+  const row = await env.DB.prepare(
+    "SELECT u.id, u.email, u.display_name, s.expires_at " +
+    "FROM auth_sessions s JOIN users u ON u.id = s.user_id " +
+    "WHERE s.token_hash = ?1 AND s.expires_at > ?2"
+  ).bind(tokenHash, now).first();
 
-  const response = await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/auth/v1/user", {
-    method: "GET",
-    headers: {
-      Authorization: "Bearer " + match[1],
-      apikey: env.SUPABASE_ANON_KEY,
-    },
-  });
-
-  if (!response.ok) return { error: "Your login session is invalid or expired.", status: 401 };
-
-  const user = await response.json().catch(() => null);
-  if (!user || !validPlayerId(user.id)) {
-    return { error: "Could not verify your DigitBox account.", status: 401 };
-  }
-
-  return { user };
+  if (!row) return { error: "Your login session is invalid or expired.", status: 401 };
+  return { user: publicUser(row), tokenHash };
 }
 
 function inviteCode() {
@@ -129,6 +198,85 @@ export default {
       return new Response(null, { status: 204, headers: cors(env) });
     }
 
+    if (url.pathname === "/v1/auth/signup" && request.method === "POST") {
+      let body;
+      try {
+        body = await request.json();
+      } catch (_) {
+        return json({ error: "Invalid JSON" }, 400, env);
+      }
+
+      const email = cleanEmail(body.email);
+      const password = String(body.password || "");
+      const displayName = cleanName(body.displayName).slice(0, 24);
+
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 160) {
+        return json({ error: "Enter a valid email address." }, 400, env);
+      }
+      if (password.length < 8 || password.length > 128) {
+        return json({ error: "Password must be 8–128 characters." }, 400, env);
+      }
+
+      const exists = await env.DB.prepare("SELECT id FROM users WHERE email = ?1").bind(email).first();
+      if (exists) return json({ error: "An account with that email already exists." }, 409, env);
+
+      const salt = randomHex(16);
+      const hash = await passwordHash(password, salt);
+      const user = {
+        id: "user_" + crypto.randomUUID().replace(/-/g, ""),
+        email,
+        displayName: displayName || email.split("@")[0].slice(0, 24),
+      };
+      const now = Date.now();
+
+      await env.DB.prepare(
+        "INSERT INTO users (id, email, display_name, password_hash, password_salt, created_at) " +
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
+      ).bind(user.id, user.email, user.displayName, hash, salt, now).run();
+
+      const session = await createSession(env, user.id);
+      return json({ user, token: session.token, expiresAt: session.expiresAt }, 201, env);
+    }
+
+    if (url.pathname === "/v1/auth/login" && request.method === "POST") {
+      let body;
+      try {
+        body = await request.json();
+      } catch (_) {
+        return json({ error: "Invalid JSON" }, 400, env);
+      }
+
+      const email = cleanEmail(body.email);
+      const password = String(body.password || "");
+      const row = await env.DB.prepare(
+        "SELECT id, email, display_name, password_hash, password_salt FROM users WHERE email = ?1"
+      ).bind(email).first();
+
+      if (!row) return json({ error: "Email or password is incorrect." }, 401, env);
+      const hash = await passwordHash(password, row.password_salt);
+      if (!constantTimeEqual(hash, row.password_hash)) {
+        return json({ error: "Email or password is incorrect." }, 401, env);
+      }
+
+      await env.DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?1").bind(Date.now()).run();
+      const session = await createSession(env, row.id);
+      return json({ user: publicUser(row), token: session.token, expiresAt: session.expiresAt }, 200, env);
+    }
+
+    if (url.pathname === "/v1/auth/me" && request.method === "GET") {
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+      return json({ user: authResult.user }, 200, env);
+    }
+
+    if (url.pathname === "/v1/auth/logout" && request.method === "POST") {
+      const authResult = await authenticatedD1User(request, env);
+      if (!authResult.error) {
+        await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?1").bind(authResult.tokenHash).run();
+      }
+      return json({ ok: true }, 200, env);
+    }
+
     if (url.pathname.startsWith("/v1/save/")) {
       const playerId = decodeURIComponent(url.pathname.slice("/v1/save/".length));
       if (!validPlayerId(playerId)) return json({ error: "Invalid player id" }, 400, env);
@@ -180,7 +328,7 @@ export default {
     }
 
     if (url.pathname === "/v1/clans" && request.method === "POST") {
-      const authResult = await authenticatedSupabaseUser(request, env);
+      const authResult = await authenticatedD1User(request, env);
       if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
 
       let body;
