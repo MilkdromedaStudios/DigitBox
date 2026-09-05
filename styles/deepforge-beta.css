@@ -1409,3 +1409,68 @@
   .df-war-header { align-items:flex-start; flex-direction:column; }
   .df-war-power { width:100%; }
 }
+
+
+/* Cloudflare D1 account controls */
+.df-clan-inline-auth {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(223,190,121,.16);
+  border-radius: 9px;
+  background: rgba(0,0,0,.14);
+}
+.df-clan-inline-auth > b {
+  display: block;
+  margin-bottom: 7px;
+  color: #dec797;
+  font-size: .67rem;
+}
+.df-clan-inline-auth form {
+  display: grid;
+  gap: 6px;
+}
+.df-clan-inline-auth input {
+  width: 100%;
+  min-height: 38px;
+  margin: 0;
+}
+.df-clan-inline-auth form > button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 7px;
+  color: #251c13;
+  background: #c6a35f;
+  font-weight: 900;
+  cursor: pointer;
+}
+.df-clan-auth-switch {
+  width: 100%;
+  margin-top: 6px;
+  min-height: 30px;
+  border: 0;
+  color: #a99a84;
+  background: transparent;
+  font-size: .58rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.df-clan-auth-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+  padding: 7px 8px;
+  border-radius: 7px;
+  color: #a99b86;
+  background: rgba(63,94,61,.14);
+  font-size: .6rem;
+}
+.df-clan-auth-status b { color: #d8c9ae; }
+.df-clan-auth-status button {
+  border: 0;
+  color: #c7ad83;
+  background: transparent;
+  text-decoration: underline;
+  cursor: pointer;
+}
