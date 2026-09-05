@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
 import InfiniteWorld from "./InfiniteWorld";
 import ClanScreen from "./ClanScreen";
 import ClanWarScreen from "./ClanWarScreen";
@@ -13,7 +12,7 @@ import {
   normalizeWorldChanges,
   surfaceHeight,
 } from "./world";
-import { cloudEnabled, getOrCreatePlayerId, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
+import { cloudEnabled, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 
@@ -272,29 +271,18 @@ export default function BetaGameV2() {
 
   useEffect(function () {
     let mounted = true;
-    if (!supabase) {
-      setAuthLoading(false);
-      return function () { mounted = false; };
-    }
-
-    supabase.auth.getUser().then(function (result) {
-      if (!mounted) return;
-      setAuthUser(result.data && result.data.user ? result.data.user : null);
-      setAuthLoading(false);
-    });
-
-    const result = supabase.auth.onAuthStateChange(function (_event, session) {
-      if (!mounted) return;
-      setAuthUser(session && session.user ? session.user : null);
-      setAuthLoading(false);
-    });
-
-    return function () {
-      mounted = false;
-      if (result && result.data && result.data.subscription) {
-        result.data.subscription.unsubscribe();
+    async function loadAuth() {
+      try {
+        const user = await loadCloudAuth();
+        if (mounted) setAuthUser(user);
+      } catch (_) {
+        if (mounted) setAuthUser(null);
+      } finally {
+        if (mounted) setAuthLoading(false);
       }
-    };
+    }
+    loadAuth();
+    return function () { mounted = false; };
   }, []);
 
   useEffect(function () {
@@ -531,7 +519,7 @@ export default function BetaGameV2() {
       <main className="df2-stage">
         {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
         {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
-        {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} />}
+        {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
       </main>
