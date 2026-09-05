@@ -1204,3 +1204,208 @@
 @media (max-width:560px) {
   .df-surface-action { right: 98px; bottom: 27px; min-width: 82px; height: 54px; }
 }
+
+
+/* Research progression */
+.df-research-screen {
+  background:
+    radial-gradient(circle at 78% 0%, rgba(105,121,84,.12), transparent 30%),
+    linear-gradient(180deg,#3b3228,#2d261f);
+}
+.df-research-hero {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(231,210,177,.11);
+  border-radius: 12px;
+  background: rgba(27,23,19,.32);
+}
+.df-research-icon { font-size: 3rem; }
+.df-research-hero h2 { margin: 3px 0 5px; color: #eadbc3; }
+.df-research-hero p { margin: 0; color: #9e907e; font-size: .72rem; }
+.df-research-points {
+  min-width: 105px;
+  padding: 10px;
+  text-align: center;
+  border-radius: 10px;
+  background: rgba(118,96,57,.16);
+  border: 1px solid rgba(211,177,108,.15);
+}
+.df-research-points small,
+.df-research-points span { display:block; color:#8e806d; font-size:.52rem; text-transform:uppercase; letter-spacing:.08em; }
+.df-research-points b { display:block; color:#e5c56f; font-size:1.45rem; }
+.df-research-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:8px;
+  margin-top:10px;
+}
+.df-research-grid article {
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:10px;
+  align-items:center;
+  padding:12px;
+  border:1px solid rgba(231,210,177,.1);
+  border-radius:10px;
+  background:rgba(26,22,18,.3);
+}
+.df-research-grid article > span { font-size:1.4rem; }
+.df-research-grid small { color:#9c895f; font-size:.54rem; }
+.df-research-grid b { display:block; color:#e2d4bf; }
+.df-research-grid p { margin:3px 0 0; color:#8f8272; font-size:.65rem; }
+.df-research-grid button {
+  min-width:72px;
+  min-height:38px;
+  border:0;
+  border-radius:8px;
+  color:#251c13;
+  background:#b89a5d;
+  font-weight:900;
+  cursor:pointer;
+}
+.df-research-grid button:disabled { opacity:.4; cursor:default; }
+.df-research-note {
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:9px;
+  background:rgba(0,0,0,.15);
+  color:#928573;
+  font-size:.66rem;
+}
+.df-research-note b { color:#cdbc9f; white-space:nowrap; }
+
+/* Clan Wars */
+.df-war-screen {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(132,74,53,.13), transparent 32%),
+    linear-gradient(180deg,#3a3027,#2b241e);
+}
+.df-war-header {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  padding:12px;
+  border:1px solid rgba(231,210,177,.1);
+  border-radius:11px;
+  background:rgba(28,23,19,.3);
+}
+.df-war-header h2 { margin:3px 0 4px; color:#eadbc3; }
+.df-war-header p { margin:0; color:#958777; font-size:.69rem; }
+.df-war-power {
+  min-width:110px;
+  padding:9px 11px;
+  text-align:center;
+  border-radius:9px;
+  background:rgba(149,76,53,.14);
+}
+.df-war-power small { display:block; color:#997e72; font-size:.5rem; }
+.df-war-power b { color:#e5b193; font-size:1.1rem; }
+.df-war-grid {
+  display:grid;
+  grid-template-columns:1.2fr .8fr;
+  gap:9px;
+  margin-top:9px;
+}
+.df-war-grid > section {
+  padding:10px;
+  border:1px solid rgba(231,210,177,.1);
+  border-radius:10px;
+  background:rgba(25,21,17,.28);
+}
+.df-war-targets { display:grid; gap:5px; }
+.df-war-targets > button {
+  display:grid;
+  grid-template-columns:28px 48px minmax(100px,1fr) auto auto;
+  align-items:center;
+  gap:7px;
+  padding:7px 8px;
+  border:1px solid transparent;
+  border-radius:8px;
+  color:#d9cdbc;
+  background:rgba(255,255,255,.022);
+  cursor:pointer;
+}
+.df-war-targets > button.active {
+  border-color:rgba(196,150,83,.42);
+  background:rgba(166,116,60,.11);
+}
+.df-war-targets i {
+  padding:5px;
+  border-radius:6px;
+  background:rgba(185,145,78,.12);
+  color:#e1c680;
+  font-size:.57rem;
+  font-style:normal;
+  font-weight:900;
+  text-align:center;
+}
+.df-war-targets b { display:block; font-size:.7rem; }
+.df-war-targets small { color:#807466; font-size:.55rem; }
+.df-war-targets em,
+.df-war-targets strong { font-size:.62rem; font-style:normal; color:#bda36d; }
+.df-war-battle h3 { margin:4px 0 10px; color:#e1d1ba; }
+.df-war-versus {
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:8px;
+  align-items:center;
+  margin:8px 0;
+}
+.df-war-versus article {
+  padding:10px;
+  text-align:center;
+  border-radius:9px;
+  background:rgba(0,0,0,.16);
+}
+.df-war-versus small { display:block; color:#817668; font-size:.5rem; }
+.df-war-versus b { display:block; margin:3px 0; color:#e0c379; font-size:1rem; }
+.df-war-versus span { color:#b9a386; font-size:.63rem; }
+.df-war-empty {
+  max-width:680px;
+  margin:0 auto;
+  padding:18px;
+  border:1px solid rgba(231,210,177,.11);
+  border-radius:12px;
+  background:rgba(27,23,19,.3);
+}
+.df-war-empty h2 { color:#eadbc3; }
+.df-war-empty p { color:#988a79; }
+
+.df-clan-login-required {
+  display:grid;
+  place-items:center;
+  width:100%;
+  min-height:40px;
+  border-radius:8px;
+  color:#241b12;
+  background:#d0ad67;
+  font-weight:900;
+  text-decoration:none;
+}
+
+@media (max-width:720px) {
+  .df-research-hero { grid-template-columns:auto 1fr; }
+  .df-research-points { grid-column:1 / -1; }
+  .df-research-grid { grid-template-columns:1fr; }
+  .df-war-grid { grid-template-columns:1fr; }
+  .df-war-targets > button { grid-template-columns:26px 44px 1fr auto; }
+  .df-war-targets em { grid-column:3; grid-row:2; }
+  .df-war-targets strong { grid-column:4; grid-row:2; }
+}
+
+@media (max-width:480px) {
+  .df2-tabs { gap:2px; padding:4px 3px; }
+  .df2-tabs button { font-size:.5rem; padding:2px 1px; }
+  .df-research-icon { font-size:2.2rem; }
+  .df-research-grid article { grid-template-columns:auto 1fr; }
+  .df-research-grid button { grid-column:1 / -1; }
+  .df-research-note { flex-direction:column; }
+  .df-war-header { align-items:flex-start; flex-direction:column; }
+  .df-war-power { width:100%; }
+}
