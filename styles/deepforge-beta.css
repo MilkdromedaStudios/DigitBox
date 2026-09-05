@@ -2072,3 +2072,37 @@
     height: 38px;
   }
 }
+
+
+.df-clan-login-prompt {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(211,177,108,.14);
+  border-radius: 9px;
+  background: rgba(116,91,50,.09);
+}
+.df-clan-login-prompt b {
+  display: block;
+  color: #ddc9aa;
+  font-size: .68rem;
+}
+.df-clan-login-prompt small {
+  display: block;
+  margin-top: 2px;
+  color: #8f8373;
+  font-size: .56rem;
+}
+.df-clan-login-prompt button {
+  min-width: 76px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  color: #251c13;
+  background: #b99a5c;
+  font-weight: 900;
+  cursor: pointer;
+}
