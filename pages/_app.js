@@ -29,10 +29,11 @@ export default function MyApp({ Component, pageProps, router }) {
 
   const cleanPath = String(router?.asPath || "").split(/[?#]/, 1)[0];
   const isAppGPT = router?.pathname === "/appgpt" || cleanPath === "/appgpt" || cleanPath === "/appgpt/";
-  const isBeta = router?.pathname === "/beta" || cleanPath === "/beta" || cleanPath === "/beta/";
+  const isBeta = router?.pathname === "/beta" || router?.pathname?.startsWith("/beta/") || cleanPath === "/beta" || cleanPath === "/beta/" || cleanPath.startsWith("/beta/");
 
   // Standalone product/beta surfaces must not reveal themselves in DigitBox
-  // navigation or inherit the site's header/footer chrome.
+  // navigation or inherit the site's header/footer chrome. The /beta landing
+  // page intentionally renders its own copied Layout; nested beta products do not.
   if (isAppGPT || isBeta) {
     return <Component {...pageProps} />;
   }
