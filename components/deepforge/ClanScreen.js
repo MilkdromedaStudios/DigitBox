@@ -74,7 +74,11 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
       const next = await action();
       if (next && next.clans) setData(next);
       else await refresh(false);
-      if (success) onNotice && onNotice(success);
+      if (next && next.requested) {
+        onNotice && onNotice("Admin access request sent. Numberstring must approve it.");
+      } else if (success) {
+        onNotice && onNotice(success);
+      }
     } catch (err) {
       setError(err.message || "Clan action failed.");
     } finally {
@@ -162,7 +166,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
             <div>
               <span className="df-kicker">YOUR CLAN</span>
               <h2>{myClan.name}</h2>
-              <p>{myClan.memberCount}/30 miners · shared mining company</p>
+              <p>{myClan.adminClan ? "♛ ADMIN CLAN · owner permissions enabled" : myClan.memberCount + "/30 miners · shared mining company"}</p>
             </div>
             <div className="df-clan-totals">
               <div><span>◆</span><b>{compact(myClan.companyValue)}</b><small>company</small></div>
@@ -170,12 +174,13 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
             </div>
           </div>
 
-          <div className="df-clan-code">
+          <div className={"df-clan-code" + (myClan.adminClan ? " admin-request-only" : "")}>
             <div>
-              <small>INVITE CODE</small>
+              <small>{myClan.adminClan ? "REQUEST-ONLY ACCESS CODE" : "INVITE CODE"}</small>
               <b>{myClan.inviteCode}</b>
             </div>
             <button onClick={() => copyCode(myClan.inviteCode)}>Copy code</button>
+            {myClan.adminClan && <p>Using this code only sends a request. Numberstring must approve every Admin member.</p>}
           </div>
 
           <ClanDesignerControl clan={myClan} authUser={authUser} onNotice={onNotice} />
@@ -245,7 +250,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
               <h2>Use an invite code</h2>
               <p>Ask another miner for the six-character code shown inside their clan screen.</p>
               <input className="df-clan-invite-input" value={invite} maxLength={6} placeholder="ABC123" onChange={(event) => setInvite(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
-              <button disabled={Boolean(busy) || invite.length !== 6}>{busy === "join-code" ? "Joining…" : "Join clan"}</button>
+              <button disabled={Boolean(busy) || invite.length !== 6}>{busy === "join-code" ? "Submitting…" : "Join / request access"}</button>
             </form>
           </section>
 
@@ -264,18 +269,37 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
                     <span className="df-clan-list-rank">#{index + 1}</span>
                     <ClanBadge clan={clan} small />
                     <div>
-                      <b>{clan.name}</b>
-                      <small>{clan.memberCount}/30 miners</small>
+                      <b>{clan.adminClan ? "♛ " + clan.name : clan.name}</b>
+                      <small>{clan.adminClan ? "REQUEST ONLY · grants admin permissions" : clan.memberCount + "/30 miners"}</small>
                     </div>
                     <em>◆ {compact(clan.companyValue)}</em>
                     <strong>🏆 {compact(clan.trophies)}</strong>
                     <div className="df-clan-public-actions">
                       <ClanDesignerControl clan={clan} authUser={authUser} onNotice={onNotice} compact />
                       <button
-                        disabled={Boolean(busy) || clan.memberCount >= 30}
-                        onClick={() => run("join-" + clan.id, () => joinClanById(playerId, clan.id, companyValue, trophies), "Joined " + clan.name + ".")}
+                        disabled={
+                          Boolean(busy) ||
+                          clan.memberCount >= 30 ||
+                          Boolean(clan.requestPending) ||
+                          Boolean(clan.adminClan && !authUser)
+                        }
+                        onClick={() => run(
+                          "join-" + clan.id,
+                          () => joinClanById(playerId, clan.id, companyValue, trophies),
+                          clan.adminClan ? "Admin request submitted." : "Joined " + clan.name + "."
+                        )}
                       >
-                        {busy === "join-" + clan.id ? "Joining…" : clan.memberCount >= 30 ? "Full" : "Join"}
+                        {busy === "join-" + clan.id
+                          ? "Submitting…"
+                          : clan.requestPending
+                            ? "Requested"
+                            : clan.adminClan && !authUser
+                              ? "Log in to request"
+                              : clan.memberCount >= 30
+                                ? "Full"
+                                : clan.requestOnly
+                                  ? "Request access"
+                                  : "Join"}
                       </button>
                     </div>
                   </article>
@@ -287,7 +311,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
       )}
 
       <style jsx global>{`
-        .df-clan-public-actions{display:flex;align-items:center;gap:6px}.df-clan-public-actions>button{min-width:58px}@media(max-width:620px){.df-clan-public-actions{flex-direction:column}}
+        .df-clan-public-actions{display:flex;align-items:center;gap:6px}.df-clan-public-actions>button{min-width:76px}.df-clan-code.admin-request-only{border-color:rgba(255,201,92,.22);background:rgba(98,67,18,.09)}.df-clan-code.admin-request-only p{grid-column:1/-1;margin:2px 0 0;color:#a88b54;font-size:.55rem}.df-clan-list article:has(.df-clan-public-actions button:disabled){opacity:.92}@media(max-width:620px){.df-clan-public-actions{flex-direction:column}}
       `}</style>
     </div>
   );
