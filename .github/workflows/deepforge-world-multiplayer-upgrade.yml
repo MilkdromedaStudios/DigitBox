@@ -1,4 +1,4 @@
-name: Install DEEPFORGE World Multiplayer Upgrade
+name: Finish DEEPFORGE World Multiplayer Upgrade
 
 on:
   push:
@@ -16,14 +16,14 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Patch world and game
-        run: python3 scripts/patch_deepforge_multiplayer.py
-      - name: Commit upgrade
+      - name: Finish multiplayer cleanup
+        run: python3 scripts/patch_deepforge_multiplayer_cleanup.py
+      - name: Commit cleanup
         shell: bash
         run: |
           git config user.name "DigitBox Builder"
           git config user.email "actions@users.noreply.github.com"
-          git add components/deepforge/InfiniteWorld.js components/deepforge/BetaGameV2.js
+          git add pages/api/deepforge/[[...path]].js pages/api/deepforge/admin.js styles/deepforge-beta.css
           git diff --cached --check
-          git commit -m "Make DEEPFORGE a walkable multiplayer world"
+          git commit -m "Clean up DEEPFORGE multiplayer account data"
           git push origin HEAD:main
