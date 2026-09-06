@@ -46,7 +46,7 @@ function animatedCityLevel(key, targetLevel, now, animations) {
 function nearestOwnBuildingTarget(zombie, cities, myUserId, levels, hpMap) {
   if (!myUserId) return null;
   const city = (cities || []).find((entry) => entry && entry.ownerId === myUserId);
-  if (!city) return null;
+  if (!city || city.ownerFortress || city.infiniteArmor) return null;
   let best = null;
   for (const building of CITY_BUILDING_LAYOUT) {
     if (building.key === "depot") continue;
@@ -654,6 +654,49 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
   ctx.save();
   ctx.globalAlpha = 0.8 + light * 0.2;
 
+  if (city.ownerFortress) {
+    // Permanent owner fortress: reinforced wall line with four active turret emplacements.
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(109,128,139,.98)";
+    ctx.lineWidth = Math.max(8, ppu * 0.22);
+    ctx.beginPath();
+    let wallFirst = true;
+    for (let wx = centerX - 7.35; wx <= centerX + 7.35; wx += 0.28) {
+      const sx = worldToScreenX(wx, cameraX, ppu, width);
+      const sy = worldToScreenY(surfaceHeight(wx) - 0.18, cameraY, ppu, height);
+      if (wallFirst) { ctx.moveTo(sx, sy); wallFirst = false; } else ctx.lineTo(sx, sy);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(202,221,230,.72)";
+    ctx.lineWidth = Math.max(2, ppu * 0.045);
+    ctx.stroke();
+
+    [-6.3, -2.15, 2.15, 6.3].forEach((dx, turretIndex) => {
+      const wx = centerX + dx;
+      const sx = worldToScreenX(wx, cameraX, ppu, width);
+      const sy = worldToScreenY(surfaceHeight(wx) - 0.2, cameraY, ppu, height);
+      ctx.fillStyle = "#32434d";
+      ctx.fillRect(sx - ppu * 0.22, sy - ppu * 0.72, ppu * 0.44, ppu * 0.7);
+      ctx.fillStyle = "#738b96";
+      ctx.beginPath();
+      ctx.arc(sx, sy - ppu * 0.78, ppu * 0.25, Math.PI, 0);
+      ctx.fill();
+      const sweep = Math.sin(now / 420 + turretIndex * 1.6) * 0.55;
+      ctx.strokeStyle = "#b9d7df";
+      ctx.lineWidth = Math.max(3, ppu * 0.07);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - ppu * 0.79);
+      ctx.lineTo(sx + Math.cos(sweep) * ppu * 0.58, sy - ppu * 0.79 + Math.sin(sweep) * ppu * 0.24);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(102,222,255,.95)";
+      ctx.beginPath();
+      ctx.arc(sx, sy - ppu * 0.79, Math.max(2, ppu * 0.055), 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
   // Road / city foundation.
   ctx.strokeStyle = "rgba(68,62,54,.9)";
   ctx.lineWidth = Math.max(4, ppu * 0.12);
@@ -848,7 +891,9 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
   });
 
   const signY = worldToScreenY(surfaceHeight(centerX) - 6.35, cameraY, ppu, height);
-  const label = String(city.name || ((city.ownerName || "MINER") + " CITY")).toUpperCase() + " · LV " + cityLevel;
+  const label = city.ownerFortress
+    ? String(city.name || "OWNER FORTRESS").toUpperCase() + " · ♛ OWNER · ∞ ARMOR"
+    : String(city.name || ((city.ownerName || "MINER") + " CITY")).toUpperCase() + " · LV " + cityLevel;
   ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
   const textWidth = ctx.measureText(label).width;
   ctx.fillStyle = "rgba(17,22,22,.84)";
@@ -888,9 +933,23 @@ function drawRemoteMiner(ctx, remote, cameraX, cameraY, ppu, width, height, ligh
   ctx.restore();
 }
 
-function drawZombie(ctx, zombie, cameraX, cameraY, ppu, width, height, light) {
+function drawZombie(ctx, zombie, cameraX, cameraY, ppu, width, height, light, now) {
   const sx = worldToScreenX(zombie.x, cameraX, ppu, width);
   const sy = worldToScreenY(zombie.y, cameraY, ppu, height);
+  if (zombie.turretShotAt && now - zombie.turretShotAt < 130 && Number.isFinite(zombie.turretFromX)) {
+    const tx = worldToScreenX(zombie.turretFromX, cameraX, ppu, width);
+    const ty = worldToScreenY(surfaceHeight(zombie.turretFromX) - 1.05, cameraY, ppu, height);
+    ctx.save();
+    ctx.strokeStyle = "rgba(104,225,255,.95)";
+    ctx.lineWidth = Math.max(2, ppu * 0.035);
+    ctx.shadowColor = "rgba(104,225,255,.85)";
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(sx, sy - ppu * 0.25);
+    ctx.stroke();
+    ctx.restore();
+  }
   if (sx < -70 || sx > width + 70 || sy < -80 || sy > height + 80) return;
   const scale = clamp(ppu / 48, 0.82, 1.18);
   ctx.save();
@@ -1298,6 +1357,18 @@ export default function InfiniteWorld(props) {
           });
         }
         for (const zombie of zombiesRef.current) {
+          const fortress = citiesRef.current.find((city) =>
+            city && city.ownerFortress && Math.abs(Number(city.x) - zombie.x) <= 9.5
+          );
+          if (fortress && now - Number(zombie.lastTurretHit || 0) > 300) {
+            zombie.lastTurretHit = now;
+            zombie.turretShotAt = now;
+            const relative = zombie.x - Number(fortress.x);
+            zombie.turretFromX = Number(fortress.x) + (relative < -4 ? -6.3 : relative < 0 ? -2.15 : relative > 4 ? 6.3 : 2.15);
+            zombie.hp -= 22;
+            if (zombie.hp <= 0) continue;
+          }
+
           const buildingTarget = nearestOwnBuildingTarget(
             zombie,
             citiesRef.current,
@@ -1328,6 +1399,7 @@ export default function InfiniteWorld(props) {
             if (zombieDamageCbRef.current) zombieDamageCbRef.current(7);
           }
         }
+        zombiesRef.current = zombiesRef.current.filter((zombie) => zombie.hp > 0);
       } else if (day.light > 0.42) {
         zombiesRef.current = [];
       }
@@ -1482,7 +1554,7 @@ export default function InfiniteWorld(props) {
         );
       }
       for (const zombie of zombiesRef.current) {
-        drawZombie(ctx, zombie, cameraX, cameraY, ppu, width, height, day.light);
+        drawZombie(ctx, zombie, cameraX, cameraY, ppu, width, height, day.light, now);
       }
 
       for (const remote of remotePlayersRef.current) {
