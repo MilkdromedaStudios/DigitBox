@@ -29,3 +29,12 @@ export function syncMultiplayerPresence(position) {
 export function leaveMultiplayerWorld() {
   return requestMultiplayer("DELETE").catch(() => null);
 }
+
+
+export function createMultiplayerCity(name, style) {
+  return requestMultiplayer("POST", { action: "createCity", name, style });
+}
+
+export function updateMultiplayerCityProfile(name, style) {
+  return requestMultiplayer("POST", { action: "cityProfile", name, style });
+}
