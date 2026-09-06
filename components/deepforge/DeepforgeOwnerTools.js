@@ -87,7 +87,7 @@ function readPrefs() {
     const raw = JSON.parse(localStorage.getItem(OWNER_PREF_KEY) || "null");
     return {
       open: Boolean(raw && raw.open),
-      view: raw && raw.view === "manage" ? "manage" : "cheats",
+      view: raw && ["cheats", "manage", "access"].includes(raw.view) ? raw.view : "cheats",
       infinite: Boolean(raw && raw.infinite),
     };
   } catch (_) {
@@ -97,13 +97,23 @@ function readPrefs() {
 
 export default function DeepforgeOwnerTools() {
   const [owner, setOwner] = useState(false);
+  const [access, setAccess] = useState({ permanentOwner: false, delegatedAdmin: false, username: "" });
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("cheats");
   const [infinite, setInfinite] = useState(false);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [adminData, setAdminData] = useState({ users: [], clans: [], ownerId: "" });
+  const [adminData, setAdminData] = useState({
+    users: [],
+    clans: [],
+    ownerId: "",
+    permanentOwner: false,
+    delegatedAdmin: false,
+    adminClan: null,
+    adminClanRequests: [],
+    adminClanMembers: [],
+  });
   const repairBusyRef = useRef(false);
   const reloadQueuedRef = useRef(false);
 
@@ -115,8 +125,9 @@ export default function DeepforgeOwnerTools() {
     }
     try {
       const user = await loadCloudAuth();
-      if (!user || user.displayName !== "Numberstring") {
+      if (!user) {
         setOwner(false);
+        setAccess({ permanentOwner: false, delegatedAdmin: false, username: "" });
         return false;
       }
       const response = await fetch("/api/deepforge/owner", {
@@ -126,6 +137,11 @@ export default function DeepforgeOwnerTools() {
       const body = await response.json().catch(() => ({}));
       const ok = Boolean(response.ok && body.owner);
       setOwner(ok);
+      setAccess({
+        permanentOwner: Boolean(body.permanentOwner),
+        delegatedAdmin: Boolean(body.delegatedAdmin),
+        username: body.username || user.displayName || "",
+      });
       return ok;
     } catch (_) {
       setOwner(false);
@@ -145,7 +161,16 @@ export default function DeepforgeOwnerTools() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Could not load admin data.");
-      setAdminData({ users: body.users || [], clans: body.clans || [], ownerId: body.ownerId || "" });
+      setAdminData({
+        users: body.users || [],
+        clans: body.clans || [],
+        ownerId: body.ownerId || "",
+        permanentOwner: Boolean(body.permanentOwner),
+        delegatedAdmin: Boolean(body.delegatedAdmin),
+        adminClan: body.adminClan || null,
+        adminClanRequests: body.adminClanRequests || [],
+        adminClanMembers: body.adminClanMembers || [],
+      });
     } catch (error) {
       setMessage(error.message || "Could not load admin data.");
     } finally {
@@ -223,7 +248,7 @@ export default function DeepforgeOwnerTools() {
   }, []);
 
   useEffect(() => {
-    if (owner && open && view === "manage") refreshAdmin();
+    if (owner && open) refreshAdmin();
   }, [owner, open, view]);
 
   useEffect(() => {
@@ -311,6 +336,57 @@ export default function DeepforgeOwnerTools() {
       await refreshAdmin();
     } catch (error) {
       setMessage(error.message || "Could not set city level.");
+      setBusy(false);
+    }
+  }
+
+  async function adminClanDecision(requestRow, action) {
+    if (!owner || busy || !access.permanentOwner || !requestRow) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const token = getCloudAuthToken();
+      const response = await fetch("/api/deepforge/admin", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ type: "adminClanRequest", playerId: requestRow.playerId, action }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Admin request action failed.");
+      setMessage((requestRow.displayName || "Player") + (action === "approve" ? " approved as Admin." : " request rejected."));
+      await refreshAdmin();
+    } catch (error) {
+      setMessage(error.message || "Admin request action failed.");
+      setBusy(false);
+    }
+  }
+
+  async function adminClanRemove(member) {
+    if (!owner || busy || !access.permanentOwner || !member || member.permanentOwner) return;
+    if (!window.confirm("Remove " + member.displayName + " from Admin and revoke their permissions?")) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const token = getCloudAuthToken();
+      const response = await fetch("/api/deepforge/admin", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ type: "adminClanRemove", playerId: member.playerId }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Could not revoke Admin access.");
+      setMessage(member.displayName + "'s Admin permissions were revoked.");
+      await refreshAdmin();
+    } catch (error) {
+      setMessage(error.message || "Could not revoke Admin access.");
       setBusy(false);
     }
   }
