@@ -1,5 +1,8 @@
 export const config = { runtime: "edge" };
 
+const CITY_STYLES = ["industrial", "frontier", "steel"];
+const CITY_UPGRADE_KEYS = ["refinery", "workshop", "academy", "walls"];
+
 function bytesToHex(bytes) {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 }
@@ -36,6 +39,22 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, number));
 }
 
+function cleanCityName(value, fallback) {
+  const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 28);
+  return name || String(fallback || "Mining Town").slice(0, 28);
+}
+
+function cleanCityStyle(value) {
+  const style = String(value || "").toLowerCase();
+  return CITY_STYLES.includes(style) ? style : "industrial";
+}
+
+async function ensureColumn(DB, table, name, sqlType) {
+  const columns = await DB.prepare("PRAGMA table_info(" + table + ")").all();
+  if ((columns.results || []).some((row) => row.name === name)) return;
+  await DB.prepare("ALTER TABLE " + table + " ADD COLUMN " + name + " " + sqlType).run().catch(() => {});
+}
+
 async function ensureSchema(DB) {
   await DB.batch([
     DB.prepare(
@@ -49,6 +68,13 @@ async function ensureSchema(DB) {
     ),
     DB.prepare("CREATE INDEX IF NOT EXISTS idx_player_presence_updated ON player_presence(updated_at)"),
   ]);
+  await ensureColumn(DB, "player_cities", "city_name", "TEXT NOT NULL DEFAULT 'Mining Town'");
+  await ensureColumn(DB, "player_cities", "city_level", "INTEGER NOT NULL DEFAULT 1");
+  await ensureColumn(DB, "player_cities", "city_style", "TEXT NOT NULL DEFAULT 'industrial'");
+  await ensureColumn(DB, "player_cities", "refinery_level", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(DB, "player_cities", "workshop_level", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(DB, "player_cities", "academy_level", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(DB, "player_cities", "walls_level", "INTEGER NOT NULL DEFAULT 0");
 }
 
 async function authenticatedUser(request, DB) {
@@ -67,14 +93,19 @@ function cityWorldX(slot) {
   return 32 + Number(slot) * 48;
 }
 
-async function ensureCity(DB, user) {
-  let row = await DB.prepare(
-    "SELECT user_id, city_slot FROM player_cities WHERE user_id = ?1"
-  ).bind(user.id).first();
-  if (row) return row;
+async function getCity(DB, userId) {
+  return DB.prepare(
+    "SELECT user_id, city_slot, city_name, city_level, city_style, refinery_level, workshop_level, academy_level, walls_level, created_at " +
+    "FROM player_cities WHERE user_id = ?1"
+  ).bind(userId).first();
+}
+
+async function createCity(DB, user, name, style) {
+  const existing = await getCity(DB, user.id);
+  if (existing) return existing;
 
   const ownerSlot = String(user.display_name || "").toLowerCase() === "numberstring" ? 0 : null;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     let slot = ownerSlot;
     if (slot === null) {
       const next = await DB.prepare(
@@ -84,24 +115,66 @@ async function ensureCity(DB, user) {
     }
     try {
       await DB.prepare(
-        "INSERT INTO player_cities (user_id, city_slot, created_at) VALUES (?1, ?2, ?3)"
-      ).bind(user.id, slot, Date.now()).run();
-      return { user_id: user.id, city_slot: slot };
+        "INSERT INTO player_cities " +
+        "(user_id, city_slot, city_name, city_level, city_style, refinery_level, workshop_level, academy_level, walls_level, created_at) " +
+        "VALUES (?1, ?2, ?3, 1, ?4, 0, 0, 0, 0, ?5)"
+      ).bind(user.id, slot, cleanCityName(name, (user.display_name || "Miner") + " City"), cleanCityStyle(style), Date.now()).run();
+      return await getCity(DB, user.id);
     } catch (_) {
-      row = await DB.prepare(
-        "SELECT user_id, city_slot FROM player_cities WHERE user_id = ?1"
-      ).bind(user.id).first();
+      const row = await getCity(DB, user.id);
       if (row) return row;
       if (ownerSlot !== null) {
         const occupied = await DB.prepare("SELECT user_id FROM player_cities WHERE city_slot = 0").first();
         if (occupied && occupied.user_id !== user.id) {
-          await DB.prepare("UPDATE player_cities SET city_slot = (SELECT COALESCE(MAX(city_slot),0)+1 FROM player_cities) WHERE user_id = ?1")
-            .bind(occupied.user_id).run().catch(() => {});
+          await DB.prepare(
+            "UPDATE player_cities SET city_slot = (SELECT COALESCE(MAX(city_slot),0)+1 FROM player_cities) WHERE user_id = ?1"
+          ).bind(occupied.user_id).run().catch(() => {});
         }
       }
     }
   }
-  throw new Error("Could not assign a city location.");
+  throw new Error("Could not found your city.");
+}
+
+function upgradesFromRow(row) {
+  return {
+    refinery: Math.max(0, Number(row && row.refinery_level) || 0),
+    workshop: Math.max(0, Number(row && row.workshop_level) || 0),
+    academy: Math.max(0, Number(row && row.academy_level) || 0),
+    walls: Math.max(0, Number(row && row.walls_level) || 0),
+  };
+}
+
+async function mergeCityUpgrades(DB, city, rawUpgrades) {
+  if (!city || !rawUpgrades || typeof rawUpgrades !== "object") return city;
+  const current = upgradesFromRow(city);
+  const next = {};
+  CITY_UPGRADE_KEYS.forEach((key) => {
+    next[key] = Math.max(current[key], Math.round(clamp(rawUpgrades[key], 0, 1000)));
+  });
+  const derivedLevel = 1 + Math.floor((next.refinery + next.workshop + next.academy + next.walls) / 4);
+  const cityLevel = Math.max(1, Number(city.city_level) || 1, derivedLevel);
+  await DB.prepare(
+    "UPDATE player_cities SET city_level=?2, refinery_level=?3, workshop_level=?4, academy_level=?5, walls_level=?6 WHERE user_id=?1"
+  ).bind(city.user_id, cityLevel, next.refinery, next.workshop, next.academy, next.walls).run();
+  return await getCity(DB, city.user_id);
+}
+
+function cityPayload(row, presence, onlineAfter) {
+  const updatedAt = Number(presence && presence.updated_at) || 0;
+  return {
+    ownerId: row.user_id,
+    ownerName: row.display_name || "Miner",
+    slot: Number(row.city_slot) || 0,
+    x: cityWorldX(row.city_slot || 0),
+    name: row.city_name || ((row.display_name || "Miner") + " City"),
+    level: Math.max(1, Number(row.city_level) || 1),
+    style: cleanCityStyle(row.city_style),
+    upgrades: upgradesFromRow(row),
+    companyValue: Number(presence && presence.company_value) || 0,
+    trophies: Number(presence && presence.trophies) || 0,
+    online: updatedAt >= onlineAfter,
+  };
 }
 
 async function worldSnapshot(DB, user, myCity) {
@@ -115,9 +188,9 @@ async function worldSnapshot(DB, user, myCity) {
   ).bind(onlineAfter).all();
 
   const cityResult = await DB.prepare(
-    "SELECT c.user_id, c.city_slot, u.display_name, " +
-    "COALESCE(p.company_value, 0) AS company_value, COALESCE(p.trophies, 0) AS trophies, " +
-    "COALESCE(p.updated_at, 0) AS updated_at " +
+    "SELECT c.user_id, c.city_slot, c.city_name, c.city_level, c.city_style, " +
+    "c.refinery_level, c.workshop_level, c.academy_level, c.walls_level, c.created_at, u.display_name, " +
+    "COALESCE(p.company_value, 0) AS company_value, COALESCE(p.trophies, 0) AS trophies, COALESCE(p.updated_at, 0) AS updated_at " +
     "FROM player_cities c JOIN users u ON u.id = c.user_id " +
     "LEFT JOIN player_presence p ON p.user_id = c.user_id " +
     "ORDER BY c.city_slot ASC LIMIT 100"
@@ -128,21 +201,14 @@ async function worldSnapshot(DB, user, myCity) {
     name: row.display_name || "Miner",
     x: Number(row.x) || 0,
     y: Number(row.y) || 0,
-    cityX: cityWorldX(row.city_slot || 0),
+    cityX: row.city_slot === null || row.city_slot === undefined ? null : cityWorldX(row.city_slot),
     companyValue: Number(row.company_value) || 0,
     trophies: Number(row.trophies) || 0,
     updatedAt: Number(row.updated_at) || 0,
   }));
 
-  const cities = (cityResult.results || []).map((row) => ({
-    ownerId: row.user_id,
-    ownerName: row.display_name || "Miner",
-    slot: Number(row.city_slot) || 0,
-    x: cityWorldX(row.city_slot || 0),
-    companyValue: Number(row.company_value) || 0,
-    trophies: Number(row.trophies) || 0,
-    online: Number(row.updated_at) >= onlineAfter,
-  }));
+  const cities = (cityResult.results || []).map((row) => cityPayload(row, row, onlineAfter));
+  const liveMine = myCity ? cities.find((city) => city.ownerId === user.id) : null;
 
   return {
     ok: true,
@@ -150,8 +216,10 @@ async function worldSnapshot(DB, user, myCity) {
     me: {
       id: user.id,
       name: user.display_name || "Miner",
-      cityX: cityWorldX(myCity.city_slot),
-      citySlot: Number(myCity.city_slot) || 0,
+      hasCity: Boolean(myCity),
+      cityX: myCity ? cityWorldX(myCity.city_slot) : null,
+      citySlot: myCity ? Number(myCity.city_slot) || 0 : null,
+      city: liveMine || null,
     },
     players,
     cities,
@@ -167,10 +235,27 @@ export default async function handler(request) {
     await ensureSchema(DB);
     const user = await authenticatedUser(request, DB);
     if (!user) return json({ error: "Log in to use multiplayer." }, 401);
-    const myCity = await ensureCity(DB, user);
+    let myCity = await getCity(DB, user.id);
 
     if (request.method === "POST") {
       const body = await request.json().catch(() => ({}));
+      const action = String(body.action || "presence");
+
+      if (action === "createCity") {
+        myCity = await createCity(DB, user, body.name, body.style);
+        return json(await worldSnapshot(DB, user, myCity));
+      }
+
+      if (action === "cityProfile") {
+        if (!myCity) return json({ error: "Create your city first." }, 409);
+        const name = cleanCityName(body.name, myCity.city_name);
+        const style = cleanCityStyle(body.style || myCity.city_style);
+        await DB.prepare("UPDATE player_cities SET city_name=?2, city_style=?3 WHERE user_id=?1")
+          .bind(user.id, name, style).run();
+        myCity = await getCity(DB, user.id);
+        return json(await worldSnapshot(DB, user, myCity));
+      }
+
       const x = clamp(body.x, -1000000, 1000000);
       const y = clamp(body.y, -1000, 1000000);
       const companyValue = Math.round(clamp(body.companyValue, 0, 9000000000000000));
@@ -182,6 +267,8 @@ export default async function handler(request) {
         "ON CONFLICT(user_id) DO UPDATE SET x=excluded.x, y=excluded.y, company_value=excluded.company_value, " +
         "trophies=excluded.trophies, updated_at=excluded.updated_at"
       ).bind(user.id, x, y, companyValue, trophies, now).run();
+
+      if (myCity && body.buildings) myCity = await mergeCityUpgrades(DB, myCity, body.buildings);
       return json(await worldSnapshot(DB, user, myCity));
     }
 
