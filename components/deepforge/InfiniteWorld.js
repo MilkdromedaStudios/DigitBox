@@ -682,9 +682,10 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
       const serverLevel = Number(serverLevels[building.key]);
       level = Number.isFinite(serverLevel) ? Math.max(0, serverLevel) : remoteLevel;
     }
-    const visualLevel = isMine && building.key !== "depot"
+    const uncappedVisualLevel = isMine && building.key !== "depot"
       ? animatedCityLevel(building.key, level, now, animations)
       : level;
+    const visualLevel = Math.min(12, Math.max(0, uncappedVisualLevel));
 
     const bw = building.w * ppu;
     const bh = Math.max(ppu * 0.85, (building.baseH + visualLevel * building.levelH) * ppu);
