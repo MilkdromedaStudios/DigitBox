@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - scripts/patch-deepforge-hourly-world-progression.py
+      - .github/workflows/apply-deepforge-hourly-world-progression.yml
   workflow_dispatch:
 
 permissions:
