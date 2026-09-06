@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { BUILDINGS } from "./data";
 import { surfaceHeight } from "./world";
 
 function distanceTo(player, city) {
@@ -10,6 +9,16 @@ function directionTo(player, city) {
   const dx = (Number(city && city.x) || 0) - (Number(player && player.x) || 0);
   if (Math.abs(dx) < 1.2) return "HERE";
   return dx < 0 ? "←" : "→";
+}
+
+function drillToolName(level) {
+  const n = Number(level) || 1;
+  if (n <= 1) return "Rusty Pickaxe";
+  if (n === 2) return "Iron Pickaxe";
+  if (n === 3) return "Steel Pickaxe";
+  if (n === 4) return "Pneumatic Pick";
+  if (n === 5) return "Power Drill";
+  return "Deepcore Drill Mk " + (n - 4);
 }
 
 export default function WorldCityOverlay(props) {
@@ -99,15 +108,19 @@ export default function WorldCityOverlay(props) {
 
           {isMyCity ? (
             <>
-              <p>Town controls only work while your miner is physically inside your city.</p>
+              <p><b>MINING SUPPLY DEPOT</b> · Gear can only be purchased while you are physically inside your own city.</p>
               <div className="df-city-buildings">
-                {BUILDINGS.map((building) => {
-                  const level = (props.game.buildings && props.game.buildings[building.key]) || 0;
-                  const cost = props.buildingCost(building);
+                {[
+                  { key: "drill", icon: "⛏", name: drillToolName(props.game.drill), detail: "Mining tool · power " + (props.drillDamage || props.game.drill) },
+                  { key: "cargoMax", icon: "🛒", name: "Heavy Haul Cart", detail: props.game.cargoMax + " ore capacity" },
+                  { key: "armor", icon: "🛡", name: "Reinforced Mining Suit", detail: props.game.maxHp + " protection" },
+                  { key: "blaster", icon: "⚔", name: "Steel Mining Sword", detail: "Sword level " + props.game.blaster },
+                ].map((item) => {
+                  const cost = props.gearCost ? props.gearCost(item.key) : 0;
                   return (
-                    <button key={building.key} onClick={() => props.upgradeBuilding(building)}>
-                      <span>{building.icon}</span>
-                      <div><b>{building.name}</b><small>LEVEL {level}</small></div>
+                    <button key={item.key} onClick={() => props.upgradeGear && props.upgradeGear(item.key)}>
+                      <span>{item.icon}</span>
+                      <div><b>{item.name}</b><small>{item.detail}</small></div>
                       <em>${cost.toLocaleString()}</em>
                     </button>
                   );

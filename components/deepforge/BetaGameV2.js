@@ -15,8 +15,11 @@ import {
 } from "./world";
 import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
 import { leaveMultiplayerWorld, syncMultiplayerPresence } from "./multiplayer";
+import { loadSharedWorld, submitSharedDigs } from "./sharedWorld";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
+const MAX_SHARED_DIG_RADIUS = 1.25;
+const CITY_PROTECTED_RADIUS = 9;
 
 function normalizeSave(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -74,6 +77,13 @@ function RigPanel(props) {
 
 function WorldScreen(props) {
   const game = props.game;
+  const [clock, setClock] = useState(Date.now());
+  useEffect(function () {
+    const timer = setInterval(function () { setClock(Date.now()); }, 1000);
+    return function () { clearInterval(timer); };
+  }, []);
+  const secondsLeft = props.resetAt ? Math.max(0, Math.ceil((props.resetAt - clock) / 1000)) : 0;
+  const resetLabel = String(Math.floor(secondsLeft / 60)).padStart(2, "0") + ":" + String(secondsLeft % 60).padStart(2, "0");
   return (
     <div className="df2-world-screen">
       <InfiniteWorld
@@ -99,6 +109,9 @@ function WorldScreen(props) {
         game={props.game}
         buildingCost={props.buildingCost}
         upgradeBuilding={props.upgradeBuilding}
+        gearCost={props.gearCost}
+        upgradeGear={props.upgradeGear}
+        drillDamage={props.drillDamage}
       />
 
       <div className="df2-world-overlay">
@@ -113,7 +126,10 @@ function WorldScreen(props) {
           </div>
           <button onClick={props.sellCargo}>SELL</button>
         </div>
-        <RigPanel game={game} drillDamage={props.drillDamage} gearCost={props.gearCost} upgradeGear={props.upgradeGear} />
+      </div>
+      <div style={{position:"absolute",left:12,top:94,zIndex:17,padding:"7px 9px",border:"1px solid rgba(255,255,255,.09)",borderRadius:8,background:"rgba(12,18,21,.82)",color:"#d7e0e2",fontSize:"10px",pointerEvents:"none"}}>
+        <b style={{display:"block",fontSize:"9px",letterSpacing:".08em"}}>HOURLY MAP RESET</b>
+        <span style={{display:"block",marginTop:2,color:props.sharedR2?"#8fe0ad":"#d8a46d"}}>{props.sharedR2 ? resetLabel : "R2 OFFLINE"}</span>
       </div>
     </div>
   );
@@ -271,13 +287,16 @@ export default function BetaGameV2() {
   const [cloudStatus, setCloudStatus] = useState(cloudEnabled() ? "D1 connecting" : "D1-ready · local save");
   const [multiplayer, setMultiplayer] = useState({ players: [], cities: [], me: null });
   const [cityWaypoint, setCityWaypoint] = useState(null);
+  const [sharedWorldMeta, setSharedWorldMeta] = useState({ r2: false, resetAt: 0, hourKey: null, maxDigRadius: MAX_SHARED_DIG_RADIUS, cityProtectedRadius: CITY_PROTECTED_RADIUS, error: "" });
   const playerIdRef = useRef(null);
   const lastCloudSaveRef = useRef(0);
   const multiplayerLiveRef = useRef({ player: DEFAULT_PLAYER, companyValue: 0, trophies: 0 });
+  const pendingDigsRef = useRef([]);
+  const sharedHourRef = useRef(null);
 
   const researchTech = game.researchTech || INITIAL.researchTech;
   const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);
-  const drillRadius = 0.7 + Math.min(0.42, drillDamage * 0.055) + (researchTech.drilling || 0) * 0.04;
+  const drillRadius = Math.min(MAX_SHARED_DIG_RADIUS, 0.7 + Math.min(0.42, drillDamage * 0.055) + (researchTech.drilling || 0) * 0.04);
   const refineryMult = 1 + (game.buildings.refinery || 0) * 0.12 + (researchTech.processing || 0) * 0.05;
   const academyBonus = game.buildings.academy || 0;
   const cityDefense = game.armor * 15 + (game.buildings.walls || 0) * 18;
@@ -375,6 +394,84 @@ export default function BetaGameV2() {
   }, [authUser ? authUser.id : ""]);
 
   useEffect(function () {
+    if (!loaded || !authUser || !authUser.id) return undefined;
+    let cancelled = false;
+    loadCloudSave(authUser.id)
+      .then(function (response) {
+        if (cancelled || !response) return;
+        const remote = normalizeSave(response && response.data ? response.data : response);
+        if (!remote) return;
+        setPlayer(remote.player);
+        setGame(remote.game);
+        setNotice("Account progression loaded from D1.");
+      })
+      .catch(function () {});
+    return function () { cancelled = true; };
+  }, [loaded, authUser ? authUser.id : ""]);
+
+  useEffect(function () {
+    if (!authUser || !authUser.id) {
+      sharedHourRef.current = null;
+      pendingDigsRef.current = [];
+      setSharedWorldMeta({ r2: false, resetAt: 0, hourKey: null, maxDigRadius: MAX_SHARED_DIG_RADIUS, cityProtectedRadius: CITY_PROTECTED_RADIUS, error: "Log in for the shared map." });
+      return undefined;
+    }
+    let stopped = false;
+    async function refreshSharedWorld() {
+      try {
+        const data = await loadSharedWorld();
+        if (stopped) return;
+        const nextHour = Number(data.hourKey);
+        const changedHour = sharedHourRef.current !== null && sharedHourRef.current !== nextHour;
+        sharedHourRef.current = nextHour;
+        let nextWorld = normalizeWorldChanges(data.worldChanges);
+        pendingDigsRef.current.forEach(function (dig) { nextWorld = addDigCircle(nextWorld, dig); });
+        setWorldChanges(nextWorld);
+        setSharedWorldMeta({
+          r2: Boolean(data.r2),
+          resetAt: Number(data.resetAt) || 0,
+          hourKey: nextHour,
+          maxDigRadius: Math.min(MAX_SHARED_DIG_RADIUS, Number(data.maxDigRadius) || MAX_SHARED_DIG_RADIUS),
+          cityProtectedRadius: Number(data.cityProtectedRadius) || CITY_PROTECTED_RADIUS,
+          error: "",
+        });
+        if (changedHour) {
+          pendingDigsRef.current = [];
+          setPlayer(function (current) { return { x: current.x, y: surfaceHeight(current.x) - 0.42 }; });
+          setResetKey(function (value) { return value + 1; });
+          setNotice("New hourly map started. Terrain reset; account progress was kept.");
+        }
+      } catch (error) {
+        if (stopped) return;
+        const data = error && error.data ? error.data : {};
+        setSharedWorldMeta(function (current) { return { ...current, r2: false, resetAt: Number(data.resetAt) || current.resetAt, error: error && error.message ? error.message : "R2 world unavailable." }; });
+      }
+    }
+    refreshSharedWorld();
+    const timer = setInterval(refreshSharedWorld, 1600);
+    return function () { stopped = true; clearInterval(timer); };
+  }, [authUser ? authUser.id : ""]);
+
+  useEffect(function () {
+    if (!authUser || !authUser.id) return undefined;
+    let busy = false;
+    const timer = setInterval(async function () {
+      if (busy || !sharedWorldMeta.r2 || pendingDigsRef.current.length === 0) return;
+      busy = true;
+      const batch = pendingDigsRef.current.splice(0, 10);
+      try {
+        await submitSharedDigs(batch);
+      } catch (error) {
+        if (!(error && error.data && error.data.protectedCity)) pendingDigsRef.current = batch.concat(pendingDigsRef.current).slice(-80);
+        if (error && error.message) setNotice(error.message);
+      } finally {
+        busy = false;
+      }
+    }, 450);
+    return function () { clearInterval(timer); };
+  }, [authUser ? authUser.id : "", sharedWorldMeta.r2]);
+
+  useEffect(function () {
     let cancelled = false;
     const playerId = getOrCreatePlayerId();
     playerIdRef.current = playerId;
@@ -404,12 +501,13 @@ export default function BetaGameV2() {
   useEffect(function () {
     if (!loaded) return undefined;
     const timer = setTimeout(function () {
-      const payload = { version: 3, updatedAt: Date.now(), player: player, game: game, worldChanges: normalizeWorldChanges(worldChanges) };
+      const accountPlayerId = (authUser && authUser.id) || playerIdRef.current;
+      const payload = { version: 4, updatedAt: Date.now(), player: player, game: game, worldChanges: authUser ? emptyWorldChanges() : normalizeWorldChanges(worldChanges) };
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(payload)); } catch (_) {}
-      if (cloudEnabled() && Date.now() - lastCloudSaveRef.current > 3500) {
+      if (cloudEnabled() && accountPlayerId && Date.now() - lastCloudSaveRef.current > 3500) {
         lastCloudSaveRef.current = Date.now();
-        setCloudStatus("D1 saving");
-        saveCloudSave(playerIdRef.current, payload)
+        setCloudStatus(authUser ? "Account saving" : "D1 saving");
+        saveCloudSave(accountPlayerId, payload)
           .then(function () {
             setCloudStatus("D1 synced");
             return syncClanProfile((authUser && authUser.id) || playerIdRef.current, companyValue, game.trophies).catch(function () {});
@@ -423,13 +521,20 @@ export default function BetaGameV2() {
   function drill(excavation) {
     if (challenge || tab !== "world") return;
 
-    const radius = Number(excavation.radius) || drillRadius;
+    const radius = Math.min(sharedWorldMeta.maxDigRadius || MAX_SHARED_DIG_RADIUS, Number(excavation.radius) || drillRadius);
     const circle = {
       x: Number(excavation.x),
       y: Number(excavation.y),
       r: radius,
       shape: "square",
     };
+
+    const protectedRadius = sharedWorldMeta.cityProtectedRadius || CITY_PROTECTED_RADIUS;
+    const protectedCity = multiplayer.cities.find(function (city) { return Math.abs(Number(city.x) - circle.x) <= protectedRadius; });
+    if (protectedCity) {
+      setNotice("City ground is protected. Walk outside " + protectedCity.ownerName + "'s city limits to mine.");
+      return;
+    }
 
     const hits = depositsHitByCircle(circle.x, circle.y, circle.r, worldChanges);
     if (hits.length && game.cargoCount >= game.cargoMax) {
@@ -446,6 +551,10 @@ export default function BetaGameV2() {
     }
 
     setWorldChanges(nextChanges);
+    if (authUser && authUser.id && sharedWorldMeta.r2) {
+      pendingDigsRef.current.push({ x: circle.x, y: circle.y, r: circle.r, shape: "square" });
+      if (pendingDigsRef.current.length > 80) pendingDigsRef.current.splice(0, pendingDigsRef.current.length - 80);
+    }
 
     if (collected) {
       const type = collected.type;
@@ -467,7 +576,7 @@ export default function BetaGameV2() {
       );
     } else {
       const depth = circle.y - surfaceHeight(circle.x);
-      setNotice(depth < 5.5 ? "Excavated a round cut through soil." : depth < 22 ? "Excavated a round cut through compact earth." : "Cut a round section of bedrock.");
+      setNotice(depth < 5.5 ? "Excavated a square cut through soil." : depth < 22 ? "Excavated a square cut through compact earth." : "Cut a square section of bedrock.");
     }
   }
 
@@ -487,6 +596,8 @@ export default function BetaGameV2() {
   }
 
   function upgradeGear(key) {
+    const inOwnCity = myCity && Math.abs(Number(player.x) - Number(myCity.x)) <= 7.5 && (Number(player.y) - surfaceHeight(Number(player.x))) < 1.5;
+    if (!inOwnCity) { setNotice("Walk to your city supply depot to buy mining gear."); return; }
     const cost = gearCost(key);
     if (game.coins < cost) { setNotice("Need $" + cost.toLocaleString() + "."); return; }
     setGame(function (g) { return { ...g, coins: g.coins - cost, [key]: key === "cargoMax" ? g.cargoMax + 8 : g[key] + 1, maxHp: key === "armor" ? g.maxHp + 15 : g.maxHp, hp: key === "armor" ? g.hp + 15 : g.hp }; });
@@ -607,7 +718,7 @@ export default function BetaGameV2() {
     const spawn = { x: 0, y: surfaceHeight(0) - 0.42 };
     setPlayer(spawn);
     setGame(INITIAL);
-    setWorldChanges(emptyWorldChanges());
+    if (!authUser) setWorldChanges(emptyWorldChanges());
     setChallenge(null);
     setChallengeResult(null);
     setTab("world");
@@ -618,15 +729,16 @@ export default function BetaGameV2() {
       updatedAt: Date.now(),
       player: spawn,
       game: INITIAL,
-      worldChanges: emptyWorldChanges(),
+      worldChanges: authUser ? emptyWorldChanges() : emptyWorldChanges(),
     };
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(resetPayload));
     } catch (_) {}
-    if (cloudEnabled() && playerIdRef.current) {
+    const resetPlayerId = (authUser && authUser.id) || playerIdRef.current;
+    if (cloudEnabled() && resetPlayerId) {
       lastCloudSaveRef.current = Date.now();
-      setCloudStatus("D1 saving");
-      saveCloudSave(playerIdRef.current, resetPayload)
+      setCloudStatus(authUser ? "Account saving" : "D1 saving");
+      saveCloudSave(resetPlayerId, resetPayload)
         .then(function () { setCloudStatus("D1 synced"); })
         .catch(function () { setCloudStatus("D1 offline · local save"); });
     }
@@ -664,7 +776,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
