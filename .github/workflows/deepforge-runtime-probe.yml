@@ -1,0 +1,21 @@
+name: DEEPFORGE Runtime Probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/probe_deepforge_runtime.sh
+      - .github/workflows/deepforge-runtime-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe production APIs
+        run: bash scripts/probe_deepforge_runtime.sh
