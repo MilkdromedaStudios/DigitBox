@@ -1,0 +1,105 @@
+name: Fix DEEPFORGE bridge pass-through
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-deepforge-bridge-pass-through.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Make bridges one-way platforms
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('components/deepforge/InfiniteWorld.js')
+          s = p.read_text()
+          old = '''function collides(x, y, changes) {
+  const samples = [
+    [0, 0],
+    [-PLAYER_RADIUS, 0],
+    [PLAYER_RADIUS, 0],
+    [0, -PLAYER_RADIUS * 0.95],
+    [0, PLAYER_RADIUS],
+    [-PLAYER_RADIUS * 0.72, PLAYER_RADIUS * 0.72],
+    [PLAYER_RADIUS * 0.72, PLAYER_RADIUS * 0.72],
+  ];
+  const terrainHit = samples.some(([ox, oy]) => isSolidAt(x + ox, y + oy, changes));
+  if (terrainHit) return true;
+  return Boolean(surfaceBridgeAt(x, y + PLAYER_RADIUS, changes));
+}'''
+          new = '''function collides(x, y, changes) {
+  const samples = [
+    [0, 0],
+    [-PLAYER_RADIUS, 0],
+    [PLAYER_RADIUS, 0],
+    [0, -PLAYER_RADIUS * 0.95],
+    [0, PLAYER_RADIUS],
+    [-PLAYER_RADIUS * 0.72, PLAYER_RADIUS * 0.72],
+    [PLAYER_RADIUS * 0.72, PLAYER_RADIUS * 0.72],
+  ];
+  // Bridges are deliberately NOT solid here. They are one-way platforms:
+  // miners can move/jump underneath them, but land on the deck from above.
+  return samples.some(([ox, oy]) => isSolidAt(x + ox, y + oy, changes));
+}
+
+function bridgeLandingAt(x, fromY, toY, changes) {
+  if (toY <= fromY) return null;
+  const fromFoot = fromY + PLAYER_RADIUS;
+  const toFoot = toY + PLAYER_RADIUS;
+  const probe = surfaceBridgeAt(x, toFoot, changes) || surfaceBridgeAt(x, fromFoot, changes);
+  if (!probe) return null;
+  if (fromFoot <= probe.y + 0.04 && toFoot >= probe.y - 0.04) return probe;
+  return null;
+}'''
+          if old not in s:
+            raise SystemExit('collision block not found; refusing unsafe patch')
+          s = s.replace(old, new, 1)
+          old2 = '''        const ny = p.y + v.y * dt;
+        if (!collides(p.x, ny, changes)) {
+          p.y = ny;
+          groundedRef.current = false;
+        } else {
+          if (v.y > 0) groundedRef.current = true;
+          v.y = 0;
+        }'''
+          new2 = '''        const ny = p.y + v.y * dt;
+        const bridgeLanding = v.y > 0 ? bridgeLandingAt(p.x, p.y, ny, changes) : null;
+        if (bridgeLanding) {
+          p.y = bridgeLanding.y - PLAYER_RADIUS;
+          groundedRef.current = true;
+          v.y = 0;
+        } else if (!collides(p.x, ny, changes)) {
+          p.y = ny;
+          groundedRef.current = false;
+        } else {
+          if (v.y > 0) groundedRef.current = true;
+          v.y = 0;
+        }'''
+          if old2 not in s:
+            raise SystemExit('vertical movement block not found; refusing unsafe patch')
+          s = s.replace(old2, new2, 1)
+          p.write_text(s)
+          PY
+      - name: Verify patch
+        run: |
+          grep -q 'function bridgeLandingAt' components/deepforge/InfiniteWorld.js
+          grep -q 'const bridgeLanding = v.y > 0' components/deepforge/InfiniteWorld.js
+          npm ci
+          npm run typecheck
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add components/deepforge/InfiniteWorld.js
+          git commit -m 'Allow miners to pass underneath bridges'
+          git push
