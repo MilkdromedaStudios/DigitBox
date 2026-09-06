@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import InfiniteWorld from "./InfiniteWorld";
+import WorldCityOverlay from "./WorldCityOverlay";
 import ClanScreen from "./ClanScreen";
 import ClanWarScreen from "./ClanWarScreen";
 import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
@@ -13,6 +14,7 @@ import {
   surfaceHeight,
 } from "./world";
 import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
+import { leaveMultiplayerWorld, syncMultiplayerPresence } from "./multiplayer";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 
@@ -82,6 +84,21 @@ function WorldScreen(props) {
         paused={props.paused}
         drillRadius={props.drillRadius}
         resetKey={props.resetKey}
+        cities={props.cities}
+        remotePlayers={props.remotePlayers}
+        myUserId={props.myUserId}
+      />
+
+      <WorldCityOverlay
+        player={props.player}
+        cities={props.cities}
+        players={props.remotePlayers}
+        myCity={props.myCity}
+        waypoint={props.waypoint}
+        onWaypoint={props.onWaypoint}
+        game={props.game}
+        buildingCost={props.buildingCost}
+        upgradeBuilding={props.upgradeBuilding}
       />
 
       <div className="df2-world-overlay">
@@ -252,8 +269,11 @@ export default function BetaGameV2() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState("");
   const [cloudStatus, setCloudStatus] = useState(cloudEnabled() ? "D1 connecting" : "D1-ready · local save");
+  const [multiplayer, setMultiplayer] = useState({ players: [], cities: [], me: null });
+  const [cityWaypoint, setCityWaypoint] = useState(null);
   const playerIdRef = useRef(null);
   const lastCloudSaveRef = useRef(0);
+  const multiplayerLiveRef = useRef({ player: DEFAULT_PLAYER, companyValue: 0, trophies: 0 });
 
   const researchTech = game.researchTech || INITIAL.researchTech;
   const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);
@@ -270,6 +290,10 @@ export default function BetaGameV2() {
     Object.values(researchTech).reduce(function (a, b) { return a + b; }, 0) * 110
   );
   const warPower = Math.round((raidPower + game.armor * 12 + companyValue * 0.012) * (1 + (researchTech.tactics || 0) * 0.12));
+  multiplayerLiveRef.current = { player, companyValue, trophies: game.trophies };
+  const myCity = multiplayer.me
+    ? (multiplayer.cities.find(function (city) { return city.ownerId === multiplayer.me.id; }) || { ownerId: multiplayer.me.id, ownerName: multiplayer.me.name, x: multiplayer.me.cityX, online: true })
+    : null;
   const leaderboard = useMemo(function () {
     return RIVALS.map(function (rival) { return { name: rival.name, trophies: rival.trophies, npc: true }; })
       .concat([{ name: "YOU", trophies: game.trophies, npc: false }])
@@ -305,6 +329,50 @@ export default function BetaGameV2() {
       });
     return function () { mounted = false; };
   }, []);
+
+
+  useEffect(function () {
+    if (!authUser || !authUser.id) {
+      setMultiplayer({ players: [], cities: [], me: null });
+      setCityWaypoint(null);
+      return undefined;
+    }
+
+    let stopped = false;
+    let timer = null;
+    async function tick() {
+      const live = multiplayerLiveRef.current;
+      try {
+        const data = await syncMultiplayerPresence({
+          x: live.player.x,
+          y: live.player.y,
+          companyValue: live.companyValue,
+          trophies: live.trophies,
+        });
+        if (stopped) return;
+        const next = {
+          players: Array.isArray(data.players) ? data.players : [],
+          cities: Array.isArray(data.cities) ? data.cities : [],
+          me: data.me || null,
+        };
+        setMultiplayer(next);
+        setCityWaypoint(function (current) {
+          const own = next.me ? next.cities.find(function (city) { return city.ownerId === next.me.id; }) : null;
+          if (!current) return own || null;
+          return next.cities.find(function (city) { return city.ownerId === current.ownerId; }) || own || null;
+        });
+      } catch (_) {
+        if (!stopped) setMultiplayer(function (current) { return { ...current, players: [] }; });
+      }
+    }
+
+    tick();
+    timer = setInterval(tick, 1000);
+    return function () {
+      stopped = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [authUser ? authUser.id : ""]);
 
   useEffect(function () {
     let cancelled = false;
@@ -520,6 +588,7 @@ export default function BetaGameV2() {
     setAccountBusy(true);
     setAccountError("");
     try {
+      await leaveMultiplayerWorld().catch(function () {});
       await cloudLogout();
       setAuthUser(null);
       setAccountOpen(false);
@@ -587,21 +656,20 @@ export default function BetaGameV2() {
       </header>
 
       <nav className="df2-tabs">
-        {[["world","⛏ Mine"],["empire","🏚 Town"],["clan","👥 Clans"],["league","⚔ Clan Wars"],["research","🔬 Research"]].map(function (item) {
+        {[["world","⛏ World"],["clan","👥 Clans"],["league","⚔ Clan Wars"],["research","🔬 Research"]].map(function (item) {
           return <button key={item[0]} className={tab === item[0] ? "active" : ""} onClick={function () { setTab(item[0]); }}>{item[1]}</button>;
         })}
       </nav>
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} />}
-        {tab === "empire" && <EmpireScreen game={game} companyValue={companyValue} cityDefense={cityDefense} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
       </main>
 
-      <footer className="df2-footer"><span>{cloudStatus}</span><span>{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>
+      <footer className="df2-footer"><span>{cloudStatus}</span><span>{authUser ? multiplayer.players.length + " online · " : ""}{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>
 
       {accountOpen && (
         <div className="df2-modal df2-account-modal" onMouseDown={function (event) { if (event.target === event.currentTarget) setAccountOpen(false); }}>

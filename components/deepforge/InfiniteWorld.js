@@ -463,6 +463,137 @@ function drawLighting(ctx, width, height, playerScreenX, playerScreenY, depth, d
   ctx.fill();
 }
 
+
+function resolveDrillTarget(player, aim, radius, changes) {
+  let ax = Number(aim && aim.x) || 0;
+  let ay = Number(aim && aim.y) || 0;
+  let magnitude = Math.sqrt(ax * ax + ay * ay);
+  if (magnitude < 0.08) {
+    ax = 0;
+    ay = 1;
+    magnitude = 1;
+  }
+  ax /= magnitude;
+  ay /= magnitude;
+
+  const start = PLAYER_RADIUS + 0.08;
+  const maxDistance = 1.18 + radius * 0.9;
+  let hitDistance = null;
+  for (let distance = start; distance <= maxDistance; distance += 0.08) {
+    if (isSolidAt(player.x + ax * distance, player.y + ay * distance, changes)) {
+      hitDistance = distance;
+      break;
+    }
+  }
+
+  if (hitDistance === null) {
+    return {
+      x: player.x + ax * maxDistance,
+      y: player.y + ay * maxDistance,
+      ax,
+      ay,
+      hit: false,
+    };
+  }
+
+  const centerDistance = Math.min(maxDistance, hitDistance + Math.min(0.38, radius * 0.42));
+  return {
+    x: player.x + ax * centerDistance,
+    y: player.y + ay * centerDistance,
+    ax,
+    ay,
+    hit: true,
+  };
+}
+
+function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light) {
+  const centerX = Number(city && city.x);
+  if (!Number.isFinite(centerX)) return;
+  const centerScreenX = worldToScreenX(centerX, cameraX, ppu, width);
+  if (centerScreenX < -520 || centerScreenX > width + 520) return;
+
+  ctx.save();
+  ctx.globalAlpha = 0.78 + light * 0.2;
+  ctx.strokeStyle = "rgba(68,62,54,.9)";
+  ctx.lineWidth = Math.max(4, ppu * 0.12);
+  ctx.beginPath();
+  let first = true;
+  for (let wx = centerX - 7.5; wx <= centerX + 7.5; wx += 0.35) {
+    const sx = worldToScreenX(wx, cameraX, ppu, width);
+    const sy = worldToScreenY(surfaceHeight(wx) - 0.02, cameraY, ppu, height);
+    if (first) { ctx.moveTo(sx, sy); first = false; }
+    else ctx.lineTo(sx, sy);
+  }
+  ctx.stroke();
+
+  const buildings = [
+    { dx: -5.2, w: 1.8, h: 2.7 },
+    { dx: -2.5, w: 2.2, h: 3.8 },
+    { dx: 0.3, w: 2.4, h: 4.7 },
+    { dx: 3.2, w: 2.0, h: 3.3 },
+    { dx: 5.6, w: 1.5, h: 2.4 },
+  ];
+
+  buildings.forEach((building, index) => {
+    const wx = centerX + building.dx;
+    const ground = surfaceHeight(wx);
+    const sx = worldToScreenX(wx, cameraX, ppu, width);
+    const sy = worldToScreenY(ground, cameraY, ppu, height);
+    const bw = building.w * ppu;
+    const bh = building.h * ppu;
+    ctx.fillStyle = index === 2 ? "#5a5042" : index % 2 ? "#6b5a47" : "#51483d";
+    ctx.fillRect(sx - bw / 2, sy - bh, bw, bh);
+    ctx.fillStyle = "#342f2a";
+    ctx.fillRect(sx - bw * 0.57, sy - bh - ppu * 0.18, bw * 1.14, ppu * 0.2);
+    ctx.fillStyle = city.online ? "rgba(255,219,126,.72)" : "rgba(150,164,166,.36)";
+    const windowSize = Math.max(2, ppu * 0.12);
+    for (let wy = sy - bh + ppu * 0.45; wy < sy - ppu * 0.35; wy += ppu * 0.55) {
+      ctx.fillRect(sx - bw * 0.24, wy, windowSize, windowSize);
+      ctx.fillRect(sx + bw * 0.13, wy, windowSize, windowSize);
+    }
+  });
+
+  const signY = worldToScreenY(surfaceHeight(centerX) - 5.8, cameraY, ppu, height);
+  const label = String(city.ownerName || "MINER").toUpperCase() + " CITY";
+  ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
+  const textWidth = ctx.measureText(label).width;
+  ctx.fillStyle = "rgba(17,22,22,.84)";
+  ctx.fillRect(centerScreenX - textWidth / 2 - 9, signY - 14, textWidth + 18, 23);
+  ctx.strokeStyle = city.online ? "rgba(91,217,143,.65)" : "rgba(173,157,122,.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(centerScreenX - textWidth / 2 - 9, signY - 14, textWidth + 18, 23);
+  ctx.fillStyle = "#e5dcc7";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, centerScreenX, signY - 2);
+  ctx.restore();
+}
+
+function drawRemoteMiner(ctx, remote, cameraX, cameraY, ppu, width, height, light, sunAngle, changes) {
+  if (!remote || !Number.isFinite(Number(remote.x)) || !Number.isFinite(Number(remote.y))) return;
+  const rx = Number(remote.x);
+  const ry = Number(remote.y);
+  const depth = ry - surfaceHeight(rx);
+  if (depth > 1.2 && isSolidAt(rx, ry, changes)) return;
+  const sx = worldToScreenX(rx, cameraX, ppu, width);
+  const sy = worldToScreenY(ry, cameraY, ppu, height);
+  if (sx < -80 || sx > width + 80 || sy < -100 || sy > height + 100) return;
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  drawMiner(ctx, sx, sy, 1, false, ppu * 0.9, light, sunAngle);
+  const label = String(remote.name || "Miner").slice(0, 22);
+  ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = "rgba(10,17,19,.82)";
+  ctx.fillRect(sx - tw / 2 - 6, sy - 58, tw + 12, 18);
+  ctx.fillStyle = "#bfe8d0";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, sx, sy - 49);
+  ctx.restore();
+}
+
 export default function InfiniteWorld(props) {
   const canvasRef = useRef(null);
   const viewportRef = useRef(null);
@@ -487,12 +618,20 @@ export default function InfiniteWorld(props) {
   const hudRef = useRef({ chunkX: 0, chunkY: 0, depth: 0, time: "DAY" });
   const [hud, setHud] = useState(hudRef.current);
   const drillRadiusRef = useRef(props.drillRadius || 0.78);
+  const mouseAimRef = useRef(false);
+  const playerScreenRef = useRef({ x: 0, y: 0 });
+  const citiesRef = useRef(Array.isArray(props.cities) ? props.cities : []);
+  const remotePlayersRef = useRef(Array.isArray(props.remotePlayers) ? props.remotePlayers : []);
+  const myUserIdRef = useRef(props.myUserId || "");
 
   useEffect(() => { changesRef.current = normalizeWorldChanges(props.worldChanges); }, [props.worldChanges]);
   useEffect(() => { positionCbRef.current = props.onPosition; }, [props.onPosition]);
   useEffect(() => { drillCbRef.current = props.onDrill; }, [props.onDrill]);
   useEffect(() => { pausedRef.current = props.paused; }, [props.paused]);
   useEffect(() => { drillRadiusRef.current = props.drillRadius || 0.78; }, [props.drillRadius]);
+  useEffect(() => { citiesRef.current = Array.isArray(props.cities) ? props.cities : []; }, [props.cities]);
+  useEffect(() => { remotePlayersRef.current = Array.isArray(props.remotePlayers) ? props.remotePlayers : []; }, [props.remotePlayers]);
+  useEffect(() => { myUserIdRef.current = props.myUserId || ""; }, [props.myUserId]);
 
   useEffect(() => {
     if (Number.isFinite(props.player.x) && Number.isFinite(props.player.y)) {
@@ -513,6 +652,7 @@ export default function InfiniteWorld(props) {
     pointerRef.current = null;
     groundedRef.current = false;
     facingRef.current = 1;
+    mouseAimRef.current = false;
     lastReportRef.current = 0;
     setJoystick({ visible: false, x: 0, y: 0, dx: 0, dy: 0 });
     const spawnChunk = chunkFor(props.player.x, props.player.y);
@@ -547,23 +687,19 @@ export default function InfiniteWorld(props) {
     const liveMove = moveRef.current;
     const liveMagnitude = Math.sqrt(liveMove.x * liveMove.x + liveMove.y * liveMove.y);
     const surfaceDepth = p.y - surfaceHeight(p.x);
-    if (surfaceDepth < 0.9 && liveMagnitude < 0.2) {
+    if (!mouseAimRef.current && surfaceDepth < 0.9 && liveMagnitude < 0.2) {
       aim = { x: 0, y: 1 };
     }
-    const magnitude = Math.sqrt(aim.x * aim.x + aim.y * aim.y);
-    if (magnitude < 0.2) aim = { x: 0, y: 1 };
-    const normalized = Math.sqrt(aim.x * aim.x + aim.y * aim.y) || 1;
-    const ax = aim.x / normalized;
-    const ay = aim.y / normalized;
     const radius = drillRadiusRef.current;
-    const distance = 0.86 + radius * 0.38;
+    const target = resolveDrillTarget(p, aim, radius, changesRef.current);
+    if (!target.hit) return;
 
     drillCbRef.current({
-      x: p.x + ax * distance,
-      y: p.y + ay * distance,
+      x: target.x,
+      y: target.y,
       radius,
-      aimX: ax,
-      aimY: ay,
+      aimX: target.ax,
+      aimY: target.ay,
     });
   }
 
@@ -587,7 +723,7 @@ export default function InfiniteWorld(props) {
     event.preventDefault();
     fireDrill();
     if (drillTimerRef.current) clearInterval(drillTimerRef.current);
-    drillTimerRef.current = setInterval(fireDrill, 260);
+    drillTimerRef.current = setInterval(fireDrill, 180);
   }
 
   function stopDrilling(event) {
@@ -653,7 +789,7 @@ export default function InfiniteWorld(props) {
         const m = Math.sqrt(keyX * keyX + keyY * keyY) || 1;
         inputX = keyX / m;
         inputY = keyY / m;
-        aimRef.current = { x: inputX, y: inputY };
+        if (!mouseAimRef.current) aimRef.current = { x: inputX, y: inputY };
       }
 
       if (!pausedRef.current) {
@@ -680,7 +816,18 @@ export default function InfiniteWorld(props) {
         if (!collides(nx, p.y, changes)) {
           p.x = nx;
         } else {
-          v.x = 0;
+          let stepped = false;
+          if (Math.abs(v.x) > 0.08 && depth < 1.35) {
+            for (let step = 0.1; step <= 0.6; step += 0.1) {
+              if (!collides(p.x, p.y - step, changes) && !collides(nx, p.y - step, changes)) {
+                p.y -= step;
+                p.x = nx;
+                stepped = true;
+                break;
+              }
+            }
+          }
+          if (!stepped) v.x = 0;
         }
 
         const ny = p.y + v.y * dt;
@@ -819,22 +966,31 @@ export default function InfiniteWorld(props) {
         ctx.fill();
       }
 
+      for (const city of citiesRef.current) {
+        drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, day.light);
+      }
+      for (const remote of remotePlayersRef.current) {
+        if (remote.id !== myUserIdRef.current) {
+          drawRemoteMiner(ctx, remote, cameraX, cameraY, ppu, width, height, day.light, day.angle, changesNow);
+        }
+      }
+
       const playerScreenX = width / 2;
       const playerScreenY = worldToScreenY(p.y, cameraY, ppu, height);
+      playerScreenRef.current = { x: playerScreenX, y: playerScreenY };
 
       let previewAim = aimRef.current;
       const previewMoveMagnitude = Math.sqrt(moveRef.current.x * moveRef.current.x + moveRef.current.y * moveRef.current.y);
-      if (depth < 0.9 && previewMoveMagnitude < 0.2) previewAim = { x: 0, y: 1 };
-      const previewMag = Math.sqrt(previewAim.x * previewAim.x + previewAim.y * previewAim.y) || 1;
-      const pax = previewAim.x / previewMag;
-      const pay = previewAim.y / previewMag;
-      const previewDistance = 0.86 + drillRadiusRef.current * 0.38;
-      const reticleX = playerScreenX + pax * previewDistance * ppu;
-      const reticleY = playerScreenY + pay * previewDistance * ppu;
+      if (!mouseAimRef.current && depth < 0.9 && previewMoveMagnitude < 0.2) previewAim = { x: 0, y: 1 };
+      const previewTarget = resolveDrillTarget(p, previewAim, drillRadiusRef.current, changesNow);
+      const reticleX = worldToScreenX(previewTarget.x, cameraX, ppu, width);
+      const reticleY = worldToScreenY(previewTarget.y, cameraY, ppu, height);
       ctx.save();
       ctx.setLineDash([5, 5]);
-      ctx.strokeStyle = depth < 1 ? "rgba(255,248,218,.58)" : "rgba(255,224,155,.46)";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = previewTarget.hit
+        ? (depth < 1 ? "rgba(255,248,218,.68)" : "rgba(255,224,155,.58)")
+        : "rgba(164,177,177,.27)";
+      ctx.lineWidth = previewTarget.hit ? 1.7 : 1.2;
       ctx.beginPath();
       ctx.arc(reticleX, reticleY, drillRadiusRef.current * ppu, 0, Math.PI * 2);
       ctx.stroke();
@@ -874,9 +1030,28 @@ export default function InfiniteWorld(props) {
     };
   }, []);
 
+  function setMouseAim(event) {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    const playerScreen = playerScreenRef.current;
+    const dx = event.clientX - rect.left - playerScreen.x;
+    const dy = event.clientY - rect.top - playerScreen.y;
+    const magnitude = Math.sqrt(dx * dx + dy * dy);
+    if (magnitude > 5) {
+      aimRef.current = { x: dx / magnitude, y: dy / magnitude };
+      mouseAimRef.current = true;
+    }
+  }
+
   function startStick(event) {
     if (props.paused) return;
-    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (event.pointerType === "mouse") {
+      if (event.button !== 0) return;
+      setMouseAim(event);
+      event.preventDefault();
+      return;
+    }
     const rect = viewportRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -888,6 +1063,10 @@ export default function InfiniteWorld(props) {
   }
 
   function moveStick(event) {
+    if (event.pointerType === "mouse") {
+      setMouseAim(event);
+      return;
+    }
     const active = pointerRef.current;
     if (!active || active.id !== event.pointerId) return;
     const rect = viewportRef.current.getBoundingClientRect();
@@ -965,7 +1144,7 @@ export default function InfiniteWorld(props) {
           <b>DIG</b>
         </button>
 
-        <div className="df-world-tip">Drag to move · hold DIG · free SURFACE rescue appears underground</div>
+        <div className="df-world-tip">WASD moves · mouse aims · hold DIG or Space · touch: drag to move</div>
       </div>
     </div>
   );
