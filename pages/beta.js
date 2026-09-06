@@ -73,7 +73,7 @@ export default function BetaPage() {
             <div className="hero-content">
               <div className="hero-box beta-liquid-hero-glass">
                 <span className="beta-kicker">DIGITBOX / BETA CHANNEL</span>
-                <h1>Latest News</h1>
+                <h1>DigitBox</h1>
                 <p>Fresh projects, build notes, experiments, and releases from DigitBox.</p>
                 <div className="beta-news-pills">
                   {updatesError && <span className="beta-news-empty">{updatesError}</span>}
@@ -248,7 +248,7 @@ export default function BetaPage() {
         .beta-deepforge-pill {
           position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:clamp(1rem,3vw,2.2rem);
           width:100%;min-height:220px;margin:1.35rem 0;padding:clamp(1.3rem,4vw,2.4rem);overflow:hidden;
-          border-radius:999px;border:1px solid rgba(255,255,255,.23);color:#f1f8ff;
+          border-radius:30px;border:1px solid rgba(255,255,255,.23);color:#f1f8ff;
           background:linear-gradient(105deg,rgba(4,16,21,.72),rgba(25,38,48,.45) 45%,rgba(63,38,19,.4));
           box-shadow:0 30px 75px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.22);backdrop-filter:blur(28px) saturate(150%);
           transition:transform .25s ease,border-color .25s ease;
