@@ -1,0 +1,35 @@
+name: Apply DEEPFORGE Square Dig
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/patch-deepforge-square-dig.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/patch-deepforge-square-dig.py
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/deepforge/world.js components/deepforge/BetaGameV2.js components/deepforge/InfiniteWorld.js
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+          else
+            git commit -m "Make DEEPFORGE digging square and keep cave darkness underground"
+            git push
+          fi
