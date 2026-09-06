@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - scripts/patch-deepforge-square-dig.py
+      - .github/workflows/apply-deepforge-square-dig.yml
   workflow_dispatch:
 
 permissions:
