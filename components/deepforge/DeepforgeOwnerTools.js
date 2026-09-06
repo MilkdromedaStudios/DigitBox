@@ -97,7 +97,7 @@ function readPrefs() {
 
 export default function DeepforgeOwnerTools() {
   const [owner, setOwner] = useState(false);
-  const [access, setAccess] = useState({ permanentOwner: false, delegatedAdmin: false, username: "" });
+  const [access, setAccess] = useState({ permanentOwner: false, delegatedAdmin: false, username: "", userId: "" });
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("cheats");
   const [infinite, setInfinite] = useState(false);
@@ -127,7 +127,7 @@ export default function DeepforgeOwnerTools() {
       const user = await loadCloudAuth();
       if (!user) {
         setOwner(false);
-        setAccess({ permanentOwner: false, delegatedAdmin: false, username: "" });
+        setAccess({ permanentOwner: false, delegatedAdmin: false, username: "", userId: "" });
         return false;
       }
       const response = await fetch("/api/deepforge/owner", {
@@ -141,6 +141,7 @@ export default function DeepforgeOwnerTools() {
         permanentOwner: Boolean(body.permanentOwner),
         delegatedAdmin: Boolean(body.delegatedAdmin),
         username: body.username || user.displayName || "",
+        userId: user.id || "",
       });
       return ok;
     } catch (_) {
@@ -197,7 +198,7 @@ export default function DeepforgeOwnerTools() {
 
     next.updatedAt = Date.now();
     localStorage.setItem(SAVE_KEY, JSON.stringify(next));
-    await saveCloudSave(getOrCreatePlayerId(), next).catch(() => null);
+    await saveCloudSave(access.userId || getOrCreatePlayerId(), next).catch(() => null);
 
     if (options.reload && !reloadQueuedRef.current) {
       reloadQueuedRef.current = true;
