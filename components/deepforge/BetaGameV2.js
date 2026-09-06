@@ -22,6 +22,11 @@ const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 const MAX_SHARED_DIG_RADIUS = 1.25;
 const CITY_PROTECTED_RADIUS = 9;
 
+function buildingMaxHp(key, level) {
+  const base = key === "walls" ? 160 : 100;
+  return base + Math.max(0, Number(level) || 0) * (key === "walls" ? 55 : 45);
+}
+
 function normalizeSave(raw) {
   if (!raw || typeof raw !== "object") return null;
   const isContinuousWorld = Number(raw.version) >= 3;
@@ -39,7 +44,13 @@ function normalizeSave(raw) {
             }
             return acc;
           }, {});
-          return { ...INITIAL, ...clean, buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) }, researchTech: { ...INITIAL.researchTech, ...(raw.game.researchTech || {}) } };
+          return {
+            ...INITIAL,
+            ...clean,
+            buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) },
+            buildingHp: { ...INITIAL.buildingHp, ...(raw.game.buildingHp || {}) },
+            researchTech: { ...INITIAL.researchTech, ...(raw.game.researchTech || {}) },
+          };
         })()
       : INITIAL,
     worldChanges: isContinuousWorld ? normalizeWorldChanges(raw.worldChanges) : emptyWorldChanges(),
@@ -104,6 +115,9 @@ function WorldScreen(props) {
         onPlayerAttack={props.onPlayerAttack}
         onZombieDamage={props.onZombieDamage}
         onZombieKill={props.onZombieKill}
+        cityBuildings={game.buildings}
+        cityBuildingHp={game.buildingHp}
+        onBuildingDamage={props.onBuildingDamage}
       />
 
       <WorldCityOverlay
@@ -652,6 +666,26 @@ export default function BetaGameV2() {
     setNotice("Zombie defeated · +$25 bounty.");
   }
 
+  function handleBuildingDamage(key, amount) {
+    if (!Object.prototype.hasOwnProperty.call(INITIAL.buildings, key)) return;
+    setGame(function (current) {
+      const level = (current.buildings && current.buildings[key]) || 0;
+      const maxHp = buildingMaxHp(key, level);
+      const stored = Number(current.buildingHp && current.buildingHp[key]);
+      const hp = Number.isFinite(stored) ? Math.min(maxHp, stored) : maxHp;
+      const nextHp = Math.max(0, hp - Math.max(1, Number(amount) || 1));
+      if (nextHp === hp) return current;
+      return {
+        ...current,
+        buildingHp: {
+          ...INITIAL.buildingHp,
+          ...(current.buildingHp || {}),
+          [key]: nextHp,
+        },
+      };
+    });
+  }
+
   function sellCargo() {
     if (!game.cargoCount) { setNotice("Cargo cart is empty."); return; }
     let raw = 0;
@@ -680,8 +714,20 @@ export default function BetaGameV2() {
   function upgradeBuilding(building) {
     const cost = buildingCost(building);
     if (game.coins < cost) { setNotice("Need $" + cost.toLocaleString() + " for " + building.name + "."); return; }
-    setGame(function (g) { return { ...g, coins: g.coins - cost, buildings: { ...g.buildings, [building.key]: (g.buildings[building.key] || 0) + 1 } }; });
-    setNotice(building.name + " upgraded.");
+    setGame(function (g) {
+      const nextLevel = (g.buildings[building.key] || 0) + 1;
+      return {
+        ...g,
+        coins: g.coins - cost,
+        buildings: { ...g.buildings, [building.key]: nextLevel },
+        buildingHp: {
+          ...INITIAL.buildingHp,
+          ...(g.buildingHp || {}),
+          [building.key]: buildingMaxHp(building.key, nextLevel),
+        },
+      };
+    });
+    setNotice(building.name + " upgraded — construction is rising in the world.");
   }
 
   function openChallenge() { setChallenge(challengeFor(game.research + game.blocksMined + Math.floor(player.x + player.y))); setChallengeResult(null); }
@@ -848,7 +894,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
