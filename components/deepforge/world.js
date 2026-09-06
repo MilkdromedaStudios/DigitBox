@@ -101,6 +101,7 @@ export function addDigCircle(changes, circle) {
         x: Number(circle.x.toFixed(3)),
         y: Number(circle.y.toFixed(3)),
         r: Number(circle.r.toFixed(3)),
+        shape: circle.shape === "square" ? "square" : "circle",
       });
       // Bound a single chunk's history. Overlapping cuts still render as one
       // organic tunnel, while this prevents a pathological save from exploding.
@@ -124,7 +125,7 @@ export function cutsNear(changes, minX, minY, maxX, maxY) {
     for (let cx = minCx; cx <= maxCx; cx += 1) {
       const list = current.cuts[chunkKey(cx, cy)] || [];
       for (const cut of list) {
-        const id = cut.x + "," + cut.y + "," + cut.r;
+        const id = cut.x + "," + cut.y + "," + cut.r + "," + (cut.shape || "circle");
         if (!seen.has(id)) {
           seen.add(id);
           result.push(cut);
@@ -145,7 +146,11 @@ function isInsideCut(x, y, changes) {
       for (const cut of list) {
         const dx = x - cut.x;
         const dy = y - cut.y;
-        if (dx * dx + dy * dy <= cut.r * cut.r) return true;
+        if (cut.shape === "square") {
+          if (Math.abs(dx) <= cut.r && Math.abs(dy) <= cut.r) return true;
+        } else if (dx * dx + dy * dy <= cut.r * cut.r) {
+          return true;
+        }
       }
     }
   }

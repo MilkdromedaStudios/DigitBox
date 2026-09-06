@@ -428,6 +428,7 @@ export default function BetaGameV2() {
       x: Number(excavation.x),
       y: Number(excavation.y),
       r: radius,
+      shape: "square",
     };
 
     const hits = depositsHitByCircle(circle.x, circle.y, circle.r, worldChanges);
