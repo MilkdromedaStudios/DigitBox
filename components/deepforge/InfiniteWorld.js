@@ -639,10 +639,17 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
 
   const isMine = Boolean(myUserId && city.ownerId === myUserId);
   const remoteLevel = remoteCityLevel(city.companyValue);
-  const ownLevels = levels || {};
+  const serverLevels = city && city.upgrades && typeof city.upgrades === "object" ? city.upgrades : {};
+  const localLevels = levels || {};
+  const ownLevels = Object.keys(localLevels).reduce((acc, key) => {
+    acc[key] = Math.max(Number(localLevels[key]) || 0, Number(serverLevels[key]) || 0);
+    return acc;
+  }, { ...serverLevels });
   const averageOwnLevel = Object.keys(ownLevels).length
     ? Object.values(ownLevels).reduce((sum, value) => sum + (Number(value) || 0), 0) / Object.keys(ownLevels).length
     : 0;
+  const cityLevel = Math.max(1, Number(city && city.level) || 1);
+  const cityStyle = String(city && city.style || "industrial");
 
   ctx.save();
   ctx.globalAlpha = 0.8 + light * 0.2;
@@ -668,9 +675,12 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
 
     let level;
     if (building.key === "depot") {
-      level = isMine ? Math.max(1, Math.floor(averageOwnLevel / 2) + 1) : Math.max(1, remoteLevel);
+      level = Math.max(cityLevel, isMine ? Math.floor(averageOwnLevel / 2) + 1 : 1);
+    } else if (isMine) {
+      level = Math.max(0, Number(ownLevels[building.key]) || 0);
     } else {
-      level = isMine ? Math.max(0, Number(ownLevels[building.key]) || 0) : remoteLevel;
+      const serverLevel = Number(serverLevels[building.key]);
+      level = Number.isFinite(serverLevel) ? Math.max(0, serverLevel) : remoteLevel;
     }
     const visualLevel = isMine && building.key !== "depot"
       ? animatedCityLevel(building.key, level, now, animations)
@@ -713,14 +723,24 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
 
     // Building body grows upward continuously as an upgrade is constructed.
     const bodyTop = sy - bh;
+    const styleBody = cityStyle === "frontier"
+      ? (index % 2 ? "#76553f" : "#674936")
+      : cityStyle === "steel"
+        ? (index % 2 ? "#58666c" : "#4b5960")
+        : building.body;
+    const styleRoof = cityStyle === "frontier"
+      ? "#3f2c21"
+      : cityStyle === "steel"
+        ? "#29343a"
+        : building.roof;
     const damageDarken = (1 - hpRatio) * 0.32;
     ctx.fillStyle = damageDarken > 0
-      ? colorMix(building.body, "#251d18", damageDarken)
-      : building.body;
+      ? colorMix(styleBody, "#251d18", damageDarken)
+      : styleBody;
     ctx.fillRect(sx - bw / 2, bodyTop, bw, bh);
 
     // Stronger silhouettes for special town structures.
-    ctx.fillStyle = building.roof;
+    ctx.fillStyle = styleRoof;
     if (building.key === "academy") {
       ctx.beginPath();
       ctx.moveTo(sx - bw * 0.58, bodyTop + ppu * 0.05);
@@ -827,7 +847,7 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
   });
 
   const signY = worldToScreenY(surfaceHeight(centerX) - 6.35, cameraY, ppu, height);
-  const label = String(city.ownerName || "MINER").toUpperCase() + " CITY";
+  const label = String(city.name || ((city.ownerName || "MINER") + " CITY")).toUpperCase() + " · LV " + cityLevel;
   ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
   const textWidth = ctx.measureText(label).width;
   ctx.fillStyle = "rgba(17,22,22,.84)";
