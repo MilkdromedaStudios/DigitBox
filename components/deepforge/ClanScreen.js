@@ -195,7 +195,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
                 <span className="df-clan-member-rank">#{index + 1}</span>
                 <div>
                   <b>{member.playerId === playerId ? "YOU" : minerName(member.playerId)}</b>
-                  <small>{member.role === "owner" ? "Clan owner" : "Member"}</small>
+                  <small>{myClan.adminClan ? (member.role === "owner" ? "Permanent owner" : "Admin permissions") : member.role === "owner" ? "Clan owner" : "Member"}</small>
                 </div>
                 <em>◆ {compact(member.companyValue)}</em>
                 <strong>🏆 {compact(member.trophies)}</strong>
@@ -208,7 +208,7 @@ export default function ClanScreen({ companyValue, trophies, onNotice, authUser,
             disabled={Boolean(busy)}
             onClick={() => run("leave", () => leaveClan(playerId), "You left the clan.")}
           >
-            {myClan.role === "owner" ? "Leave clan / transfer ownership" : "Leave clan"}
+            {myClan.adminClan && myClan.role !== "owner" ? "Leave Admin / revoke my permissions" : myClan.role === "owner" ? "Leave clan / transfer ownership" : "Leave clan"}
           </button>
         </section>
       ) : (
