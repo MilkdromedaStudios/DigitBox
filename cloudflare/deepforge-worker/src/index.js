@@ -114,6 +114,16 @@ async function ensureSchema(env) {
           "joined_at INTEGER NOT NULL, " +
           "PRIMARY KEY (clan_id, player_id), " +
           "FOREIGN KEY (clan_id) REFERENCES clans(id) ON DELETE CASCADE)"
+        ),
+        env.DB.prepare(
+          "CREATE TABLE IF NOT EXISTS clan_join_requests (" +
+          "clan_id TEXT NOT NULL, " +
+          "player_id TEXT NOT NULL, " +
+          "company_value INTEGER NOT NULL DEFAULT 0, " +
+          "trophies INTEGER NOT NULL DEFAULT 0, " +
+          "requested_at INTEGER NOT NULL, " +
+          "PRIMARY KEY (clan_id, player_id), " +
+          "FOREIGN KEY (clan_id) REFERENCES clans(id) ON DELETE CASCADE)"
         )
       ]);
 
@@ -123,7 +133,8 @@ async function ensureSchema(env) {
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at)"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_player_saves_updated_at ON player_saves(updated_at)"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_clan_members_clan ON clan_members(clan_id)"),
-        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_clan_rank_value ON clan_members(company_value DESC)")
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_clan_rank_value ON clan_members(company_value DESC)"),
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_clan_join_requests_player ON clan_join_requests(player_id)")
       ]);
     })().catch((error) => {
       schemaReadyPromise = null;
@@ -312,6 +323,21 @@ function clanEmblemKey(value) {
   return "clans/" + value + "/emblem";
 }
 
+async function canonicalNumberstringId(env) {
+  const row = await env.DB.prepare(
+    "SELECT id FROM users WHERE lower(display_name)='numberstring' ORDER BY created_at ASC LIMIT 1"
+  ).first();
+  return row ? String(row.id) : "";
+}
+
+async function canonicalAdminClan(env) {
+  const ownerId = await canonicalNumberstringId(env);
+  if (!ownerId) return null;
+  return env.DB.prepare(
+    "SELECT id, name, tag, owner_id FROM clans WHERE owner_id=?1 AND lower(name)='admin' ORDER BY created_at ASC LIMIT 1"
+  ).bind(ownerId).first();
+}
+
 async function requireClanOwner(request, env, clanIdValue) {
   const authResult = await authenticatedD1User(request, env);
   if (authResult.error) return authResult;
@@ -329,6 +355,14 @@ async function requireClanOwner(request, env, clanIdValue) {
 }
 
 async function clanSnapshot(env, playerId) {
+  const adminClan = await canonicalAdminClan(env);
+  const pendingResult = validPlayerId(playerId)
+    ? await env.DB.prepare(
+        "SELECT clan_id, requested_at FROM clan_join_requests WHERE player_id=?1"
+      ).bind(playerId).all()
+    : { results: [] };
+  const pendingByClan = new Map((pendingResult.results || []).map((row) => [String(row.clan_id), Number(row.requested_at) || 0]));
+
   const membership = validPlayerId(playerId)
     ? await env.DB.prepare(
         "SELECT c.id, c.name, c.tag, c.invite_code, c.owner_id, c.created_at, cm.role " +
@@ -363,11 +397,12 @@ async function clanSnapshot(env, playerId) {
       memberCount: members.length,
       companyValue: members.reduce((sum, member) => sum + member.companyValue, 0),
       trophies: members.reduce((sum, member) => sum + member.trophies, 0),
+      adminClan: Boolean(adminClan && membership.id === adminClan.id),
     };
   }
 
   const listResult = await env.DB.prepare(
-    "SELECT c.id, c.name, c.tag, c.created_at, " +
+    "SELECT c.id, c.name, c.tag, c.owner_id, c.created_at, " +
     "COUNT(cm.player_id) AS member_count, " +
     "COALESCE(SUM(cm.company_value), 0) AS company_value, " +
     "COALESCE(SUM(cm.trophies), 0) AS trophies " +
@@ -386,7 +421,12 @@ async function clanSnapshot(env, playerId) {
       memberCount: Number(row.member_count) || 0,
       companyValue: Number(row.company_value) || 0,
       trophies: Number(row.trophies) || 0,
+      requestOnly: Boolean(adminClan && row.id === adminClan.id),
+      adminClan: Boolean(adminClan && row.id === adminClan.id),
+      requestPending: pendingByClan.has(String(row.id)),
+      requestedAt: pendingByClan.get(String(row.id)) || 0,
     })),
+    joinRequests: Array.from(pendingByClan, ([clanId, requestedAt]) => ({ clanId, requestedAt })),
   };
 }
 
@@ -735,17 +775,43 @@ export default {
       let clan = null;
       if (body.clanId) {
         clan = await env.DB.prepare(
-          "SELECT id FROM clans WHERE id = ?1"
+          "SELECT id, name, owner_id FROM clans WHERE id = ?1"
         ).bind(String(body.clanId)).first();
       } else {
         const code = cleanName(body.code).toUpperCase();
         if (!/^[A-Z0-9]{6}$/.test(code)) return json({ error: "Enter a valid 6-character invite code." }, 400, env);
         clan = await env.DB.prepare(
-          "SELECT id FROM clans WHERE invite_code = ?1"
+          "SELECT id, name, owner_id FROM clans WHERE invite_code = ?1"
         ).bind(code).first();
       }
 
       if (!clan) return json({ error: "Clan not found." }, 404, env);
+
+      const canonicalOwnerId = await canonicalNumberstringId(env);
+      const isAdminClan = Boolean(
+        canonicalOwnerId &&
+        clan.owner_id === canonicalOwnerId &&
+        String(clan.name || "").toLowerCase() === "admin"
+      );
+      if (isAdminClan) {
+        const authResult = await authenticatedD1User(request, env);
+        if (authResult.error) return json({ error: "Log in before requesting Admin access." }, 401, env);
+        if (authResult.user.id !== playerId) return json({ error: "Admin requests must use your logged-in account." }, 403, env);
+
+        await env.DB.prepare(
+          "INSERT INTO clan_join_requests (clan_id, player_id, company_value, trophies, requested_at) " +
+          "VALUES (?1, ?2, ?3, ?4, ?5) " +
+          "ON CONFLICT(clan_id, player_id) DO UPDATE SET company_value=excluded.company_value, trophies=excluded.trophies, requested_at=excluded.requested_at"
+        ).bind(
+          clan.id,
+          playerId,
+          Math.max(0, Math.floor(Number(body.companyValue) || 0)),
+          Math.max(0, Math.floor(Number(body.trophies) || 0)),
+          Date.now()
+        ).run();
+
+        return json({ ...(await clanSnapshot(env, playerId)), requested: true, clanId: clan.id }, 202, env);
+      }
 
       const count = await env.DB.prepare(
         "SELECT COUNT(*) AS count FROM clan_members WHERE clan_id = ?1"
@@ -812,6 +878,7 @@ export default {
         ).bind(membership.clan_id, playerId).run();
       }
 
+      await env.DB.prepare("DELETE FROM clan_join_requests WHERE player_id=?1").bind(playerId).run().catch(() => {});
       return json(await clanSnapshot(env, playerId), 200, env);
     }
 
