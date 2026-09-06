@@ -13,6 +13,58 @@ import {
 const DAY_MS = 150000;
 const PLAYER_RADIUS = 0.34;
 
+const CITY_BUILDING_LAYOUT = [
+  { key: "refinery", dx: -5.1, w: 1.75, baseH: 1.75, levelH: 0.62, body: "#675547", roof: "#342c27" },
+  { key: "workshop", dx: -2.35, w: 2.05, baseH: 1.95, levelH: 0.68, body: "#5e5145", roof: "#302c28" },
+  { key: "depot", dx: 0.15, w: 2.2, baseH: 2.45, levelH: 0.4, body: "#51483d", roof: "#292621" },
+  { key: "academy", dx: 2.85, w: 1.9, baseH: 2.05, levelH: 0.72, body: "#66594b", roof: "#352e28" },
+  { key: "walls", dx: 5.35, w: 1.55, baseH: 1.55, levelH: 0.56, body: "#554b40", roof: "#2e2924" },
+];
+
+function cityBuildingMaxHp(key, level) {
+  const base = key === "walls" ? 160 : 100;
+  return base + Math.max(0, Number(level) || 0) * (key === "walls" ? 55 : 45);
+}
+
+function remoteCityLevel(companyValue) {
+  const value = Math.max(0, Number(companyValue) || 0);
+  return clamp(Math.floor(Math.log10(value + 10)) - 1, 0, 6);
+}
+
+function animatedCityLevel(key, targetLevel, now, animations) {
+  const animation = animations && animations[key];
+  if (!animation) return targetLevel;
+  const progress = clamp((now - animation.start) / 1500, 0, 1);
+  if (progress >= 1) {
+    delete animations[key];
+    return targetLevel;
+  }
+  const eased = 1 - Math.pow(1 - progress, 3);
+  return animation.from + (animation.to - animation.from) * eased;
+}
+
+function nearestOwnBuildingTarget(zombie, cities, myUserId, levels, hpMap) {
+  if (!myUserId) return null;
+  const city = (cities || []).find((entry) => entry && entry.ownerId === myUserId);
+  if (!city) return null;
+  let best = null;
+  for (const building of CITY_BUILDING_LAYOUT) {
+    if (building.key === "depot") continue;
+    const level = Math.max(0, Number(levels && levels[building.key]) || 0);
+    const maxHp = cityBuildingMaxHp(building.key, level);
+    const storedHp = Number(hpMap && hpMap[building.key]);
+    const hp = Number.isFinite(storedHp) ? clamp(storedHp, 0, maxHp) : maxHp;
+    if (hp <= 0) continue;
+    const worldX = Number(city.x) + building.dx;
+    const worldY = surfaceHeight(worldX) - 0.38;
+    const dx = worldX - zombie.x;
+    const dy = worldY - zombie.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (!best || distance < best.distance) best = { city, building, key: building.key, worldX, worldY, distance };
+  }
+  return best;
+}
+
 const MATERIAL = {
   topsoil: { light: "#7a5838", mid: "#65472e", dark: "#503622" },
   dirt: { light: "#755337", mid: "#5d402b", dark: "#49311f" },
@@ -579,14 +631,23 @@ function resolveDrillTarget(player, aim, radius, changes) {
   };
 }
 
-function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light) {
+function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, now, myUserId, levels, hpMap, animations, hitTimes) {
   const centerX = Number(city && city.x);
   if (!Number.isFinite(centerX)) return;
   const centerScreenX = worldToScreenX(centerX, cameraX, ppu, width);
   if (centerScreenX < -520 || centerScreenX > width + 520) return;
 
+  const isMine = Boolean(myUserId && city.ownerId === myUserId);
+  const remoteLevel = remoteCityLevel(city.companyValue);
+  const ownLevels = levels || {};
+  const averageOwnLevel = Object.keys(ownLevels).length
+    ? Object.values(ownLevels).reduce((sum, value) => sum + (Number(value) || 0), 0) / Object.keys(ownLevels).length
+    : 0;
+
   ctx.save();
-  ctx.globalAlpha = 0.78 + light * 0.2;
+  ctx.globalAlpha = 0.8 + light * 0.2;
+
+  // Road / city foundation.
   ctx.strokeStyle = "rgba(68,62,54,.9)";
   ctx.lineWidth = Math.max(4, ppu * 0.12);
   ctx.beginPath();
@@ -599,34 +660,173 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light) {
   }
   ctx.stroke();
 
-  const buildings = [
-    { dx: -5.2, w: 1.8, h: 2.7 },
-    { dx: -2.5, w: 2.2, h: 3.8 },
-    { dx: 0.3, w: 2.4, h: 4.7 },
-    { dx: 3.2, w: 2.0, h: 3.3 },
-    { dx: 5.6, w: 1.5, h: 2.4 },
-  ];
-
-  buildings.forEach((building, index) => {
+  CITY_BUILDING_LAYOUT.forEach((building, index) => {
     const wx = centerX + building.dx;
     const ground = surfaceHeight(wx);
     const sx = worldToScreenX(wx, cameraX, ppu, width);
     const sy = worldToScreenY(ground, cameraY, ppu, height);
+
+    let level;
+    if (building.key === "depot") {
+      level = isMine ? Math.max(1, Math.floor(averageOwnLevel / 2) + 1) : Math.max(1, remoteLevel);
+    } else {
+      level = isMine ? Math.max(0, Number(ownLevels[building.key]) || 0) : remoteLevel;
+    }
+    const visualLevel = isMine && building.key !== "depot"
+      ? animatedCityLevel(building.key, level, now, animations)
+      : level;
+
     const bw = building.w * ppu;
-    const bh = building.h * ppu;
-    ctx.fillStyle = index === 2 ? "#5a5042" : index % 2 ? "#6b5a47" : "#51483d";
-    ctx.fillRect(sx - bw / 2, sy - bh, bw, bh);
-    ctx.fillStyle = "#342f2a";
-    ctx.fillRect(sx - bw * 0.57, sy - bh - ppu * 0.18, bw * 1.14, ppu * 0.2);
-    ctx.fillStyle = city.online ? "rgba(255,219,126,.72)" : "rgba(150,164,166,.36)";
-    const windowSize = Math.max(2, ppu * 0.12);
-    for (let wy = sy - bh + ppu * 0.45; wy < sy - ppu * 0.35; wy += ppu * 0.55) {
-      ctx.fillRect(sx - bw * 0.24, wy, windowSize, windowSize);
+    const bh = Math.max(ppu * 0.85, (building.baseH + visualLevel * building.levelH) * ppu);
+    const construction = isMine && building.key !== "depot" && animations && animations[building.key];
+
+    let hpRatio = 1;
+    let hp = 1;
+    let maxHp = 1;
+    if (isMine && building.key !== "depot") {
+      maxHp = cityBuildingMaxHp(building.key, level);
+      const storedHp = Number(hpMap && hpMap[building.key]);
+      hp = Number.isFinite(storedHp) ? clamp(storedHp, 0, maxHp) : maxHp;
+      hpRatio = clamp(hp / maxHp, 0, 1);
+    }
+
+    // A destroyed building stays as rubble instead of popping out of existence.
+    if (hpRatio <= 0 && building.key !== "depot") {
+      ctx.fillStyle = "#342d27";
+      ctx.beginPath();
+      ctx.moveTo(sx - bw * 0.55, sy);
+      ctx.lineTo(sx - bw * 0.36, sy - ppu * 0.32);
+      ctx.lineTo(sx - bw * 0.08, sy - ppu * 0.16);
+      ctx.lineTo(sx + bw * 0.18, sy - ppu * 0.4);
+      ctx.lineTo(sx + bw * 0.55, sy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(68,68,66,.35)";
+      for (let puff = 0; puff < 3; puff += 1) {
+        const drift = ((now / 45 + puff * 31) % 70);
+        ctx.beginPath();
+        ctx.arc(sx + (puff - 1) * 8, sy - 18 - drift * 0.35, 5 + puff * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
+
+    // Building body grows upward continuously as an upgrade is constructed.
+    const bodyTop = sy - bh;
+    const damageDarken = (1 - hpRatio) * 0.32;
+    ctx.fillStyle = damageDarken > 0
+      ? colorMix(building.body, "#251d18", damageDarken)
+      : building.body;
+    ctx.fillRect(sx - bw / 2, bodyTop, bw, bh);
+
+    // Stronger silhouettes for special town structures.
+    ctx.fillStyle = building.roof;
+    if (building.key === "academy") {
+      ctx.beginPath();
+      ctx.moveTo(sx - bw * 0.58, bodyTop + ppu * 0.05);
+      ctx.lineTo(sx, bodyTop - ppu * 0.48);
+      ctx.lineTo(sx + bw * 0.58, bodyTop + ppu * 0.05);
+      ctx.closePath();
+      ctx.fill();
+    } else if (building.key === "walls") {
+      const tooth = bw / 4;
+      for (let i = 0; i < 4; i += 1) ctx.fillRect(sx - bw / 2 + i * tooth, bodyTop - ppu * 0.18, tooth * 0.62, ppu * 0.22);
+    } else {
+      ctx.fillRect(sx - bw * 0.57, bodyTop - ppu * 0.18, bw * 1.14, ppu * 0.2);
+    }
+
+    if (building.key === "refinery") {
+      const chimneyH = ppu * (0.65 + visualLevel * 0.11);
+      ctx.fillStyle = "#3a312b";
+      ctx.fillRect(sx + bw * 0.2, bodyTop - chimneyH, bw * 0.18, chimneyH);
+      ctx.fillStyle = "rgba(65,64,61,.35)";
+      const smoke = (now / 35) % 58;
+      ctx.beginPath();
+      ctx.arc(sx + bw * 0.29 + Math.sin(now / 300) * 3, bodyTop - chimneyH - smoke * 0.35, 4 + smoke * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Windows become more numerous as the building gets taller.
+    ctx.fillStyle = city.online ? "rgba(255,219,126,.76)" : "rgba(150,164,166,.36)";
+    const windowSize = Math.max(2, ppu * 0.11);
+    const floorGap = Math.max(ppu * 0.48, 18);
+    for (let wy = bodyTop + ppu * 0.42; wy < sy - ppu * 0.3; wy += floorGap) {
+      ctx.fillRect(sx - bw * 0.25, wy, windowSize, windowSize);
       ctx.fillRect(sx + bw * 0.13, wy, windowSize, windowSize);
+    }
+
+    // Construction scaffolding makes upgrades visibly "rise" instead of snapping.
+    if (construction) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(211,167,95,.82)";
+      ctx.lineWidth = Math.max(1, ppu * 0.035);
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(sx - bw * 0.64, bodyTop - ppu * 0.18, bw * 1.28, bh + ppu * 0.2);
+      for (let y = bodyTop + ppu * 0.25; y < sy; y += ppu * 0.65) {
+        ctx.beginPath();
+        ctx.moveTo(sx - bw * 0.7, y);
+        ctx.lineTo(sx + bw * 0.7, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if (isMine && building.key !== "depot" && hpRatio < 0.98) {
+      // HP bar only appears after the structure has taken damage.
+      ctx.fillStyle = "rgba(12,10,9,.78)";
+      ctx.fillRect(sx - bw * 0.48, bodyTop - ppu * 0.42, bw * 0.96, Math.max(4, ppu * 0.08));
+      ctx.fillStyle = hpRatio > 0.55 ? "#d2b562" : hpRatio > 0.25 ? "#d77a48" : "#c84e3d";
+      ctx.fillRect(sx - bw * 0.48, bodyTop - ppu * 0.42, bw * 0.96 * hpRatio, Math.max(4, ppu * 0.08));
+
+      // Cracks spread as health falls.
+      const crackCount = hpRatio < 0.7 ? 2 : 1;
+      ctx.strokeStyle = "rgba(39,28,23,.8)";
+      ctx.lineWidth = Math.max(1, ppu * 0.025);
+      for (let crack = 0; crack < crackCount; crack += 1) {
+        const cx = sx + (crack ? bw * 0.2 : -bw * 0.18);
+        const cy = bodyTop + bh * (0.35 + crack * 0.16);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - ppu * 0.18);
+        ctx.lineTo(cx - ppu * 0.12, cy);
+        ctx.lineTo(cx + ppu * 0.03, cy + ppu * 0.16);
+        ctx.lineTo(cx - ppu * 0.08, cy + ppu * 0.3);
+        ctx.stroke();
+      }
+
+      const recentlyHit = now - Number(hitTimes && hitTimes[building.key] || 0) < 1050;
+      if (hpRatio < 0.78) {
+        const smokeCount = hpRatio < 0.45 ? 4 : 2;
+        ctx.fillStyle = "rgba(55,57,56,.44)";
+        for (let puff = 0; puff < smokeCount; puff += 1) {
+          const phase = ((now / 28) + puff * 27 + index * 13) % 95;
+          const px = sx + Math.sin((now + puff * 190) / 230) * bw * 0.22;
+          const py = bodyTop + bh * 0.4 - phase * 0.42;
+          ctx.beginPath();
+          ctx.arc(px, py, 4 + phase * 0.035, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Fire starts during an active zombie hit and remains once HP is low.
+      if (recentlyHit || hpRatio < 0.58) {
+        const intensity = hpRatio < 0.25 ? 5 : hpRatio < 0.58 ? 3 : 1;
+        for (let flame = 0; flame < intensity; flame += 1) {
+          const fx = sx + (flame - (intensity - 1) / 2) * Math.min(13, bw * 0.16);
+          const flicker = 0.72 + 0.28 * Math.sin(now / 70 + flame * 2.4);
+          const baseY = sy - ppu * (0.18 + (flame % 2) * 0.12);
+          ctx.fillStyle = flame % 2 ? "rgba(255,178,53,.9)" : "rgba(233,82,37,.92)";
+          ctx.beginPath();
+          ctx.moveTo(fx - 5, baseY);
+          ctx.quadraticCurveTo(fx - 2, baseY - 13 * flicker, fx, baseY - 20 * flicker);
+          ctx.quadraticCurveTo(fx + 5, baseY - 10 * flicker, fx + 6, baseY);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
     }
   });
 
-  const signY = worldToScreenY(surfaceHeight(centerX) - 5.8, cameraY, ppu, height);
+  const signY = worldToScreenY(surfaceHeight(centerX) - 6.35, cameraY, ppu, height);
   const label = String(city.ownerName || "MINER").toUpperCase() + " CITY";
   ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
   const textWidth = ctx.measureText(label).width;
@@ -727,6 +927,12 @@ export default function InfiniteWorld(props) {
   const zombieDamageCbRef = useRef(props.onZombieDamage);
   const zombieKillCbRef = useRef(props.onZombieKill);
   const swordDamageRef = useRef(Number(props.swordDamage) || 14);
+  const cityBuildingsRef = useRef({ ...(props.cityBuildings || {}) });
+  const cityBuildingHpRef = useRef({ ...(props.cityBuildingHp || {}) });
+  const buildingDamageCbRef = useRef(props.onBuildingDamage);
+  const previousCityBuildingsRef = useRef({ ...(props.cityBuildings || {}) });
+  const buildingAnimationsRef = useRef({});
+  const buildingHitTimesRef = useRef({});
   const zombiesRef = useRef([]);
   const lastZombieSpawnRef = useRef(0);
   const lastZombieBiteRef = useRef(0);
@@ -744,6 +950,21 @@ export default function InfiniteWorld(props) {
   useEffect(() => { zombieDamageCbRef.current = props.onZombieDamage; }, [props.onZombieDamage]);
   useEffect(() => { zombieKillCbRef.current = props.onZombieKill; }, [props.onZombieKill]);
   useEffect(() => { swordDamageRef.current = Number(props.swordDamage) || 14; }, [props.swordDamage]);
+  useEffect(() => {
+    const next = { ...(props.cityBuildings || {}) };
+    const previous = previousCityBuildingsRef.current || {};
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    CITY_BUILDING_LAYOUT.forEach((building) => {
+      if (building.key === "depot") return;
+      const from = Math.max(0, Number(previous[building.key]) || 0);
+      const to = Math.max(0, Number(next[building.key]) || 0);
+      if (to > from) buildingAnimationsRef.current[building.key] = { from, to, start: now };
+    });
+    previousCityBuildingsRef.current = next;
+    cityBuildingsRef.current = next;
+  }, [props.cityBuildings]);
+  useEffect(() => { cityBuildingHpRef.current = { ...(props.cityBuildingHp || {}) }; }, [props.cityBuildingHp]);
+  useEffect(() => { buildingDamageCbRef.current = props.onBuildingDamage; }, [props.onBuildingDamage]);
 
   useEffect(() => {
     if (Number.isFinite(props.player.x) && Number.isFinite(props.player.y)) {
@@ -1037,7 +1258,7 @@ export default function InfiniteWorld(props) {
 
       const day = drawSky(ctx, width, height, cameraX, now);
 
-      // Night survival: surface zombies spawn around the active miner and chase them until sunrise.
+      // Night survival: zombies can attack the miner or tear into the miner's city structures.
       const nearSurface = depth < 1.4;
       if (day.light < 0.27 && nearSurface && !pausedRef.current) {
         if (now - lastZombieSpawnRef.current > 2400 && zombiesRef.current.length < 6) {
@@ -1046,15 +1267,42 @@ export default function InfiniteWorld(props) {
           let zx = p.x + side * (6.5 + visualNoise(Math.floor(now / 1700), 0, 1202) * 5.5);
           let attempts = 0;
           while (citiesRef.current.some((city) => Math.abs(Number(city.x) - zx) < 9) && attempts < 4) { zx += side * 5; attempts += 1; }
-          zombiesRef.current.push({ id: "z_" + now + "_" + Math.random().toString(36).slice(2, 7), x: zx, y: surfaceHeight(zx) - 0.38, hp: 35, maxHp: 35 });
+          zombiesRef.current.push({
+            id: "z_" + now + "_" + Math.random().toString(36).slice(2, 7),
+            x: zx,
+            y: surfaceHeight(zx) - 0.38,
+            hp: 35,
+            maxHp: 35,
+            lastBuildingHit: 0,
+          });
         }
         for (const zombie of zombiesRef.current) {
-          const direction = p.x < zombie.x ? -1 : 1;
-          zombie.x += direction * 1.15 * dt;
+          const buildingTarget = nearestOwnBuildingTarget(
+            zombie,
+            citiesRef.current,
+            myUserIdRef.current,
+            cityBuildingsRef.current,
+            cityBuildingHpRef.current
+          );
+          const playerDx = p.x - zombie.x;
+          const playerDy = p.y - zombie.y;
+          const playerDistance = Math.sqrt(playerDx * playerDx + playerDy * playerDy);
+          const attackBuilding = buildingTarget && buildingTarget.distance < 7.2;
+          const targetX = attackBuilding ? buildingTarget.worldX : p.x;
+          const horizontal = targetX - zombie.x;
+
+          if (Math.abs(horizontal) > 0.48) {
+            zombie.x += (horizontal < 0 ? -1 : 1) * 1.15 * dt;
+          }
           zombie.y = surfaceHeight(zombie.x) - 0.38;
-          const dx = zombie.x - p.x;
-          const dy = zombie.y - p.y;
-          if (Math.sqrt(dx * dx + dy * dy) < 0.72 && now - lastZombieBiteRef.current > 950) {
+
+          if (attackBuilding && Math.abs(buildingTarget.worldX - zombie.x) < 0.62) {
+            if (now - Number(zombie.lastBuildingHit || 0) > 820) {
+              zombie.lastBuildingHit = now;
+              buildingHitTimesRef.current[buildingTarget.key] = now;
+              if (buildingDamageCbRef.current) buildingDamageCbRef.current(buildingTarget.key, 7);
+            }
+          } else if (playerDistance < 0.72 && now - lastZombieBiteRef.current > 950) {
             lastZombieBiteRef.current = now;
             if (zombieDamageCbRef.current) zombieDamageCbRef.current(7);
           }
@@ -1195,7 +1443,22 @@ export default function InfiniteWorld(props) {
       }
 
       for (const city of citiesRef.current) {
-        drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, day.light);
+        drawWorldCity(
+          ctx,
+          city,
+          cameraX,
+          cameraY,
+          ppu,
+          width,
+          height,
+          day.light,
+          now,
+          myUserIdRef.current,
+          cityBuildingsRef.current,
+          cityBuildingHpRef.current,
+          buildingAnimationsRef.current,
+          buildingHitTimesRef.current
+        );
       }
       for (const zombie of zombiesRef.current) {
         drawZombie(ctx, zombie, cameraX, cameraY, ppu, width, height, day.light);
