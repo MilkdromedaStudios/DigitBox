@@ -424,95 +424,216 @@ export default function DeepforgeOwnerTools() {
   return (
     <>
       <button className={"df-owner-fab" + (infinite ? " infinite" : "")} onClick={() => setOpen(!open)}>
-        <span>{infinite ? "∞" : "♛"}</span><b>{infinite ? "OWNER ∞" : "OWNER"}</b>
+        <span>{access.permanentOwner ? "♛" : "◆"}</span>
+        <b>{access.permanentOwner ? (infinite ? "OWNER ∞" : "OWNER") : "ADMIN"}</b>
       </button>
 
       {open && (
         <aside className="df-owner-console">
-          <div className="df-owner-head">
-            <div><small>DEEPFORGE PERMANENT OWNER</small><h3>Numberstring</h3></div>
-            <button onClick={() => setOpen(false)}>×</button>
-          </div>
-
-          <div className="df-owner-tabs">
-            <button className={view === "cheats" ? "active" : ""} onClick={() => setView("cheats")}>Cheats</button>
-            <button className={view === "manage" ? "active" : ""} onClick={() => setView("manage")}>Manage</button>
-          </div>
-
-          {view === "cheats" ? (
-            <>
-              <div className={"df-owner-infinity" + (infinite ? " on" : "")}>
-                <div><small>PERSISTENT OWNER POWER</small><b>∞ INFINITE EVERYTHING</b><span>Survives reloads and repairs itself after Reset.</span></div>
-                <button disabled={busy} onClick={toggleInfinite}>{infinite ? "∞ ON" : "TURN ON"}</button>
-              </div>
-              <p>Owner preferences and infinity mode are kept outside the normal game reset.</p>
-              <div className="df-owner-grid">
-                <button disabled={busy} onClick={() => applyCheat("money")}><b>+$1,000,000</b><small>Cash</small></button>
-                <button disabled={busy} onClick={() => applyCheat("research")}><b>+10,000 RP</b><small>Research</small></button>
-                <button disabled={busy} onClick={() => applyCheat("trophies")}><b>+10,000</b><small>Trophies</small></button>
-                <button disabled={busy} onClick={() => applyCheat("heal")}><b>GOD SUPPLY</b><small>HP + boosts</small></button>
-                <button className="max" disabled={busy} onClick={() => applyCheat("max")}><b>MAX EVERYTHING</b><small>Gear · town · research · money</small></button>
-              </div>
-            </>
-          ) : (
-            <div className="df-owner-manage">
-              <div className="df-owner-manage-title"><b>Accounts</b><button disabled={busy} onClick={refreshAdmin}>Refresh</button></div>
-              <div className="df-owner-list">
-                {adminData.users.map((user) => (
-                  <article key={user.id} className="df-owner-user-row">
-                    <div className="df-owner-user-main">
-                      <div><b>{user.displayName}</b><small>{user.email}</small></div>
-                      {user.permanent ? <span className="permanent">PERMANENT</span> : <button disabled={busy} onClick={() => adminDelete("user", user.id, "account " + user.displayName, false)}>Delete</button>}
-                    </div>
-                    {user.city ? (
-                      <div className={"df-owner-city-admin" + (user.city.ownerFortress ? " fortress" : "")}>
-                        <div className="df-owner-city-summary">
-                          <span>{user.city.ownerFortress ? "🏰" : "🏙"}</span>
-                          <div>
-                            <b>{user.city.name}</b>
-                            <small>{user.city.ownerFortress ? "♛ OWNER FORTRESS · ∞ PROPERTY · ∞ ARMOR · 4 TURRETS" : "LEVEL " + user.city.level + " · " + user.city.style}</small>
-                          </div>
-                          {!user.city.ownerFortress && <button disabled={busy} onClick={() => adminSetCityLevel(user)}>SET LVL</button>}
-                        </div>
-                        {user.city.ownerFortress ? (
-                          <div className="df-owner-fortress-lock">
-                            <span>OWNER ONLY</span><b>ALL CITY SYSTEMS MAXED</b><small>Permanent server-side fortress status</small>
-                          </div>
-                        ) : (
-                          <div className="df-owner-city-grants">
-                            <button disabled={busy} onClick={() => adminCityGrant(user, "cityLevel")}>+ City Lv</button>
-                            <button disabled={busy} onClick={() => adminCityGrant(user, "refinery")}>+ Mill <small>{user.city.upgrades.refinery}</small></button>
-                            <button disabled={busy} onClick={() => adminCityGrant(user, "workshop")}>+ Shop <small>{user.city.upgrades.workshop}</small></button>
-                            <button disabled={busy} onClick={() => adminCityGrant(user, "academy")}>+ Survey <small>{user.city.upgrades.academy}</small></button>
-                            <button disabled={busy} onClick={() => adminCityGrant(user, "walls")}>+ Walls <small>{user.city.upgrades.walls}</small></button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="df-owner-no-city">No city yet — this player must found one in the world.</div>
-                    )}
-                  </article>
-                ))}
-              </div>
-
-              <div className="df-owner-manage-title clans"><b>Clans</b><span>{adminData.clans.length}</span></div>
-              <div className="df-owner-list">
-                {adminData.clans.map((clan) => (
-                  <article key={clan.id}>
-                    <div><b>[{clan.tag}] {clan.name}</b><small>{clan.memberCount} member{clan.memberCount === 1 ? "" : "s"}</small></div>
-                    <button disabled={busy} onClick={() => adminDelete("clan", clan.id, "clan " + clan.name, false)}>Delete</button>
-                  </article>
-                ))}
+          <header className="df-owner-head">
+            <div className="df-owner-brand">
+              <span>{access.permanentOwner ? "♛" : "◆"}</span>
+              <div>
+                <small>DEEPFORGE CONTROL CENTER</small>
+                <h3>{access.permanentOwner ? "Owner Dashboard" : "Admin Dashboard"}</h3>
+                <p>{access.username || "Admin"} · {access.permanentOwner ? "Permanent owner" : "Approved Admin clan member"}</p>
               </div>
             </div>
-          )}
+            <div className="df-owner-head-actions">
+              <em>{access.permanentOwner ? "OWNER" : "ADMIN"}</em>
+              <button onClick={() => setOpen(false)}>×</button>
+            </div>
+          </header>
 
-          {message && <div className="df-owner-message">{message}</div>}
+          <nav className="df-owner-sidebar">
+            <small>CONTROL</small>
+            <button className={view === "cheats" ? "active" : ""} onClick={() => setView("cheats")}>
+              <span>⌁</span><div><b>Overview</b><em>Power & cheats</em></div>
+            </button>
+            <button className={view === "manage" ? "active" : ""} onClick={() => setView("manage")}>
+              <span>▦</span><div><b>World Admin</b><em>Players, cities, clans</em></div>
+            </button>
+            <button className={view === "access" ? "active" : ""} onClick={() => setView("access")}>
+              <span>♜</span><div><b>Admin Access</b><em>{adminData.adminClanRequests.length} pending</em></div>
+            </button>
+            <div className="df-owner-sidebar-note">
+              <small>PERMISSION SOURCE</small>
+              <b>{access.permanentOwner ? "Numberstring" : "Admin clan"}</b>
+              <span>{access.permanentOwner ? "Cannot be revoked." : "Leaving Admin removes dashboard access."}</span>
+            </div>
+          </nav>
+
+          <main className="df-owner-main">
+            <div className="df-owner-page-head">
+              <div>
+                <small>{view === "cheats" ? "COMMAND OVERVIEW" : view === "manage" ? "WORLD ADMINISTRATION" : "PRIVILEGED MEMBERSHIP"}</small>
+                <h2>{view === "cheats" ? "Control Center" : view === "manage" ? "Players & Clans" : "Admin Clan Access"}</h2>
+              </div>
+              <button disabled={busy} onClick={refreshAdmin}>↻ Refresh</button>
+            </div>
+
+            {view === "cheats" && (
+              <>
+                <div className="df-owner-stat-grid">
+                  <article><span>👥</span><div><small>ACCOUNTS</small><b>{adminData.users.length || "—"}</b></div></article>
+                  <article><span>⚑</span><div><small>CLANS</small><b>{adminData.clans.length || "—"}</b></div></article>
+                  <article><span>♜</span><div><small>ADMINS</small><b>{adminData.adminClanMembers.length || "—"}</b></div></article>
+                  <article><span>⌛</span><div><small>PENDING</small><b>{adminData.adminClanRequests.length}</b></div></article>
+                </div>
+
+                <section className="df-owner-panel">
+                  <div className="df-owner-section-title">
+                    <div><small>YOUR ACCOUNT</small><h3>Game overrides</h3></div>
+                    <span>{access.permanentOwner ? "Permanent owner powers" : "Admin powers"}</span>
+                  </div>
+                  <div className={"df-owner-infinity" + (infinite ? " on" : "")}>
+                    <div><small>PERSISTENT POWER</small><b>∞ INFINITE EVERYTHING</b><span>Repairs itself after normal game reset on this browser.</span></div>
+                    <button disabled={busy} onClick={toggleInfinite}>{infinite ? "∞ ON" : "TURN ON"}</button>
+                  </div>
+                  <div className="df-owner-grid">
+                    <button disabled={busy} onClick={() => applyCheat("money")}><b>+$1,000,000</b><small>Cash</small></button>
+                    <button disabled={busy} onClick={() => applyCheat("research")}><b>+10,000 RP</b><small>Research</small></button>
+                    <button disabled={busy} onClick={() => applyCheat("trophies")}><b>+10,000</b><small>Trophies</small></button>
+                    <button disabled={busy} onClick={() => applyCheat("heal")}><b>GOD SUPPLY</b><small>HP + boosts</small></button>
+                    <button className="max" disabled={busy} onClick={() => applyCheat("max")}><b>MAX EVERYTHING</b><small>Gear · town · research · money</small></button>
+                  </div>
+                </section>
+              </>
+            )}
+
+            {view === "manage" && (
+              <div className="df-owner-manage">
+                <section className="df-owner-panel">
+                  <div className="df-owner-section-title"><div><small>PLAYERS</small><h3>Accounts & Cities</h3></div><span>{adminData.users.length}</span></div>
+                  <div className="df-owner-account-grid">
+                    {adminData.users.map((user) => (
+                      <article key={user.id} className="df-owner-user-card">
+                        <div className="df-owner-user-main">
+                          <div><b>{user.displayName}</b><small>{user.email}</small></div>
+                          {user.permanent
+                            ? <span className="permanent">PERMANENT OWNER</span>
+                            : <button disabled={busy} onClick={() => adminDelete("user", user.id, "account " + user.displayName, false)}>Delete</button>}
+                        </div>
+                        {user.city ? (
+                          <div className={"df-owner-city-admin" + (user.city.ownerFortress ? " fortress" : "")}>
+                            <div className="df-owner-city-summary">
+                              <span>{user.city.ownerFortress ? "🏰" : "🏙"}</span>
+                              <div><b>{user.city.name}</b><small>{user.city.ownerFortress ? "♛ OWNER FORTRESS · ∞ ARMOR · ∞ PROPERTY" : "LEVEL " + user.city.level + " · " + user.city.style}</small></div>
+                              {!user.city.ownerFortress && <button disabled={busy} onClick={() => adminSetCityLevel(user)}>SET LVL</button>}
+                            </div>
+                            {user.city.ownerFortress ? (
+                              <div className="df-owner-fortress-lock"><b>OWNER ONLY</b><span>All city systems maxed · 4 turrets</span></div>
+                            ) : (
+                              <div className="df-owner-city-grants">
+                                <button disabled={busy} onClick={() => adminCityGrant(user, "cityLevel")}>+ City Lv</button>
+                                <button disabled={busy} onClick={() => adminCityGrant(user, "refinery")}>+ Mill <small>{user.city.upgrades.refinery}</small></button>
+                                <button disabled={busy} onClick={() => adminCityGrant(user, "workshop")}>+ Shop <small>{user.city.upgrades.workshop}</small></button>
+                                <button disabled={busy} onClick={() => adminCityGrant(user, "academy")}>+ Survey <small>{user.city.upgrades.academy}</small></button>
+                                <button disabled={busy} onClick={() => adminCityGrant(user, "walls")}>+ Walls <small>{user.city.upgrades.walls}</small></button>
+                              </div>
+                            )}
+                          </div>
+                        ) : <div className="df-owner-no-city">No city yet.</div>}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="df-owner-panel">
+                  <div className="df-owner-section-title"><div><small>GROUPS</small><h3>Clans</h3></div><span>{adminData.clans.length}</span></div>
+                  <div className="df-owner-clan-grid">
+                    {adminData.clans.map((clan) => (
+                      <article key={clan.id} className={clan.adminClan ? "admin-clan" : ""}>
+                        <div><b>{clan.adminClan ? "♜ " : ""}[{clan.tag}] {clan.name}</b><small>{clan.memberCount} member{clan.memberCount === 1 ? "" : "s"}{clan.adminClan ? " · REQUEST ONLY" : ""}</small></div>
+                        <button
+                          disabled={busy || (clan.adminClan && !access.permanentOwner)}
+                          onClick={() => adminDelete("clan", clan.id, "clan " + clan.name, false)}
+                        >Delete</button>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {view === "access" && (
+              <div className="df-owner-access">
+                <section className="df-owner-access-hero">
+                  <span>♜</span>
+                  <div>
+                    <small>CANONICAL ADMIN CLAN</small>
+                    <h3>{adminData.adminClan ? "[" + adminData.adminClan.tag + "] " + adminData.adminClan.name : "Admin clan not found"}</h3>
+                    <p>{adminData.adminClan
+                      ? "Membership grants the full admin dashboard. Nobody joins automatically; every request waits for Numberstring."
+                      : "Create a clan named Admin while logged in as Numberstring. Only that exact owner-controlled clan can grant admin permissions."}</p>
+                  </div>
+                  {adminData.adminClan && <div className="df-owner-access-code"><small>REQUEST CODE</small><b>{adminData.adminClan.inviteCode}</b></div>}
+                </section>
+
+                <div className="df-owner-access-columns">
+                  <section className="df-owner-panel">
+                    <div className="df-owner-section-title"><div><small>PENDING</small><h3>Join Requests</h3></div><span>{adminData.adminClanRequests.length}</span></div>
+                    <div className="df-owner-request-list">
+                      {adminData.adminClanRequests.length === 0 && <div className="df-owner-empty">No pending Admin requests.</div>}
+                      {adminData.adminClanRequests.map((requestRow) => (
+                        <article key={requestRow.playerId}>
+                          <div><b>{requestRow.displayName}</b><small>{requestRow.email}</small><span>◆ {Number(requestRow.companyValue || 0).toLocaleString()} · 🏆 {Number(requestRow.trophies || 0).toLocaleString()}</span></div>
+                          {access.permanentOwner ? (
+                            <div className="df-owner-request-actions">
+                              <button className="approve" disabled={busy} onClick={() => adminClanDecision(requestRow, "approve")}>Approve</button>
+                              <button className="reject" disabled={busy} onClick={() => adminClanDecision(requestRow, "reject")}>Reject</button>
+                            </div>
+                          ) : <em>NUMBERSTRING APPROVAL REQUIRED</em>}
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="df-owner-panel">
+                    <div className="df-owner-section-title"><div><small>AUTHORIZED</small><h3>Admin Members</h3></div><span>{adminData.adminClanMembers.length}</span></div>
+                    <div className="df-owner-member-list">
+                      {adminData.adminClanMembers.length === 0 && <div className="df-owner-empty">No Admin members.</div>}
+                      {adminData.adminClanMembers.map((member) => (
+                        <article key={member.playerId}>
+                          <span className="member-icon">{member.permanentOwner ? "♛" : "◆"}</span>
+                          <div><b>{member.displayName}</b><small>{member.email}</small></div>
+                          <em>{member.permanentOwner ? "PERMANENT OWNER" : "ADMIN"}</em>
+                          {access.permanentOwner && !member.permanentOwner && <button disabled={busy} onClick={() => adminClanRemove(member)}>Revoke</button>}
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+
+                {!access.permanentOwner && (
+                  <div className="df-owner-delegated-note"><b>Delegated Admin</b><span>You have owner-level management controls through approved Admin-clan membership, but only Numberstring can approve or revoke Admin access.</span></div>
+                )}
+              </div>
+            )}
+
+            {message && <div className="df-owner-message">{message}</div>}
+          </main>
         </aside>
       )}
 
       <style jsx global>{`
-        .df-owner-fab{position:fixed;right:18px;bottom:18px;z-index:1400;display:flex;align-items:center;gap:7px;height:42px;padding:0 13px;border:1px solid rgba(255,212,105,.45);border-radius:12px;background:linear-gradient(180deg,#6b5124,#322410);color:#ffe09a;box-shadow:0 12px 34px rgba(0,0,0,.42);font-weight:950;cursor:pointer}.df-owner-fab.infinite{border-color:rgba(255,225,111,.75);background:linear-gradient(180deg,#8a671d,#3b2a0b);box-shadow:0 0 24px rgba(255,199,57,.2),0 12px 34px rgba(0,0,0,.42)}.df-owner-fab span{font-size:1rem}.df-owner-fab b{font-size:.65rem;letter-spacing:.12em}.df-owner-console{position:fixed;right:18px;bottom:70px;z-index:1399;width:min(430px,calc(100vw - 24px));max-height:calc(100svh - 95px);overflow:auto;padding:14px;border:1px solid rgba(255,214,116,.27);border-radius:16px;background:linear-gradient(180deg,rgba(50,38,19,.98),rgba(20,16,11,.99));color:#f3e4c4;box-shadow:0 24px 70px rgba(0,0,0,.58)}.df-owner-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.df-owner-head small{display:block;color:#cda95d;font-size:.5rem;letter-spacing:.15em;font-weight:950}.df-owner-head h3{margin:2px 0 0;font-size:1.2rem}.df-owner-head>button{width:32px;height:32px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(255,255,255,.03);color:#d9c8a7;font-size:1.1rem;cursor:pointer}.df-owner-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}.df-owner-tabs button{min-height:35px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.025);color:#9e9076;font-weight:850;cursor:pointer}.df-owner-tabs button.active{border-color:rgba(224,183,90,.28);background:rgba(189,136,37,.13);color:#ebcc82}.df-owner-console>p{margin:9px 0 12px;color:#9d8f75;font-size:.65rem;line-height:1.45}.df-owner-infinity{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid rgba(255,212,99,.16);border-radius:11px;background:rgba(125,89,22,.08)}.df-owner-infinity.on{border-color:rgba(255,214,75,.4);background:linear-gradient(135deg,rgba(185,127,24,.21),rgba(82,57,15,.16))}.df-owner-infinity>div{min-width:0;flex:1}.df-owner-infinity small,.df-owner-infinity b,.df-owner-infinity span{display:block}.df-owner-infinity small{color:#a8905f;font-size:.46rem;letter-spacing:.12em;font-weight:900}.df-owner-infinity b{margin-top:2px;color:#f1cf75;font-size:.72rem}.df-owner-infinity span{margin-top:2px;color:#8f8065;font-size:.55rem}.df-owner-infinity>button{min-width:72px;min-height:38px;border:1px solid rgba(255,214,99,.25);border-radius:8px;background:#77551d;color:#f7d987;font-weight:950;cursor:pointer}.df-owner-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.df-owner-grid button{min-height:58px;padding:8px;border:1px solid rgba(255,220,140,.12);border-radius:10px;background:rgba(255,255,255,.035);color:#ecd7ae;text-align:left;cursor:pointer}.df-owner-grid button:hover{background:rgba(255,211,112,.08)}.df-owner-grid button:disabled{opacity:.5;cursor:default}.df-owner-grid button b,.df-owner-grid button small{display:block}.df-owner-grid button b{font-size:.68rem}.df-owner-grid button small{margin-top:3px;color:#8f826c;font-size:.55rem}.df-owner-grid .max{grid-column:1/-1;background:linear-gradient(180deg,rgba(179,130,42,.24),rgba(105,72,20,.18));border-color:rgba(255,205,92,.25);text-align:center}.df-owner-manage{display:grid;gap:8px}.df-owner-manage-title{display:flex;align-items:center;justify-content:space-between;margin-top:4px}.df-owner-manage-title.clans{margin-top:12px}.df-owner-manage-title>b{font-size:.68rem;color:#dfc88f}.df-owner-manage-title>button{min-height:30px;border:1px solid rgba(255,255,255,.08);border-radius:7px;background:rgba(255,255,255,.03);color:#aa9b80;font-size:.58rem;cursor:pointer}.df-owner-manage-title>span{color:#8e8067;font-size:.58rem}.df-owner-list{display:grid;gap:5px;max-height:210px;overflow:auto}.df-owner-list article{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.02)}.df-owner-list article>div{min-width:0;flex:1}.df-owner-list article b,.df-owner-list article small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.df-owner-list article b{font-size:.63rem;color:#d6c5a6}.df-owner-list article small{margin-top:2px;color:#756b5b;font-size:.52rem}.df-owner-list article>button{min-width:58px;min-height:31px;border:1px solid rgba(205,92,70,.2);border-radius:7px;background:rgba(125,48,36,.16);color:#dfa595;font-size:.56rem;font-weight:850;cursor:pointer}.df-owner-list .permanent{padding:5px 7px;border:1px solid rgba(224,182,84,.2);border-radius:6px;background:rgba(176,123,28,.1);color:#e2c06c;font-size:.48rem;font-weight:950}.df-owner-user-row{display:grid!important;gap:7px!important}.df-owner-user-main{display:flex;align-items:center;gap:8px;width:100%}.df-owner-user-main>div{min-width:0;flex:1}.df-owner-city-admin{display:grid;gap:5px;width:100%;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)}.df-owner-city-summary{display:flex;align-items:center;gap:6px}.df-owner-city-summary>span{font-size:.9rem}.df-owner-city-summary>div{min-width:0;flex:1}.df-owner-city-summary b,.df-owner-city-summary small{display:block}.df-owner-city-summary b{font-size:.58rem;color:#d8c8a9}.df-owner-city-summary small{font-size:.48rem;color:#87785f;text-transform:uppercase}.df-owner-city-summary>button{min-height:27px!important;min-width:52px!important;border-color:rgba(215,180,94,.17)!important;background:rgba(137,99,30,.12)!important;color:#d7b86f!important}.df-owner-city-grants{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}.df-owner-city-grants button{min-width:0;min-height:29px;border:1px solid rgba(224,186,101,.12);border-radius:6px;background:rgba(174,128,45,.08);color:#cdb47c;font-size:.47rem;font-weight:850;cursor:pointer}.df-owner-city-grants button small{display:inline;color:#8b7653;font-size:.43rem}.df-owner-city-admin.fortress{border-color:rgba(101,210,235,.18);background:rgba(46,105,120,.06);padding:7px;border-radius:8px}.df-owner-fortress-lock{display:flex;align-items:center;gap:7px;padding:7px;border:1px solid rgba(103,214,239,.13);border-radius:7px;background:rgba(49,114,131,.08)}.df-owner-fortress-lock span{padding:3px 5px;border-radius:5px;background:rgba(103,214,239,.12);color:#9eddeb;font-size:.42rem;font-weight:950}.df-owner-fortress-lock b{color:#c7edf4;font-size:.5rem}.df-owner-fortress-lock small{margin-left:auto;color:#7299a2;font-size:.43rem}.df-owner-no-city{width:100%;padding:6px;border-radius:6px;background:rgba(255,255,255,.018);color:#746958;font-size:.5rem}.df-owner-message{margin-top:9px;padding:8px;border-radius:8px;background:rgba(255,222,143,.08);color:#e8ce95;font-size:.6rem}@media(max-width:520px){.df-owner-fab{right:10px;bottom:10px}.df-owner-console{right:10px;bottom:60px}.df-owner-grid{grid-template-columns:1fr 1fr}}
+        .df-owner-fab{position:fixed;right:18px;bottom:18px;z-index:1401;height:44px;padding:0 15px;display:flex;align-items:center;gap:8px;border:1px solid rgba(228,188,91,.42);border-radius:11px;background:#302515;color:#efd18a;box-shadow:0 12px 32px rgba(0,0,0,.4);font-weight:950;cursor:pointer}.df-owner-fab.infinite{box-shadow:0 0 22px rgba(235,190,70,.18),0 12px 32px rgba(0,0,0,.4)}.df-owner-fab b{font-size:.64rem;letter-spacing:.12em}
+        .df-owner-console{position:fixed;inset:0;z-index:1400;width:100vw;height:100svh;display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:72px minmax(0,1fr);overflow:hidden;background:#0d1011;color:#e5e0d6}
+        .df-owner-head{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid rgba(255,255,255,.07);background:#121617}.df-owner-brand{display:flex;align-items:center;gap:11px}.df-owner-brand>span{display:grid;place-items:center;width:40px;height:40px;border:1px solid rgba(220,180,82,.2);border-radius:9px;background:rgba(150,105,27,.08);color:#dfbd67;font-size:1.15rem}.df-owner-brand small{display:block;color:#8e7e5d;font-size:.44rem;letter-spacing:.15em;font-weight:900}.df-owner-brand h3{margin:2px 0 0;font-size:1rem}.df-owner-brand p{margin:2px 0 0;color:#697173;font-size:.5rem}.df-owner-head-actions{display:flex;align-items:center;gap:8px}.df-owner-head-actions em{padding:5px 8px;border-radius:6px;background:rgba(71,133,151,.1);color:#9bd1dd;font-size:.44rem;font-style:normal;font-weight:950;letter-spacing:.1em}.df-owner-head-actions button{width:34px;height:34px;border:1px solid rgba(255,255,255,.07);border-radius:7px;background:rgba(255,255,255,.02);color:#aaa;font-size:1.1rem;cursor:pointer}
+        .df-owner-sidebar{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:5px;padding:14px 10px;border-right:1px solid rgba(255,255,255,.06);background:#101415}.df-owner-sidebar>small{padding:5px 8px;color:#545d5f;font-size:.42rem;letter-spacing:.14em;font-weight:900}.df-owner-sidebar>button{display:flex;align-items:center;gap:9px;min-height:56px;padding:8px;border:1px solid transparent;border-radius:8px;background:transparent;color:#828b8d;text-align:left;cursor:pointer}.df-owner-sidebar>button>span{width:26px;text-align:center;font-size:.9rem}.df-owner-sidebar button b,.df-owner-sidebar button em{display:block}.df-owner-sidebar button b{font-size:.58rem;color:#a6adae}.df-owner-sidebar button em{margin-top:2px;color:#5f696b;font-size:.45rem;font-style:normal}.df-owner-sidebar>button.active{border-color:rgba(215,176,85,.13);background:rgba(145,102,31,.07)}.df-owner-sidebar>button.active span,.df-owner-sidebar>button.active b{color:#d8b96d}.df-owner-sidebar-note{margin-top:auto;padding:9px;border:1px solid rgba(255,255,255,.05);border-radius:8px;background:rgba(255,255,255,.014)}.df-owner-sidebar-note small,.df-owner-sidebar-note b,.df-owner-sidebar-note span{display:block}.df-owner-sidebar-note small{font-size:.39rem;color:#596164;letter-spacing:.1em}.df-owner-sidebar-note b{margin-top:3px;font-size:.52rem}.df-owner-sidebar-note span{margin-top:2px;color:#62696a;font-size:.43rem;line-height:1.35}
+        .df-owner-main{grid-column:2;grid-row:2;overflow:auto;padding:22px}.df-owner-page-head{display:flex;align-items:center;justify-content:space-between;margin:0 auto 14px;width:min(1180px,100%)}.df-owner-page-head small{display:block;color:#7d6f51;font-size:.43rem;letter-spacing:.15em;font-weight:900}.df-owner-page-head h2{margin:3px 0 0;font-size:1.35rem}.df-owner-page-head>button{min-height:32px;padding:0 10px;border:1px solid rgba(255,255,255,.07);border-radius:7px;background:rgba(255,255,255,.02);color:#929a9c;font-size:.5rem;cursor:pointer}.df-owner-main>*,.df-owner-manage,.df-owner-access{width:min(1180px,100%);margin-left:auto;margin-right:auto}
+        .df-owner-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:11px}.df-owner-stat-grid article{display:flex;align-items:center;gap:9px;padding:12px;border:1px solid rgba(255,255,255,.055);border-radius:9px;background:#14191a}.df-owner-stat-grid article>span{font-size:1rem}.df-owner-stat-grid small,.df-owner-stat-grid b{display:block}.df-owner-stat-grid small{font-size:.4rem;color:#667073;letter-spacing:.08em}.df-owner-stat-grid b{margin-top:2px;font-size:.9rem}
+        .df-owner-panel{padding:13px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:#14191a}.df-owner-panel+.df-owner-panel{margin-top:10px}.df-owner-section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.df-owner-section-title small{display:block;color:#656e70;font-size:.4rem;letter-spacing:.1em}.df-owner-section-title h3{margin:2px 0 0;font-size:.73rem}.df-owner-section-title>span{color:#737c7e;font-size:.47rem}
+        .df-owner-infinity{display:flex;align-items:center;gap:10px;padding:11px;margin-bottom:8px;border:1px solid rgba(220,178,75,.11);border-radius:8px;background:rgba(120,84,21,.05)}.df-owner-infinity.on{border-color:rgba(231,191,81,.24);background:rgba(130,90,18,.09)}.df-owner-infinity>div{flex:1}.df-owner-infinity small,.df-owner-infinity b,.df-owner-infinity span{display:block}.df-owner-infinity small{font-size:.4rem;color:#827352;letter-spacing:.1em}.df-owner-infinity b{margin-top:2px;color:#ddbd70;font-size:.64rem}.df-owner-infinity span{margin-top:2px;color:#6f7270;font-size:.48rem}.df-owner-infinity>button{min-width:76px;min-height:35px;border:1px solid rgba(221,179,77,.16);border-radius:7px;background:#5e451b;color:#dfc278;font-size:.52rem;font-weight:900;cursor:pointer}
+        .df-owner-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.df-owner-grid button{min-height:62px;padding:9px;border:1px solid rgba(255,255,255,.06);border-radius:8px;background:rgba(255,255,255,.02);color:#d2c5aa;text-align:left;cursor:pointer}.df-owner-grid button b,.df-owner-grid button small{display:block}.df-owner-grid button b{font-size:.59rem}.df-owner-grid button small{margin-top:3px;color:#697071;font-size:.46rem}.df-owner-grid .max{grid-column:span 2;text-align:center;border-color:rgba(214,173,77,.13);background:rgba(130,90,23,.06)}
+        .df-owner-manage{display:grid;gap:10px}.df-owner-account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.df-owner-user-card{padding:9px;border:1px solid rgba(255,255,255,.05);border-radius:8px;background:rgba(255,255,255,.015)}.df-owner-user-main{display:flex;align-items:center;gap:7px}.df-owner-user-main>div{flex:1;min-width:0}.df-owner-user-main b,.df-owner-user-main small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.df-owner-user-main b{font-size:.57rem}.df-owner-user-main small{margin-top:2px;color:#646d6e;font-size:.45rem}.df-owner-user-main>button,.df-owner-clan-grid article>button{min-height:27px;border:1px solid rgba(190,75,62,.14);border-radius:6px;background:rgba(116,42,34,.08);color:#ca877d;font-size:.43rem;cursor:pointer}.permanent{padding:4px 6px;border-radius:5px;background:rgba(171,122,29,.09);color:#ddbd6c;font-size:.4rem;font-weight:950}
+        .df-owner-city-admin{display:grid;gap:5px;margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.045)}.df-owner-city-summary{display:flex;align-items:center;gap:6px}.df-owner-city-summary>span{font-size:.85rem}.df-owner-city-summary>div{flex:1;min-width:0}.df-owner-city-summary b,.df-owner-city-summary small{display:block}.df-owner-city-summary b{font-size:.51rem}.df-owner-city-summary small{margin-top:2px;color:#676f70;font-size:.41rem}.df-owner-city-summary>button{min-height:25px;border:1px solid rgba(206,169,83,.12);border-radius:5px;background:rgba(122,87,28,.07);color:#bda05f;font-size:.4rem;cursor:pointer}.df-owner-city-grants{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}.df-owner-city-grants button{min-height:26px;border:1px solid rgba(206,169,83,.08);border-radius:5px;background:rgba(122,87,28,.045);color:#aa925e;font-size:.39rem;cursor:pointer}.df-owner-city-grants small{color:#776947}.df-owner-city-admin.fortress{padding:6px;border:1px solid rgba(94,195,220,.11);border-radius:7px;background:rgba(43,94,107,.035)}.df-owner-fortress-lock{display:flex;align-items:center;justify-content:space-between;padding:6px;border-radius:6px;background:rgba(51,111,127,.05)}.df-owner-fortress-lock b{color:#96cfdb;font-size:.42rem}.df-owner-fortress-lock span{color:#627d83;font-size:.39rem}.df-owner-no-city{margin-top:7px;padding:5px;border-radius:5px;background:rgba(255,255,255,.012);color:#5f6869;font-size:.43rem}
+        .df-owner-clan-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.df-owner-clan-grid article{display:flex;align-items:center;gap:7px;padding:8px;border:1px solid rgba(255,255,255,.05);border-radius:7px;background:rgba(255,255,255,.015)}.df-owner-clan-grid article>div{flex:1;min-width:0}.df-owner-clan-grid b,.df-owner-clan-grid small{display:block}.df-owner-clan-grid b{font-size:.53rem}.df-owner-clan-grid small{margin-top:2px;color:#636c6e;font-size:.43rem}.df-owner-clan-grid .admin-clan{border-color:rgba(91,190,214,.11);background:rgba(43,95,108,.04)}
+        .df-owner-access-hero{display:flex;align-items:center;gap:12px;padding:14px;margin-bottom:10px;border:1px solid rgba(89,190,215,.12);border-radius:10px;background:rgba(43,94,108,.05)}.df-owner-access-hero>span{font-size:1.45rem;color:#91cfdd}.df-owner-access-hero>div:nth-child(2){flex:1;min-width:0}.df-owner-access-hero small{display:block;color:#608a94;font-size:.4rem;letter-spacing:.1em}.df-owner-access-hero h3{margin:2px 0 0;font-size:.78rem}.df-owner-access-hero p{margin:3px 0 0;color:#707b7e;font-size:.47rem;line-height:1.4}.df-owner-access-code{padding:8px 10px;border:1px solid rgba(86,183,207,.1);border-radius:7px;background:rgba(0,0,0,.12);text-align:center}.df-owner-access-code b{display:block;margin-top:2px;color:#a9dce7;font-size:.65rem;letter-spacing:.1em}
+        .df-owner-access-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}.df-owner-request-list,.df-owner-member-list{display:grid;gap:5px}.df-owner-request-list article,.df-owner-member-list article{display:flex;align-items:center;gap:7px;padding:8px;border:1px solid rgba(255,255,255,.045);border-radius:7px;background:rgba(255,255,255,.012)}.df-owner-request-list article>div:first-child,.df-owner-member-list article>div{flex:1;min-width:0}.df-owner-request-list b,.df-owner-request-list small,.df-owner-request-list span,.df-owner-member-list b,.df-owner-member-list small{display:block}.df-owner-request-list b,.df-owner-member-list b{font-size:.51rem}.df-owner-request-list small,.df-owner-member-list small{margin-top:2px;color:#626b6d;font-size:.42rem}.df-owner-request-list span{margin-top:2px;color:#756b54;font-size:.39rem}.df-owner-request-actions{display:flex!important;gap:3px;flex:0 0 auto!important}.df-owner-request-actions button,.df-owner-member-list article>button{min-height:27px;padding:0 7px;border-radius:5px;font-size:.4rem;cursor:pointer}.df-owner-request-actions .approve{border:1px solid rgba(70,180,110,.13);background:rgba(48,112,72,.07);color:#80c99a}.df-owner-request-actions .reject,.df-owner-member-list article>button{border:1px solid rgba(183,72,59,.13);background:rgba(109,42,34,.07);color:#c77d73}.df-owner-request-list em,.df-owner-member-list em{color:#756f62;font-size:.38rem;font-style:normal}.member-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.025);color:#87c4d1}.df-owner-empty{padding:16px;border:1px dashed rgba(255,255,255,.06);border-radius:7px;color:#5d6668;text-align:center;font-size:.47rem}.df-owner-delegated-note{margin-top:10px;padding:9px;border:1px solid rgba(214,174,78,.09);border-radius:7px;background:rgba(111,79,25,.035)}.df-owner-delegated-note b,.df-owner-delegated-note span{display:block}.df-owner-delegated-note b{color:#b99d5c;font-size:.5rem}.df-owner-delegated-note span{margin-top:2px;color:#68665f;font-size:.45rem}
+        .df-owner-message{position:sticky;bottom:0;margin-top:10px;padding:8px 10px;border:1px solid rgba(218,178,83,.1);border-radius:7px;background:#272217;color:#ccb16e;font-size:.48rem}
+        @media(max-width:850px){.df-owner-console{grid-template-columns:170px minmax(0,1fr)}.df-owner-account-grid,.df-owner-access-columns{grid-template-columns:1fr}.df-owner-stat-grid{grid-template-columns:1fr 1fr}.df-owner-grid{grid-template-columns:1fr 1fr}.df-owner-grid .max{grid-column:1/-1}}
+        @media(max-width:600px){.df-owner-console{grid-template-columns:1fr;grid-template-rows:64px auto minmax(0,1fr)}.df-owner-head{grid-column:1;grid-row:1;padding:0 9px}.df-owner-brand p{display:none}.df-owner-sidebar{grid-column:1;grid-row:2;flex-direction:row;padding:5px;overflow-x:auto;border-right:0;border-bottom:1px solid rgba(255,255,255,.06)}.df-owner-sidebar>small,.df-owner-sidebar-note{display:none}.df-owner-sidebar>button{min-width:125px;min-height:43px}.df-owner-main{grid-column:1;grid-row:3;padding:11px}.df-owner-page-head h2{font-size:1rem}.df-owner-stat-grid{gap:6px}.df-owner-clan-grid{grid-template-columns:1fr}.df-owner-access-hero{align-items:flex-start;flex-wrap:wrap}.df-owner-access-code{width:100%}}
       `}</style>
     </>
   );
