@@ -127,7 +127,7 @@ export default function Home() {
       </section>
 
       <section className="section">
-        <h2>Latest Updates</h2>
+        <h2>DigitBox</h2>
         <p>
           New projects and posts appear here as they are published. Open a
           project to try it, or read a post when you want the context behind a
