@@ -739,9 +739,14 @@ function drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, light, n
     let maxHp = 1;
     if (isMine && building.key !== "depot") {
       maxHp = cityBuildingMaxHp(building.key, level);
-      const storedHp = Number(hpMap && hpMap[building.key]);
-      hp = Number.isFinite(storedHp) ? clamp(storedHp, 0, maxHp) : maxHp;
-      hpRatio = clamp(hp / maxHp, 0, 1);
+      if (city.ownerFortress || city.infiniteArmor) {
+        hp = maxHp;
+        hpRatio = 1;
+      } else {
+        const storedHp = Number(hpMap && hpMap[building.key]);
+        hp = Number.isFinite(storedHp) ? clamp(storedHp, 0, maxHp) : maxHp;
+        hpRatio = clamp(hp / maxHp, 0, 1);
+      }
     }
 
     // A destroyed building stays as rubble instead of popping out of existence.
