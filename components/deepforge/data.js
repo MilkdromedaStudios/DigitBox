@@ -46,6 +46,7 @@ export const INITIAL = {
   researchTech: { drilling: 0, processing: 0, survey: 0, tactics: 0 },
   boostCharges: 0,
   buildings: { refinery: 0, workshop: 0, academy: 0, walls: 0 },
+  buildingHp: { refinery: 100, workshop: 100, academy: 100, walls: 160 },
 };
 
 function seededNoise(row, col) {
