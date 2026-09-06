@@ -1,13 +1,12 @@
 import Head from "next/head";
 import Link from "next/link";
-import Script from "next/script";
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
+import KubeLiquidGlass from "../components/KubeLiquidGlass";
 
 export default function BetaPage() {
   const [updates, setUpdates] = useState([]);
   const [updatesError, setUpdatesError] = useState("");
-  const [liquidReady, setLiquidReady] = useState(false);
 
   useEffect(() => {
     document.body.classList.add("beta-liquid-active");
@@ -46,44 +45,6 @@ export default function BetaPage() {
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    if (!liquidReady || typeof window === "undefined" || typeof window.liquidGL !== "function") return undefined;
-    const instances = [];
-    const timer = window.setTimeout(() => {
-      [
-        ".beta-liquid-active .header",
-        ".beta-liquid-hero-glass",
-        ".beta-deepforge-pill",
-        ".beta-liquid-active .footer",
-      ].forEach((target) => {
-        try {
-          const instance = window.liquidGL({
-            target,
-            snapshot: "body",
-            resolution: 1.4,
-            refraction: 0.018,
-            bevelDepth: 0.12,
-            bevelWidth: 0.18,
-            frost: 3,
-            shadow: true,
-            specular: true,
-            reveal: "fade",
-            tilt: true,
-            tiltFactor: 2.2,
-          });
-          if (instance) instances.push(instance);
-        } catch (_) {}
-      });
-    }, 80);
-    return () => {
-      window.clearTimeout(timer);
-      instances.forEach((instance) => {
-        try {
-          if (instance && typeof instance.destroy === "function") instance.destroy();
-        } catch (_) {}
-      });
-    };
-  }, [liquidReady]);
 
   const heroNews = useMemo(() => updates.slice(0, 3), [updates]);
 
@@ -97,18 +58,13 @@ export default function BetaPage() {
     <>
       <Head>
         <title>DigitBox Beta — Liquid Glass Preview</title>
-        <meta name="description" content="The Liquid GL powered preview of DigitBox, including the DEEPFORGE private beta." />
+        <meta name="description" content="DigitBox beta with Kube-style CSS and SVG Liquid Glass refraction, including the DEEPFORGE private beta." />
         <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
         <meta name="googlebot" content="noindex,nofollow,noarchive,nosnippet" />
         <meta name="theme-color" content="#07111f" />
       </Head>
 
-      <Script
-        src="https://unpkg.com/liquid-gl@2.0.1/package/liquidGL.js"
-        strategy="afterInteractive"
-        onLoad={() => setLiquidReady(true)}
-        onReady={() => setLiquidReady(true)}
-      />
+      <KubeLiquidGlass />
 
       <Layout>
         <div className="beta-liquid-site">
