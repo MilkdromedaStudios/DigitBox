@@ -252,6 +252,9 @@ function LabScreen(props) {
 
 function ResearchScreen(props) {
   const tech = props.game.researchTech || {};
+  const [mathSeed, setMathSeed] = useState(function () { return Math.floor(Date.now() / 1000); });
+  const [mathFeedback, setMathFeedback] = useState(null);
+  const mathQuestion = challengeFor(mathSeed);
   const projects = [
     { key: "drilling", icon: "⛏", name: "Drill Engineering", effect: "+0.04 m excavation radius per level" },
     { key: "processing", icon: "⚙", name: "Ore Processing", effect: "+5% ore sale value per level" },
@@ -259,17 +262,72 @@ function ResearchScreen(props) {
     { key: "tactics", icon: "⚔", name: "Clan Tactics", effect: "+12% personal war contribution per level" },
   ];
 
+  function answerMath(choice) {
+    const correct = choice === mathQuestion.answer;
+    if (correct) {
+      if (props.awardMathResearch) props.awardMathResearch();
+      setMathFeedback({
+        correct: true,
+        text: "Correct! +3 research points. " + mathQuestion.explain,
+      });
+    } else {
+      setMathFeedback({
+        correct: false,
+        text: "Not quite. Try another answer.",
+      });
+    }
+  }
+
+  function nextMathQuestion() {
+    setMathSeed(function (seed) { return seed + 1; });
+    setMathFeedback(null);
+  }
+
   return (
     <div className="df2-screen-scroll df-research-screen">
       <div className="df-research-hero">
         <div className="df-research-icon">🔬</div>
         <section>
           <span className="df-kicker">RESEARCH WORKSHOP</span>
-          <h2>Turn mineral samples into better technology.</h2>
-          <p>Research is earned while mining. Spend it on permanent mine and clan upgrades.</p>
+          <h2>Turn knowledge and mineral samples into better technology.</h2>
+          <p>Mine valuable samples or solve engineering math to earn research points.</p>
         </section>
         <div className="df-research-points"><small>AVAILABLE</small><b>{props.game.research}</b><span>research</span></div>
       </div>
+
+      <section className="df-research-math">
+        <div className="df-research-math-head">
+          <div>
+            <span>🧠</span>
+            <div><small>MATH RESEARCH</small><h3>Earn +3 RP for every correct answer</h3></div>
+          </div>
+          <b>+3 RP</b>
+        </div>
+        <div className="df-research-math-question">
+          <small>{mathQuestion.title}</small>
+          <p>{mathQuestion.text}</p>
+        </div>
+        <div className="df-research-math-choices">
+          {mathQuestion.choices.map(function (choice) {
+            return (
+              <button
+                key={choice}
+                disabled={Boolean(mathFeedback && mathFeedback.correct)}
+                onClick={function () { answerMath(choice); }}
+              >
+                {choice}
+              </button>
+            );
+          })}
+        </div>
+        {mathFeedback && (
+          <div className={"df-research-math-feedback " + (mathFeedback.correct ? "good" : "bad")}>
+            <span>{mathFeedback.correct ? "✓" : "×"}</span>
+            <p>{mathFeedback.text}</p>
+            {mathFeedback.correct && <button onClick={nextMathQuestion}>Next problem →</button>}
+          </div>
+        )}
+      </section>
 
       <div className="df-research-grid">
         {projects.map(function (project) {
@@ -289,7 +347,7 @@ function ResearchScreen(props) {
 
       <div className="df-research-note">
         <b>How research is earned</b>
-        <span>Every third ordinary ore sample can produce research. Quartz and gold produce extra research automatically.</span>
+        <span>Correct Math Research answers award +3 RP. Mining samples can still produce research too, with quartz and gold giving extra.</span>
       </div>
     </div>
   );
@@ -831,6 +889,11 @@ export default function BetaGameV2() {
     return base + level * 3;
   }
 
+  function awardMathResearch() {
+    setGame(function (g) { return { ...g, research: g.research + 3 }; });
+    setNotice("Math research solved · +3 research points.");
+  }
+
   function buyResearch(key) {
     const cost = researchCost(key);
     if (game.research < cost) {
@@ -972,7 +1035,7 @@ export default function BetaGameV2() {
         {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} onCreateCity={handleCreateCity} onCustomizeCity={handleCustomizeCity} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
-        {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
+        {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} awardMathResearch={awardMathResearch} />}
       </main>
 
       <footer className="df2-footer"><span>{cloudStatus}</span><span>{authUser ? multiplayer.players.length + " online · " : ""}{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>
