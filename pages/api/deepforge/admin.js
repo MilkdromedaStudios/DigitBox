@@ -41,10 +41,22 @@ async function authUser(request, DB) {
   ).bind(tokenHash, Date.now()).first();
 }
 
-async function ensureColumn(DB, table, name, sqlType) {
-  const columns = await DB.prepare("PRAGMA table_info(" + table + ")").all();
-  if ((columns.results || []).some((row) => row.name === name)) return;
-  await DB.prepare("ALTER TABLE " + table + " ADD COLUMN " + name + " " + sqlType).run().catch(() => {});
+async function ensureCityColumns(DB) {
+  const columns = await DB.prepare("PRAGMA table_info(player_cities)").all();
+  const existing = new Set((columns.results || []).map((row) => row.name));
+  const required = [
+    ["city_name", "TEXT NOT NULL DEFAULT 'Mining Town'"],
+    ["city_level", "INTEGER NOT NULL DEFAULT 1"],
+    ["city_style", "TEXT NOT NULL DEFAULT 'industrial'"],
+    ["refinery_level", "INTEGER NOT NULL DEFAULT 0"],
+    ["workshop_level", "INTEGER NOT NULL DEFAULT 0"],
+    ["academy_level", "INTEGER NOT NULL DEFAULT 0"],
+    ["walls_level", "INTEGER NOT NULL DEFAULT 0"],
+  ];
+  for (const [name, sqlType] of required) {
+    if (existing.has(name)) continue;
+    await DB.prepare("ALTER TABLE player_cities ADD COLUMN " + name + " " + sqlType).run().catch(() => {});
+  }
 }
 
 async function ensureAdminTables(DB) {
@@ -54,13 +66,7 @@ async function ensureAdminTables(DB) {
     DB.prepare("CREATE TABLE IF NOT EXISTS player_cities (user_id TEXT PRIMARY KEY, city_slot INTEGER NOT NULL UNIQUE, created_at INTEGER NOT NULL)"),
     DB.prepare("CREATE TABLE IF NOT EXISTS player_presence (user_id TEXT PRIMARY KEY, x REAL NOT NULL, y REAL NOT NULL, company_value INTEGER NOT NULL DEFAULT 0, trophies INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)"),
   ]);
-  await ensureColumn(DB, "player_cities", "city_name", "TEXT NOT NULL DEFAULT 'Mining Town'");
-  await ensureColumn(DB, "player_cities", "city_level", "INTEGER NOT NULL DEFAULT 1");
-  await ensureColumn(DB, "player_cities", "city_style", "TEXT NOT NULL DEFAULT 'industrial'");
-  await ensureColumn(DB, "player_cities", "refinery_level", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(DB, "player_cities", "workshop_level", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(DB, "player_cities", "academy_level", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(DB, "player_cities", "walls_level", "INTEGER NOT NULL DEFAULT 0");
+  await ensureCityColumns(DB);
 }
 
 async function repairOwnerId(DB) {
