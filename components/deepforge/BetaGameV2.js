@@ -3,7 +3,7 @@ import InfiniteWorld from "./InfiniteWorld";
 import WorldCityOverlay from "./WorldCityOverlay";
 import ClanScreen from "./ClanScreen";
 import ClanWarScreen from "./ClanWarScreen";
-import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor } from "./data";
+import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor, generateResearchMathQuestion } from "./data";
 import {
   RESOURCE_TYPES,
   addDigCircle,
@@ -252,9 +252,8 @@ function LabScreen(props) {
 
 function ResearchScreen(props) {
   const tech = props.game.researchTech || {};
-  const [mathSeed, setMathSeed] = useState(function () { return Math.floor(Date.now() / 1000); });
+  const [mathQuestion, setMathQuestion] = useState(function () { return generateResearchMathQuestion(); });
   const [mathFeedback, setMathFeedback] = useState(null);
-  const mathQuestion = challengeFor(mathSeed);
   const projects = [
     { key: "drilling", icon: "⛏", name: "Drill Engineering", effect: "+0.04 m excavation radius per level" },
     { key: "processing", icon: "⚙", name: "Ore Processing", effect: "+5% ore sale value per level" },
@@ -263,12 +262,16 @@ function ResearchScreen(props) {
   ];
 
   function answerMath(choice) {
-    const correct = choice === mathQuestion.answer;
-    if (correct) {
+    const actuallyCorrect = choice === mathQuestion.answer;
+    const accepted = actuallyCorrect || Boolean(props.ownerBypass);
+
+    if (accepted) {
       if (props.awardMathResearch) props.awardMathResearch();
       setMathFeedback({
         correct: true,
-        text: "Correct! +3 research points. " + mathQuestion.explain,
+        text: actuallyCorrect
+          ? "Correct! +3 research points. " + mathQuestion.explain
+          : "Owner bypass active — +3 research points. Correct answer: " + mathQuestion.answer + ". " + mathQuestion.explain,
       });
     } else {
       setMathFeedback({
@@ -279,7 +282,7 @@ function ResearchScreen(props) {
   }
 
   function nextMathQuestion() {
-    setMathSeed(function (seed) { return seed + 1; });
+    setMathQuestion(generateResearchMathQuestion());
     setMathFeedback(null);
   }
 
@@ -301,7 +304,7 @@ function ResearchScreen(props) {
             <span>🧠</span>
             <div><small>MATH RESEARCH</small><h3>Earn +3 RP for every correct answer</h3></div>
           </div>
-          <b>+3 RP</b>
+          <b>{props.ownerBypass ? "♛ OWNER BYPASS" : "+3 RP"}</b>
         </div>
         <div className="df-research-math-question">
           <small>{mathQuestion.title}</small>
@@ -1035,7 +1038,7 @@ export default function BetaGameV2() {
         {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} onCreateCity={handleCreateCity} onCustomizeCity={handleCustomizeCity} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
-        {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} awardMathResearch={awardMathResearch} />}
+        {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} awardMathResearch={awardMathResearch} ownerBypass={Boolean(authUser && String(authUser.displayName || "").toLowerCase() === "numberstring")} />}
       </main>
 
       <footer className="df2-footer"><span>{cloudStatus}</span><span>{authUser ? multiplayer.players.length + " online · " : ""}{player.x.toFixed(1)}, {player.y.toFixed(1)}</span><button onClick={reset}>Reset</button></footer>
