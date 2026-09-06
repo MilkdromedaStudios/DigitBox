@@ -58,9 +58,23 @@ async function repairNumberstringOwner(DB) {
   return String(canonical.id);
 }
 
-async function ownerStatus(DB, user) {
+async function accessStatus(DB, user) {
   const ownerId = await repairNumberstringOwner(DB);
-  return Boolean(user && ownerId && ownerId === user.id);
+  if (!user || !ownerId) return { owner: false, permanentOwner: false, delegatedAdmin: false, ownerId };
+  if (ownerId === user.id) return { owner: true, permanentOwner: true, delegatedAdmin: false, ownerId };
+
+  const membership = await DB.prepare(
+    "SELECT cm.player_id FROM clan_members cm " +
+    "JOIN clans c ON c.id=cm.clan_id " +
+    "WHERE cm.player_id=?1 AND c.owner_id=?2 AND lower(c.name)='admin' LIMIT 1"
+  ).bind(user.id, ownerId).first();
+
+  return {
+    owner: Boolean(membership),
+    permanentOwner: false,
+    delegatedAdmin: Boolean(membership),
+    ownerId,
+  };
 }
 
 export default async function handler(request) {
@@ -70,12 +84,14 @@ export default async function handler(request) {
 
   const user = await authenticatedUser(request, DB);
   if (!user) return json({ owner: false, authenticated: false }, 200);
-  const owner = await ownerStatus(DB, user);
+  const access = await accessStatus(DB, user);
 
   return json({
     authenticated: true,
-    owner,
+    owner: access.owner,
+    permanentOwner: access.permanentOwner,
+    delegatedAdmin: access.delegatedAdmin,
     username: user.display_name,
-    ownerLabel: owner ? "DEEPFORGE OWNER" : null,
+    ownerLabel: access.permanentOwner ? "DEEPFORGE OWNER" : access.delegatedAdmin ? "ADMIN CLAN" : null,
   });
 }
