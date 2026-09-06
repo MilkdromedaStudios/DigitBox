@@ -1,5 +1,13 @@
 export const config = { runtime: "edge" };
 
+const CITY_GRANTS = {
+  cityLevel: "city_level",
+  refinery: "refinery_level",
+  workshop: "workshop_level",
+  academy: "academy_level",
+  walls: "walls_level",
+};
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -33,6 +41,12 @@ async function authUser(request, DB) {
   ).bind(tokenHash, Date.now()).first();
 }
 
+async function ensureColumn(DB, table, name, sqlType) {
+  const columns = await DB.prepare("PRAGMA table_info(" + table + ")").all();
+  if ((columns.results || []).some((row) => row.name === name)) return;
+  await DB.prepare("ALTER TABLE " + table + " ADD COLUMN " + name + " " + sqlType).run().catch(() => {});
+}
+
 async function ensureAdminTables(DB) {
   await DB.batch([
     DB.prepare("CREATE TABLE IF NOT EXISTS deepforge_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
@@ -40,6 +54,13 @@ async function ensureAdminTables(DB) {
     DB.prepare("CREATE TABLE IF NOT EXISTS player_cities (user_id TEXT PRIMARY KEY, city_slot INTEGER NOT NULL UNIQUE, created_at INTEGER NOT NULL)"),
     DB.prepare("CREATE TABLE IF NOT EXISTS player_presence (user_id TEXT PRIMARY KEY, x REAL NOT NULL, y REAL NOT NULL, company_value INTEGER NOT NULL DEFAULT 0, trophies INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)"),
   ]);
+  await ensureColumn(DB, "player_cities", "city_name", "TEXT NOT NULL DEFAULT 'Mining Town'");
+  await ensureColumn(DB, "player_cities", "city_level", "INTEGER NOT NULL DEFAULT 1");
+  await ensureColumn(DB, "player_cities", "city_style", "TEXT NOT NULL DEFAULT 'industrial'");
+  await ensureColumn(DB, "player_cities", "refinery_level", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(DB, "player_cities", "workshop_level", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(DB, "player_cities", "academy_level", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(DB, "player_cities", "walls_level", "INTEGER NOT NULL DEFAULT 0");
 }
 
 async function repairOwnerId(DB) {
@@ -103,6 +124,22 @@ async function removeUserFromClan(DB, BUCKET, userId) {
   }
 }
 
+function cityInfo(row) {
+  if (!row || row.city_slot === null || row.city_slot === undefined) return null;
+  return {
+    slot: Number(row.city_slot) || 0,
+    name: row.city_name || "Mining Town",
+    level: Math.max(1, Number(row.city_level) || 1),
+    style: row.city_style || "industrial",
+    upgrades: {
+      refinery: Math.max(0, Number(row.refinery_level) || 0),
+      workshop: Math.max(0, Number(row.workshop_level) || 0),
+      academy: Math.max(0, Number(row.academy_level) || 0),
+      walls: Math.max(0, Number(row.walls_level) || 0),
+    },
+  };
+}
+
 export default async function handler(request) {
   const { DB, BUCKET } = findBindings(process.env);
   if (!DB) return json({ error: "D1 unavailable." }, 503);
@@ -111,7 +148,9 @@ export default async function handler(request) {
 
   if (request.method === "GET") {
     const users = await DB.prepare(
-      "SELECT id, email, display_name, created_at FROM users ORDER BY created_at DESC LIMIT 200"
+      "SELECT u.id, u.email, u.display_name, u.created_at, " +
+      "c.city_slot, c.city_name, c.city_level, c.city_style, c.refinery_level, c.workshop_level, c.academy_level, c.walls_level " +
+      "FROM users u LEFT JOIN player_cities c ON c.user_id = u.id ORDER BY u.created_at DESC LIMIT 200"
     ).all();
     const clans = await DB.prepare(
       "SELECT c.id, c.name, c.tag, c.owner_id, c.created_at, COUNT(cm.player_id) AS member_count " +
@@ -120,9 +159,53 @@ export default async function handler(request) {
     const permanentOwnerId = await ownerId(DB);
     return json({
       ownerId: permanentOwnerId,
-      users: (users.results || []).map((row) => ({ id: row.id, email: row.email, displayName: row.display_name, createdAt: Number(row.created_at) || 0, permanent: row.id === permanentOwnerId })),
-      clans: (clans.results || []).map((row) => ({ id: row.id, name: row.name, tag: row.tag, ownerId: row.owner_id, memberCount: Number(row.member_count) || 0, createdAt: Number(row.created_at) || 0 })),
+      users: (users.results || []).map((row) => ({
+        id: row.id,
+        email: row.email,
+        displayName: row.display_name,
+        createdAt: Number(row.created_at) || 0,
+        permanent: row.id === permanentOwnerId,
+        city: cityInfo(row),
+      })),
+      clans: (clans.results || []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        tag: row.tag,
+        ownerId: row.owner_id,
+        memberCount: Number(row.member_count) || 0,
+        createdAt: Number(row.created_at) || 0,
+      })),
     });
+  }
+
+  if (request.method === "POST") {
+    const body = await request.json().catch(() => null);
+    if (!body) return json({ error: "Invalid JSON." }, 400);
+
+    if (body.type === "cityGrant") {
+      const userId = String(body.userId || "");
+      const key = String(body.key || "");
+      const column = CITY_GRANTS[key];
+      if (!column) return json({ error: "Unknown city upgrade." }, 400);
+      const amount = Math.max(1, Math.min(100, Math.round(Number(body.amount) || 1)));
+      const city = await DB.prepare("SELECT user_id FROM player_cities WHERE user_id = ?1").bind(userId).first();
+      if (!city) return json({ error: "That account has not created a city yet." }, 409);
+      await DB.prepare(
+        "UPDATE player_cities SET " + column + " = MIN(1000, " + column + " + ?2) WHERE user_id = ?1"
+      ).bind(userId, amount).run();
+      return json({ ok: true, granted: key, amount, userId });
+    }
+
+    if (body.type === "citySetLevel") {
+      const userId = String(body.userId || "");
+      const level = Math.max(1, Math.min(1000, Math.round(Number(body.level) || 1)));
+      const city = await DB.prepare("SELECT user_id FROM player_cities WHERE user_id = ?1").bind(userId).first();
+      if (!city) return json({ error: "That account has not created a city yet." }, 409);
+      await DB.prepare("UPDATE player_cities SET city_level = ?2 WHERE user_id = ?1").bind(userId, level).run();
+      return json({ ok: true, level, userId });
+    }
+
+    return json({ error: "Unknown admin action." }, 400);
   }
 
   if (request.method !== "DELETE") return json({ error: "Method not allowed." }, 405);
