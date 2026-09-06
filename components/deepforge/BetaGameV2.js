@@ -14,7 +14,7 @@ import {
   surfaceHeight,
 } from "./world";
 import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
-import { createMultiplayerCity, leaveMultiplayerWorld, syncMultiplayerPresence } from "./multiplayer";
+import { createMultiplayerCity, leaveMultiplayerWorld, syncMultiplayerPresence, updateMultiplayerCityProfile } from "./multiplayer";
 import { loadSharedWorld, submitSharedDigs } from "./sharedWorld";
 import { attackPlayer, loadCombatStatus, takeZombieDamage } from "./combat";
 
@@ -137,6 +137,7 @@ function WorldScreen(props) {
         waypoint={props.waypoint}
         onWaypoint={props.onWaypoint}
         onCreateCity={props.onCreateCity}
+        onCustomizeCity={props.onCustomizeCity}
         game={props.game}
         buildingCost={props.buildingCost}
         upgradeBuilding={props.upgradeBuilding}
@@ -692,6 +693,26 @@ export default function BetaGameV2() {
     }
   }
 
+  async function handleCustomizeCity(name, style) {
+    if (!authUser || !authUser.id) return false;
+    try {
+      const data = await updateMultiplayerCityProfile(name, style);
+      const next = {
+        players: Array.isArray(data.players) ? data.players : [],
+        cities: Array.isArray(data.cities) ? data.cities : [],
+        me: data.me || null,
+      };
+      setMultiplayer(next);
+      const city = next.me ? next.cities.find(function (entry) { return entry.ownerId === next.me.id; }) : null;
+      if (city) setCityWaypoint(city);
+      setNotice(city ? city.name + " updated." : "City updated.");
+      return true;
+    } catch (error) {
+      setNotice(error && error.message ? error.message : "Could not update city.");
+      return false;
+    }
+  }
+
   async function handlePlayerAttack(targetId) {
     if (!authUser || !authUser.id) { setNotice("Log in before fighting other players."); return; }
     try {
@@ -948,7 +969,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} onCreateCity={handleCreateCity} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} onCreateCity={handleCreateCity} onCustomizeCity={handleCustomizeCity} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
