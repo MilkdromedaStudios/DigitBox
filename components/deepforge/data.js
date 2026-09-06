@@ -120,6 +120,294 @@ export function challengeFor(seed) {
   return challenges[Math.abs(Number(seed) || 0) % challenges.length];
 }
 
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffled(values) {
+  const list = values.slice();
+  for (let i = list.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = list[i];
+    list[i] = list[j];
+    list[j] = tmp;
+  }
+  return list;
+}
+
+function numericChoices(answer, spread, suffix) {
+  const values = new Set([answer]);
+  const step = Math.max(1, Math.round(spread || Math.max(2, Math.abs(answer) * 0.15)));
+  let guard = 0;
+  while (values.size < 4 && guard < 30) {
+    guard += 1;
+    const direction = Math.random() < 0.5 ? -1 : 1;
+    const distance = randomInt(1, 3) * step;
+    const value = Math.max(0, answer + direction * distance);
+    values.add(value);
+  }
+  let filler = answer + step;
+  while (values.size < 4) {
+    values.add(Math.max(0, filler));
+    filler += step;
+  }
+  return shuffled(Array.from(values).map((value) => String(value) + (suffix || "")));
+}
+
+export function generateResearchMathQuestion() {
+  const type = randomInt(0, 17);
+
+  if (type === 0) {
+    const a = randomInt(18, 180);
+    const b = randomInt(12, 140);
+    const answer = a + b;
+    return {
+      title: "Ore inventory",
+      text: "The depot has " + a + " iron samples and receives " + b + " more. How many samples are there now?",
+      choices: numericChoices(answer, randomInt(4, 13), ""),
+      answer: String(answer),
+      explain: a + " + " + b + " = " + answer + ".",
+    };
+  }
+
+  if (type === 1) {
+    const start = randomInt(90, 350);
+    const used = randomInt(20, start - 20);
+    const answer = start - used;
+    return {
+      title: "Supply count",
+      text: "A workshop starts with " + start + " bolts and uses " + used + ". How many remain?",
+      choices: numericChoices(answer, randomInt(3, 11), ""),
+      answer: String(answer),
+      explain: start + " − " + used + " = " + answer + ".",
+    };
+  }
+
+  if (type === 2) {
+    const trucks = randomInt(3, 12);
+    const each = randomInt(8, 45);
+    const answer = trucks * each;
+    return {
+      title: "Hauling capacity",
+      text: trucks + " mining carts each carry " + each + " kg. What is the total carrying capacity?",
+      choices: numericChoices(answer, each, " kg"),
+      answer: String(answer) + " kg",
+      explain: trucks + " × " + each + " = " + answer + " kg.",
+    };
+  }
+
+  if (type === 3) {
+    const groups = randomInt(3, 15);
+    const each = randomInt(4, 24);
+    const total = groups * each;
+    return {
+      title: "Sample crates",
+      text: total + " mineral samples are split equally into " + groups + " crates. How many samples go in each crate?",
+      choices: numericChoices(each, randomInt(1, 5), ""),
+      answer: String(each),
+      explain: total + " ÷ " + groups + " = " + each + ".",
+    };
+  }
+
+  if (type === 4) {
+    const length = randomInt(6, 28);
+    const width = randomInt(5, 22);
+    const answer = length * width;
+    return {
+      title: "Factory lot",
+      text: "A factory lot is " + length + " m by " + width + " m. What is its area?",
+      choices: numericChoices(answer, randomInt(6, 20), " m²"),
+      answer: String(answer) + " m²",
+      explain: "Area = " + length + " × " + width + " = " + answer + " m².",
+    };
+  }
+
+  if (type === 5) {
+    const length = randomInt(8, 32);
+    const width = randomInt(5, 20);
+    const answer = 2 * (length + width);
+    return {
+      title: "Claim fence",
+      text: "A rectangular claim is " + length + " m long and " + width + " m wide. How much fencing is needed for the perimeter?",
+      choices: numericChoices(answer, randomInt(4, 12), " m"),
+      answer: String(answer) + " m",
+      explain: "Perimeter = 2(" + length + " + " + width + ") = " + answer + " m.",
+    };
+  }
+
+  if (type === 6) {
+    const percent = [10, 20, 25, 40, 50, 75][randomInt(0, 5)];
+    const baseUnit = percent === 25 || percent === 75 ? 4 : percent === 20 || percent === 40 ? 5 : 10;
+    const total = randomInt(4, 24) * baseUnit;
+    const answer = total * percent / 100;
+    return {
+      title: "Ore percentage",
+      text: percent + "% of a " + total + " kg ore load is copper. How many kilograms are copper?",
+      choices: numericChoices(answer, Math.max(2, Math.round(total / 10)), " kg"),
+      answer: String(answer) + " kg",
+      explain: percent + "% of " + total + " = " + answer + " kg.",
+    };
+  }
+
+  if (type === 7) {
+    const percent = [10, 20, 25, 40, 50][randomInt(0, 4)];
+    const baseUnit = percent === 25 ? 4 : percent === 20 || percent === 40 ? 5 : 10;
+    const original = randomInt(5, 25) * baseUnit;
+    const removed = original * percent / 100;
+    return {
+      title: "Fence damage",
+      text: "A claim has " + original + " fence posts. Zombies destroy " + removed + ". What percent of the posts were destroyed?",
+      choices: shuffled([percent, Math.max(5, percent - 10), Math.min(95, percent + 10), Math.min(95, percent + 20)].map((v) => String(v) + "%")),
+      answer: String(percent) + "%",
+      explain: removed + " ÷ " + original + " = " + (percent / 100) + " = " + percent + "%.",
+    };
+  }
+
+  if (type === 8) {
+    const x = randomInt(2, 18);
+    const a = randomInt(2, 9);
+    const b = randomInt(3, 25);
+    const total = a * x + b;
+    return {
+      title: "Pump calibration",
+      text: "A pump setting follows " + a + "x + " + b + " = " + total + ". What is x?",
+      choices: numericChoices(x, randomInt(1, 3), ""),
+      answer: String(x),
+      explain: "Subtract " + b + ", then divide by " + a + ": x = " + x + ".",
+    };
+  }
+
+  if (type === 9) {
+    const left = randomInt(2, 7);
+    const right = randomInt(2, 7);
+    const scale = randomInt(3, 12);
+    const known = left * scale;
+    const answer = right * scale;
+    return {
+      title: "Alloy ratio",
+      text: "Copper : iron must be " + left + " : " + right + ". If you use " + known + " copper samples, how many iron samples are needed?",
+      choices: numericChoices(answer, right, ""),
+      answer: String(answer),
+      explain: known + " ÷ " + left + " = " + scale + " groups, so " + right + " × " + scale + " = " + answer + ".",
+    };
+  }
+
+  if (type === 10) {
+    const a = randomInt(20, 90);
+    const b = randomInt(20, 90);
+    const c = randomInt(20, 90);
+    const sum = a + b + c;
+    const adjustedC = c + ((3 - (sum % 3)) % 3);
+    const answer = (a + b + adjustedC) / 3;
+    return {
+      title: "Daily production",
+      text: "A mill processes " + a + ", " + b + ", and " + adjustedC + " tons over three shifts. What is the average per shift?",
+      choices: numericChoices(answer, randomInt(3, 9), " tons"),
+      answer: String(answer) + " tons",
+      explain: "(" + a + " + " + b + " + " + adjustedC + ") ÷ 3 = " + answer + " tons.",
+    };
+  }
+
+  if (type === 11) {
+    const meters = randomInt(2, 35);
+    const answer = meters * 100;
+    return {
+      title: "Survey conversion",
+      text: "A tunnel section is " + meters + " meters long. How many centimeters is that?",
+      choices: numericChoices(answer, 100, " cm"),
+      answer: String(answer) + " cm",
+      explain: meters + " × 100 = " + answer + " cm.",
+    };
+  }
+
+  if (type === 12) {
+    const denominator = [2, 3, 4, 5, 6, 8][randomInt(0, 5)];
+    const numerator = randomInt(1, denominator - 1);
+    const total = randomInt(3, 18) * denominator;
+    const answer = total * numerator / denominator;
+    return {
+      title: "Refinery fraction",
+      text: numerator + "/" + denominator + " of a " + total + " kg batch is high-grade ore. How many kilograms is that?",
+      choices: numericChoices(answer, randomInt(2, 8), " kg"),
+      answer: String(answer) + " kg",
+      explain: total + " × " + numerator + "/" + denominator + " = " + answer + " kg.",
+    };
+  }
+
+  if (type === 13) {
+    const price = randomInt(4, 30) * 10;
+    const discount = [10, 20, 25, 50][randomInt(0, 3)];
+    const saved = price * discount / 100;
+    const answer = price - saved;
+    return {
+      title: "Equipment discount",
+      text: "A mining tool costs $" + price + " and is discounted " + discount + "%. What is the sale price?",
+      choices: numericChoices(answer, 10, ""),
+      answer: String(answer),
+      explain: "$" + price + " − $" + saved + " = $" + answer + ".",
+    };
+  }
+
+  if (type === 14) {
+    const speed = randomInt(4, 18);
+    const hours = randomInt(2, 8);
+    const answer = speed * hours;
+    return {
+      title: "Haul route",
+      text: "A crawler travels " + speed + " km each hour for " + hours + " hours. How far does it travel?",
+      choices: numericChoices(answer, speed, " km"),
+      answer: String(answer) + " km",
+      explain: speed + " × " + hours + " = " + answer + " km.",
+    };
+  }
+
+  if (type === 15) {
+    const length = randomInt(3, 12);
+    const width = randomInt(2, 9);
+    const height = randomInt(2, 7);
+    const answer = length * width * height;
+    return {
+      title: "Storage volume",
+      text: "A storage chamber measures " + length + " m × " + width + " m × " + height + " m. What is its volume?",
+      choices: numericChoices(answer, randomInt(8, 30), " m³"),
+      answer: String(answer) + " m³",
+      explain: length + " × " + width + " × " + height + " = " + answer + " m³.",
+    };
+  }
+
+  if (type === 16) {
+    const angle = randomInt(2, 16) * 5;
+    const answer = 90 - angle;
+    return {
+      title: "Tunnel angle",
+      text: "A support beam makes a " + angle + "° angle with the floor. What angle completes a right angle?",
+      choices: numericChoices(answer, 5, "°"),
+      answer: String(answer) + "°",
+      explain: "90° − " + angle + "° = " + answer + "°.",
+    };
+  }
+
+  const red = randomInt(2, 8);
+  const blue = randomInt(2, 8);
+  const total = red + blue;
+  const numerator = red;
+  const gcd = (a, b) => b ? gcd(b, a % b) : a;
+  const divisor = gcd(numerator, total);
+  const simpleN = numerator / divisor;
+  const simpleD = total / divisor;
+  const answer = simpleN + "/" + simpleD;
+  const distractors = new Set([answer, red + "/" + blue, blue + "/" + total, "1/" + total]);
+  while (distractors.size < 4) distractors.add(randomInt(1, total - 1) + "/" + total);
+  return {
+    title: "Core sample probability",
+    text: "A bin has " + red + " red markers and " + blue + " blue markers. What is the probability of randomly choosing a red marker?",
+    choices: shuffled(Array.from(distractors).slice(0, 4)),
+    answer,
+    explain: red + " red out of " + total + " total = " + answer + ".",
+  };
+}
+
 export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
