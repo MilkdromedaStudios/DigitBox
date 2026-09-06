@@ -252,6 +252,59 @@ export default function DeepforgeOwnerTools() {
     }
   }
 
+  async function adminCityGrant(user, key) {
+    if (!owner || busy || !user || !user.city) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const token = getCloudAuthToken();
+      const response = await fetch("/api/deepforge/admin", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ type: "cityGrant", userId: user.id, key, amount: 1 }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "City grant failed.");
+      setMessage("Granted " + key + " to " + user.displayName + "'s city.");
+      await refreshAdmin();
+    } catch (error) {
+      setMessage(error.message || "City grant failed.");
+      setBusy(false);
+    }
+  }
+
+  async function adminSetCityLevel(user) {
+    if (!owner || busy || !user || !user.city) return;
+    const value = window.prompt("Set city level for " + user.displayName + ":", String(user.city.level || 1));
+    if (value === null) return;
+    const level = Math.max(1, Math.min(1000, Math.round(Number(value) || 1)));
+    setBusy(true);
+    setMessage("");
+    try {
+      const token = getCloudAuthToken();
+      const response = await fetch("/api/deepforge/admin", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ type: "citySetLevel", userId: user.id, level }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Could not set city level.");
+      setMessage(user.displayName + "'s city is now level " + level + ".");
+      await refreshAdmin();
+    } catch (error) {
+      setMessage(error.message || "Could not set city level.");
+      setBusy(false);
+    }
+  }
+
   async function adminDelete(type, id, label, permanent) {
     if (!owner || busy || permanent) return;
     if (!window.confirm("Delete " + label + " permanently?")) return;
@@ -320,9 +373,29 @@ export default function DeepforgeOwnerTools() {
               <div className="df-owner-manage-title"><b>Accounts</b><button disabled={busy} onClick={refreshAdmin}>Refresh</button></div>
               <div className="df-owner-list">
                 {adminData.users.map((user) => (
-                  <article key={user.id}>
-                    <div><b>{user.displayName}</b><small>{user.email}</small></div>
-                    {user.permanent ? <span className="permanent">PERMANENT</span> : <button disabled={busy} onClick={() => adminDelete("user", user.id, "account " + user.displayName, false)}>Delete</button>}
+                  <article key={user.id} className="df-owner-user-row">
+                    <div className="df-owner-user-main">
+                      <div><b>{user.displayName}</b><small>{user.email}</small></div>
+                      {user.permanent ? <span className="permanent">PERMANENT</span> : <button disabled={busy} onClick={() => adminDelete("user", user.id, "account " + user.displayName, false)}>Delete</button>}
+                    </div>
+                    {user.city ? (
+                      <div className="df-owner-city-admin">
+                        <div className="df-owner-city-summary">
+                          <span>🏙</span>
+                          <div><b>{user.city.name}</b><small>LEVEL {user.city.level} · {user.city.style}</small></div>
+                          <button disabled={busy} onClick={() => adminSetCityLevel(user)}>SET LVL</button>
+                        </div>
+                        <div className="df-owner-city-grants">
+                          <button disabled={busy} onClick={() => adminCityGrant(user, "cityLevel")}>+ City Lv</button>
+                          <button disabled={busy} onClick={() => adminCityGrant(user, "refinery")}>+ Mill <small>{user.city.upgrades.refinery}</small></button>
+                          <button disabled={busy} onClick={() => adminCityGrant(user, "workshop")}>+ Shop <small>{user.city.upgrades.workshop}</small></button>
+                          <button disabled={busy} onClick={() => adminCityGrant(user, "academy")}>+ Survey <small>{user.city.upgrades.academy}</small></button>
+                          <button disabled={busy} onClick={() => adminCityGrant(user, "walls")}>+ Walls <small>{user.city.upgrades.walls}</small></button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="df-owner-no-city">No city yet — this player must found one in the world.</div>
+                    )}
                   </article>
                 ))}
               </div>
@@ -344,7 +417,7 @@ export default function DeepforgeOwnerTools() {
       )}
 
       <style jsx global>{`
-        .df-owner-fab{position:fixed;right:18px;bottom:18px;z-index:1400;display:flex;align-items:center;gap:7px;height:42px;padding:0 13px;border:1px solid rgba(255,212,105,.45);border-radius:12px;background:linear-gradient(180deg,#6b5124,#322410);color:#ffe09a;box-shadow:0 12px 34px rgba(0,0,0,.42);font-weight:950;cursor:pointer}.df-owner-fab.infinite{border-color:rgba(255,225,111,.75);background:linear-gradient(180deg,#8a671d,#3b2a0b);box-shadow:0 0 24px rgba(255,199,57,.2),0 12px 34px rgba(0,0,0,.42)}.df-owner-fab span{font-size:1rem}.df-owner-fab b{font-size:.65rem;letter-spacing:.12em}.df-owner-console{position:fixed;right:18px;bottom:70px;z-index:1399;width:min(430px,calc(100vw - 24px));max-height:calc(100svh - 95px);overflow:auto;padding:14px;border:1px solid rgba(255,214,116,.27);border-radius:16px;background:linear-gradient(180deg,rgba(50,38,19,.98),rgba(20,16,11,.99));color:#f3e4c4;box-shadow:0 24px 70px rgba(0,0,0,.58)}.df-owner-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.df-owner-head small{display:block;color:#cda95d;font-size:.5rem;letter-spacing:.15em;font-weight:950}.df-owner-head h3{margin:2px 0 0;font-size:1.2rem}.df-owner-head>button{width:32px;height:32px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(255,255,255,.03);color:#d9c8a7;font-size:1.1rem;cursor:pointer}.df-owner-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}.df-owner-tabs button{min-height:35px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.025);color:#9e9076;font-weight:850;cursor:pointer}.df-owner-tabs button.active{border-color:rgba(224,183,90,.28);background:rgba(189,136,37,.13);color:#ebcc82}.df-owner-console>p{margin:9px 0 12px;color:#9d8f75;font-size:.65rem;line-height:1.45}.df-owner-infinity{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid rgba(255,212,99,.16);border-radius:11px;background:rgba(125,89,22,.08)}.df-owner-infinity.on{border-color:rgba(255,214,75,.4);background:linear-gradient(135deg,rgba(185,127,24,.21),rgba(82,57,15,.16))}.df-owner-infinity>div{min-width:0;flex:1}.df-owner-infinity small,.df-owner-infinity b,.df-owner-infinity span{display:block}.df-owner-infinity small{color:#a8905f;font-size:.46rem;letter-spacing:.12em;font-weight:900}.df-owner-infinity b{margin-top:2px;color:#f1cf75;font-size:.72rem}.df-owner-infinity span{margin-top:2px;color:#8f8065;font-size:.55rem}.df-owner-infinity>button{min-width:72px;min-height:38px;border:1px solid rgba(255,214,99,.25);border-radius:8px;background:#77551d;color:#f7d987;font-weight:950;cursor:pointer}.df-owner-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.df-owner-grid button{min-height:58px;padding:8px;border:1px solid rgba(255,220,140,.12);border-radius:10px;background:rgba(255,255,255,.035);color:#ecd7ae;text-align:left;cursor:pointer}.df-owner-grid button:hover{background:rgba(255,211,112,.08)}.df-owner-grid button:disabled{opacity:.5;cursor:default}.df-owner-grid button b,.df-owner-grid button small{display:block}.df-owner-grid button b{font-size:.68rem}.df-owner-grid button small{margin-top:3px;color:#8f826c;font-size:.55rem}.df-owner-grid .max{grid-column:1/-1;background:linear-gradient(180deg,rgba(179,130,42,.24),rgba(105,72,20,.18));border-color:rgba(255,205,92,.25);text-align:center}.df-owner-manage{display:grid;gap:8px}.df-owner-manage-title{display:flex;align-items:center;justify-content:space-between;margin-top:4px}.df-owner-manage-title.clans{margin-top:12px}.df-owner-manage-title>b{font-size:.68rem;color:#dfc88f}.df-owner-manage-title>button{min-height:30px;border:1px solid rgba(255,255,255,.08);border-radius:7px;background:rgba(255,255,255,.03);color:#aa9b80;font-size:.58rem;cursor:pointer}.df-owner-manage-title>span{color:#8e8067;font-size:.58rem}.df-owner-list{display:grid;gap:5px;max-height:210px;overflow:auto}.df-owner-list article{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.02)}.df-owner-list article>div{min-width:0;flex:1}.df-owner-list article b,.df-owner-list article small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.df-owner-list article b{font-size:.63rem;color:#d6c5a6}.df-owner-list article small{margin-top:2px;color:#756b5b;font-size:.52rem}.df-owner-list article>button{min-width:58px;min-height:31px;border:1px solid rgba(205,92,70,.2);border-radius:7px;background:rgba(125,48,36,.16);color:#dfa595;font-size:.56rem;font-weight:850;cursor:pointer}.df-owner-list .permanent{padding:5px 7px;border:1px solid rgba(224,182,84,.2);border-radius:6px;background:rgba(176,123,28,.1);color:#e2c06c;font-size:.48rem;font-weight:950}.df-owner-message{margin-top:9px;padding:8px;border-radius:8px;background:rgba(255,222,143,.08);color:#e8ce95;font-size:.6rem}@media(max-width:520px){.df-owner-fab{right:10px;bottom:10px}.df-owner-console{right:10px;bottom:60px}.df-owner-grid{grid-template-columns:1fr 1fr}}
+        .df-owner-fab{position:fixed;right:18px;bottom:18px;z-index:1400;display:flex;align-items:center;gap:7px;height:42px;padding:0 13px;border:1px solid rgba(255,212,105,.45);border-radius:12px;background:linear-gradient(180deg,#6b5124,#322410);color:#ffe09a;box-shadow:0 12px 34px rgba(0,0,0,.42);font-weight:950;cursor:pointer}.df-owner-fab.infinite{border-color:rgba(255,225,111,.75);background:linear-gradient(180deg,#8a671d,#3b2a0b);box-shadow:0 0 24px rgba(255,199,57,.2),0 12px 34px rgba(0,0,0,.42)}.df-owner-fab span{font-size:1rem}.df-owner-fab b{font-size:.65rem;letter-spacing:.12em}.df-owner-console{position:fixed;right:18px;bottom:70px;z-index:1399;width:min(430px,calc(100vw - 24px));max-height:calc(100svh - 95px);overflow:auto;padding:14px;border:1px solid rgba(255,214,116,.27);border-radius:16px;background:linear-gradient(180deg,rgba(50,38,19,.98),rgba(20,16,11,.99));color:#f3e4c4;box-shadow:0 24px 70px rgba(0,0,0,.58)}.df-owner-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.df-owner-head small{display:block;color:#cda95d;font-size:.5rem;letter-spacing:.15em;font-weight:950}.df-owner-head h3{margin:2px 0 0;font-size:1.2rem}.df-owner-head>button{width:32px;height:32px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(255,255,255,.03);color:#d9c8a7;font-size:1.1rem;cursor:pointer}.df-owner-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}.df-owner-tabs button{min-height:35px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.025);color:#9e9076;font-weight:850;cursor:pointer}.df-owner-tabs button.active{border-color:rgba(224,183,90,.28);background:rgba(189,136,37,.13);color:#ebcc82}.df-owner-console>p{margin:9px 0 12px;color:#9d8f75;font-size:.65rem;line-height:1.45}.df-owner-infinity{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid rgba(255,212,99,.16);border-radius:11px;background:rgba(125,89,22,.08)}.df-owner-infinity.on{border-color:rgba(255,214,75,.4);background:linear-gradient(135deg,rgba(185,127,24,.21),rgba(82,57,15,.16))}.df-owner-infinity>div{min-width:0;flex:1}.df-owner-infinity small,.df-owner-infinity b,.df-owner-infinity span{display:block}.df-owner-infinity small{color:#a8905f;font-size:.46rem;letter-spacing:.12em;font-weight:900}.df-owner-infinity b{margin-top:2px;color:#f1cf75;font-size:.72rem}.df-owner-infinity span{margin-top:2px;color:#8f8065;font-size:.55rem}.df-owner-infinity>button{min-width:72px;min-height:38px;border:1px solid rgba(255,214,99,.25);border-radius:8px;background:#77551d;color:#f7d987;font-weight:950;cursor:pointer}.df-owner-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.df-owner-grid button{min-height:58px;padding:8px;border:1px solid rgba(255,220,140,.12);border-radius:10px;background:rgba(255,255,255,.035);color:#ecd7ae;text-align:left;cursor:pointer}.df-owner-grid button:hover{background:rgba(255,211,112,.08)}.df-owner-grid button:disabled{opacity:.5;cursor:default}.df-owner-grid button b,.df-owner-grid button small{display:block}.df-owner-grid button b{font-size:.68rem}.df-owner-grid button small{margin-top:3px;color:#8f826c;font-size:.55rem}.df-owner-grid .max{grid-column:1/-1;background:linear-gradient(180deg,rgba(179,130,42,.24),rgba(105,72,20,.18));border-color:rgba(255,205,92,.25);text-align:center}.df-owner-manage{display:grid;gap:8px}.df-owner-manage-title{display:flex;align-items:center;justify-content:space-between;margin-top:4px}.df-owner-manage-title.clans{margin-top:12px}.df-owner-manage-title>b{font-size:.68rem;color:#dfc88f}.df-owner-manage-title>button{min-height:30px;border:1px solid rgba(255,255,255,.08);border-radius:7px;background:rgba(255,255,255,.03);color:#aa9b80;font-size:.58rem;cursor:pointer}.df-owner-manage-title>span{color:#8e8067;font-size:.58rem}.df-owner-list{display:grid;gap:5px;max-height:210px;overflow:auto}.df-owner-list article{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.02)}.df-owner-list article>div{min-width:0;flex:1}.df-owner-list article b,.df-owner-list article small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.df-owner-list article b{font-size:.63rem;color:#d6c5a6}.df-owner-list article small{margin-top:2px;color:#756b5b;font-size:.52rem}.df-owner-list article>button{min-width:58px;min-height:31px;border:1px solid rgba(205,92,70,.2);border-radius:7px;background:rgba(125,48,36,.16);color:#dfa595;font-size:.56rem;font-weight:850;cursor:pointer}.df-owner-list .permanent{padding:5px 7px;border:1px solid rgba(224,182,84,.2);border-radius:6px;background:rgba(176,123,28,.1);color:#e2c06c;font-size:.48rem;font-weight:950}.df-owner-user-row{display:grid!important;gap:7px!important}.df-owner-user-main{display:flex;align-items:center;gap:8px;width:100%}.df-owner-user-main>div{min-width:0;flex:1}.df-owner-city-admin{display:grid;gap:5px;width:100%;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)}.df-owner-city-summary{display:flex;align-items:center;gap:6px}.df-owner-city-summary>span{font-size:.9rem}.df-owner-city-summary>div{min-width:0;flex:1}.df-owner-city-summary b,.df-owner-city-summary small{display:block}.df-owner-city-summary b{font-size:.58rem;color:#d8c8a9}.df-owner-city-summary small{font-size:.48rem;color:#87785f;text-transform:uppercase}.df-owner-city-summary>button{min-height:27px!important;min-width:52px!important;border-color:rgba(215,180,94,.17)!important;background:rgba(137,99,30,.12)!important;color:#d7b86f!important}.df-owner-city-grants{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}.df-owner-city-grants button{min-width:0;min-height:29px;border:1px solid rgba(224,186,101,.12);border-radius:6px;background:rgba(174,128,45,.08);color:#cdb47c;font-size:.47rem;font-weight:850;cursor:pointer}.df-owner-city-grants button small{display:inline;color:#8b7653;font-size:.43rem}.df-owner-no-city{width:100%;padding:6px;border-radius:6px;background:rgba(255,255,255,.018);color:#746958;font-size:.5rem}.df-owner-message{margin-top:9px;padding:8px;border-radius:8px;background:rgba(255,222,143,.08);color:#e8ce95;font-size:.6rem}@media(max-width:520px){.df-owner-fab{right:10px;bottom:10px}.df-owner-console{right:10px;bottom:60px}.df-owner-grid{grid-template-columns:1fr 1fr}}
       `}</style>
     </>
   );
