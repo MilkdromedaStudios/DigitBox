@@ -1,0 +1,43 @@
+name: DEEPFORGE Hourly World Reset
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deepforge-hourly-world-reset
+  cancel-in-progress: false
+
+jobs:
+  reset-hour:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Initialize the current hourly world
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://digitbox.pages.dev/api/deepforge/hourly-reset"
+          for attempt in $(seq 1 20); do
+            echo "Hourly reset attempt $attempt"
+            code="$(curl -sS -o /tmp/deepforge-hourly-reset.json -w "%{http_code}" -X POST --max-time 20 "$endpoint" || true)"
+            cat /tmp/deepforge-hourly-reset.json 2>/dev/null || true
+            echo
+            if [ "$code" = "200" ]; then
+              BODY="$(cat /tmp/deepforge-hourly-reset.json)" python3 - <<'PY'
+import json, os, sys
+payload = json.loads(os.environ["BODY"])
+if payload.get("ok") is not True or payload.get("r2") is not True:
+    sys.exit(1)
+print("DEEPFORGE hour", payload.get("hourKey"), "is initialized; next reset at", payload.get("resetAt"))
+PY
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "The hourly DEEPFORGE world could not be initialized."
+          exit 1
