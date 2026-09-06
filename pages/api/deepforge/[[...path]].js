@@ -257,6 +257,14 @@ export default async function handler(request) {
       return json({ ok: true, deleted: true }, 200);
     }
 
+    if (incoming.pathname.startsWith("/v1/save/user_") && (request.method === "GET" || request.method === "PUT")) {
+      await ensureSchema(request, env, incoming);
+      const row = await authenticatedUser(request, env);
+      if (!row) return json({ error: "Log in to access account progression." }, 401);
+      const requestedUserId = decodeURIComponent(incoming.pathname.slice("/v1/save/".length));
+      if (requestedUserId !== row.id) return json({ error: "You cannot access another player's progression." }, 403);
+    }
+
     const forwarded = new Request(incoming.toString(), request);
     return deepforgeWorker.fetch(forwarded, env);
   } catch (error) {

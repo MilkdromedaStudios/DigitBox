@@ -647,6 +647,32 @@ function drawRemoteMiner(ctx, remote, cameraX, cameraY, ppu, width, height, ligh
   ctx.restore();
 }
 
+function drawZombie(ctx, zombie, cameraX, cameraY, ppu, width, height, light) {
+  const sx = worldToScreenX(zombie.x, cameraX, ppu, width);
+  const sy = worldToScreenY(zombie.y, cameraY, ppu, height);
+  if (sx < -70 || sx > width + 70 || sy < -80 || sy > height + 80) return;
+  const scale = clamp(ppu / 48, 0.82, 1.18);
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "rgba(0,0,0,.28)";
+  ctx.beginPath(); ctx.ellipse(0, 20, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = light < 0.35 ? "#436a45" : "#5b7f55";
+  ctx.fillRect(-10, -6, 20, 22);
+  ctx.fillStyle = "#6f8f63";
+  ctx.beginPath(); ctx.arc(0, -14, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#ff5148";
+  ctx.fillRect(-5, -17, 3, 2); ctx.fillRect(3, -17, 3, 2);
+  ctx.strokeStyle = "#4c382f"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(-18, 8); ctx.moveTo(9, 0); ctx.lineTo(18, 8); ctx.stroke();
+  ctx.strokeStyle = "#313638";
+  ctx.beginPath(); ctx.moveTo(-5, 15); ctx.lineTo(-8, 24); ctx.moveTo(5, 15); ctx.lineTo(8, 24); ctx.stroke();
+  const ratio = clamp(zombie.hp / zombie.maxHp, 0, 1);
+  ctx.fillStyle = "rgba(0,0,0,.7)"; ctx.fillRect(-15, -31, 30, 4);
+  ctx.fillStyle = ratio > 0.5 ? "#63d17d" : "#d66b58"; ctx.fillRect(-15, -31, 30 * ratio, 4);
+  ctx.restore();
+}
+
 export default function InfiniteWorld(props) {
   const canvasRef = useRef(null);
   const viewportRef = useRef(null);
@@ -677,6 +703,14 @@ export default function InfiniteWorld(props) {
   const citiesRef = useRef(Array.isArray(props.cities) ? props.cities : []);
   const remotePlayersRef = useRef(Array.isArray(props.remotePlayers) ? props.remotePlayers : []);
   const myUserIdRef = useRef(props.myUserId || "");
+  const playerAttackCbRef = useRef(props.onPlayerAttack);
+  const zombieDamageCbRef = useRef(props.onZombieDamage);
+  const zombieKillCbRef = useRef(props.onZombieKill);
+  const swordDamageRef = useRef(Number(props.swordDamage) || 14);
+  const zombiesRef = useRef([]);
+  const lastZombieSpawnRef = useRef(0);
+  const lastZombieBiteRef = useRef(0);
+  const swordSwingRef = useRef(0);
 
   useEffect(() => { changesRef.current = normalizeWorldChanges(props.worldChanges); }, [props.worldChanges]);
   useEffect(() => { positionCbRef.current = props.onPosition; }, [props.onPosition]);
@@ -686,6 +720,10 @@ export default function InfiniteWorld(props) {
   useEffect(() => { citiesRef.current = Array.isArray(props.cities) ? props.cities : []; }, [props.cities]);
   useEffect(() => { remotePlayersRef.current = Array.isArray(props.remotePlayers) ? props.remotePlayers : []; }, [props.remotePlayers]);
   useEffect(() => { myUserIdRef.current = props.myUserId || ""; }, [props.myUserId]);
+  useEffect(() => { playerAttackCbRef.current = props.onPlayerAttack; }, [props.onPlayerAttack]);
+  useEffect(() => { zombieDamageCbRef.current = props.onZombieDamage; }, [props.onZombieDamage]);
+  useEffect(() => { zombieKillCbRef.current = props.onZombieKill; }, [props.onZombieKill]);
+  useEffect(() => { swordDamageRef.current = Number(props.swordDamage) || 14; }, [props.swordDamage]);
 
   useEffect(() => {
     if (Number.isFinite(props.player.x) && Number.isFinite(props.player.y)) {
@@ -718,13 +756,24 @@ export default function InfiniteWorld(props) {
   useEffect(() => {
     function down(event) {
       keysRef.current[event.key.toLowerCase()] = true;
-      if ((event.code === "KeyE" || event.code === "Space") && !event.repeat) {
+      if (event.code === "KeyE" && !event.repeat) {
         event.preventDefault();
         fireDrill();
+        if (!drillTimerRef.current) drillTimerRef.current = setInterval(fireDrill, 180);
+      } else if (event.code === "Space" && !event.repeat) {
+        event.preventDefault();
+        fireDrill();
+      } else if (event.code === "KeyF" && !event.repeat) {
+        event.preventDefault();
+        swingSword();
       }
     }
     function up(event) {
       keysRef.current[event.key.toLowerCase()] = false;
+      if (event.code === "KeyE" && drillTimerRef.current) {
+        clearInterval(drillTimerRef.current);
+        drillTimerRef.current = null;
+      }
     }
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -733,6 +782,39 @@ export default function InfiniteWorld(props) {
       window.removeEventListener("keyup", up);
     };
   }, []);
+
+  function swingSword(event) {
+    if (event) { event.stopPropagation(); event.preventDefault(); }
+    if (pausedRef.current) return;
+    swordSwingRef.current = performance.now();
+    const p = playerRef.current;
+    let bestZombie = null;
+    let bestZombieDistance = Infinity;
+    for (const zombie of zombiesRef.current) {
+      const dx = zombie.x - p.x;
+      const dy = zombie.y - p.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance <= 2.35 && distance < bestZombieDistance) { bestZombie = zombie; bestZombieDistance = distance; }
+    }
+    if (bestZombie) {
+      bestZombie.hp -= Math.max(1, Number(swordDamageRef.current) || 14);
+      if (bestZombie.hp <= 0) {
+        zombiesRef.current = zombiesRef.current.filter((zombie) => zombie.id !== bestZombie.id);
+        if (zombieKillCbRef.current) zombieKillCbRef.current(bestZombie);
+      }
+      return;
+    }
+    let bestPlayer = null;
+    let bestDistance = Infinity;
+    for (const remote of remotePlayersRef.current) {
+      if (!remote || remote.id === myUserIdRef.current) continue;
+      const dx = Number(remote.x) - p.x;
+      const dy = Number(remote.y) - p.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance <= 2.45 && distance < bestDistance) { bestPlayer = remote; bestDistance = distance; }
+    }
+    if (bestPlayer && playerAttackCbRef.current) playerAttackCbRef.current(bestPlayer.id);
+  }
 
   function fireDrill() {
     if (pausedRef.current || !drillCbRef.current) return;
@@ -925,6 +1007,32 @@ export default function InfiniteWorld(props) {
 
       const day = drawSky(ctx, width, height, cameraX, now);
 
+      // Night survival: surface zombies spawn around the active miner and chase them until sunrise.
+      const nearSurface = depth < 1.4;
+      if (day.light < 0.27 && nearSurface && !pausedRef.current) {
+        if (now - lastZombieSpawnRef.current > 2400 && zombiesRef.current.length < 6) {
+          lastZombieSpawnRef.current = now;
+          const side = visualNoise(Math.floor(now / 2400), Math.floor(p.x), 1201) > 0.5 ? 1 : -1;
+          let zx = p.x + side * (6.5 + visualNoise(Math.floor(now / 1700), 0, 1202) * 5.5);
+          let attempts = 0;
+          while (citiesRef.current.some((city) => Math.abs(Number(city.x) - zx) < 9) && attempts < 4) { zx += side * 5; attempts += 1; }
+          zombiesRef.current.push({ id: "z_" + now + "_" + Math.random().toString(36).slice(2, 7), x: zx, y: surfaceHeight(zx) - 0.38, hp: 35, maxHp: 35 });
+        }
+        for (const zombie of zombiesRef.current) {
+          const direction = p.x < zombie.x ? -1 : 1;
+          zombie.x += direction * 1.15 * dt;
+          zombie.y = surfaceHeight(zombie.x) - 0.38;
+          const dx = zombie.x - p.x;
+          const dy = zombie.y - p.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 0.72 && now - lastZombieBiteRef.current > 950) {
+            lastZombieBiteRef.current = now;
+            if (zombieDamageCbRef.current) zombieDamageCbRef.current(7);
+          }
+        }
+      } else if (day.light > 0.42) {
+        zombiesRef.current = [];
+      }
+
       // Distant hills above the true terrain give the surface more depth.
       ctx.save();
       ctx.globalAlpha = 0.28 + day.light * 0.22;
@@ -1059,6 +1167,10 @@ export default function InfiniteWorld(props) {
       for (const city of citiesRef.current) {
         drawWorldCity(ctx, city, cameraX, cameraY, ppu, width, height, day.light);
       }
+      for (const zombie of zombiesRef.current) {
+        drawZombie(ctx, zombie, cameraX, cameraY, ppu, width, height, day.light);
+      }
+
       for (const remote of remotePlayersRef.current) {
         if (remote.id !== myUserIdRef.current) {
           drawRemoteMiner(ctx, remote, cameraX, cameraY, ppu, width, height, day.light, day.angle, changesNow);
@@ -1087,6 +1199,17 @@ export default function InfiniteWorld(props) {
 
       const moving = Math.abs(v.x) > 0.12 || Math.abs(v.y) > 0.3;
       drawMiner(ctx, playerScreenX, playerScreenY, facingRef.current, moving, ppu, day.light, day.angle);
+      if (now - swordSwingRef.current < 230) {
+        const progress = clamp((now - swordSwingRef.current) / 230, 0, 1);
+        ctx.save();
+        ctx.strokeStyle = "rgba(225,235,238," + (0.9 - progress * 0.5) + ")";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        const direction = facingRef.current < 0 ? -1 : 1;
+        ctx.arc(playerScreenX, playerScreenY - 8, 32, direction < 0 ? Math.PI * 0.75 : -Math.PI * 0.25, direction < 0 ? Math.PI * 1.35 : Math.PI * 0.35);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       drawLighting(ctx, width, height, playerScreenX, playerScreenY, depth, day.light);
 
@@ -1187,7 +1310,7 @@ export default function InfiniteWorld(props) {
       <div className="df-world-hud">
         <span>AREA {hud.chunkX},{hud.chunkY}</span>
         <b>{hud.depth < 0.7 ? "SURFACE" : Math.round(hud.depth) + " m DEEP"}</b>
-        <small>{hud.time}</small>
+        <small>{hud.time} · HP {Math.max(0, Math.round(Number(props.playerHp) || 0))}/{Math.max(1, Math.round(Number(props.playerMaxHp) || 100))}</small>
       </div>
 
       <div
@@ -1227,13 +1350,22 @@ export default function InfiniteWorld(props) {
           onPointerUp={stopDrilling}
           onPointerCancel={stopDrilling}
           onPointerLeave={stopDrilling}
-          aria-label="Excavate circular terrain"
+          aria-label="Excavate square terrain"
         >
           <span>⛏</span>
           <b>DIG</b>
         </button>
 
-        <div className="df-world-tip">WASD moves · mouse aims · hold DIG or Space · touch: drag to move</div>
+        <button
+          onPointerDown={swingSword}
+          aria-label="Swing sword"
+          style={{position:"absolute",right:92,bottom:14,zIndex:8,minWidth:66,height:48,border:"1px solid rgba(225,235,238,.22)",borderRadius:12,background:"rgba(24,30,32,.9)",color:"#e6ecee",fontWeight:900,cursor:"pointer",touchAction:"none"}}
+        >
+          <span style={{display:"block",fontSize:18}}>⚔</span>
+          <b style={{fontSize:9}}>SWORD</b>
+        </button>
+
+        <div className="df-world-tip">WASD moves · mouse aims · hold E or DIG · F sword · touch: drag to move</div>
       </div>
     </div>
   );

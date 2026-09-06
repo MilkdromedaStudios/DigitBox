@@ -16,6 +16,7 @@ import {
 import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
 import { leaveMultiplayerWorld, syncMultiplayerPresence } from "./multiplayer";
 import { loadSharedWorld, submitSharedDigs } from "./sharedWorld";
+import { attackPlayer, loadCombatStatus, takeZombieDamage } from "./combat";
 
 const DEFAULT_PLAYER = { x: 0, y: surfaceHeight(0) - 0.38 };
 const MAX_SHARED_DIG_RADIUS = 1.25;
@@ -97,6 +98,12 @@ function WorldScreen(props) {
         cities={props.cities}
         remotePlayers={props.remotePlayers}
         myUserId={props.myUserId}
+        playerHp={props.playerHp}
+        playerMaxHp={props.playerMaxHp}
+        swordDamage={props.swordDamage}
+        onPlayerAttack={props.onPlayerAttack}
+        onZombieDamage={props.onZombieDamage}
+        onZombieKill={props.onZombieKill}
       />
 
       <WorldCityOverlay
@@ -288,11 +295,15 @@ export default function BetaGameV2() {
   const [multiplayer, setMultiplayer] = useState({ players: [], cities: [], me: null });
   const [cityWaypoint, setCityWaypoint] = useState(null);
   const [sharedWorldMeta, setSharedWorldMeta] = useState({ r2: false, resetAt: 0, hourKey: null, maxDigRadius: MAX_SHARED_DIG_RADIUS, cityProtectedRadius: CITY_PROTECTED_RADIUS, error: "" });
+  const [combatStatus, setCombatStatus] = useState({ hp: 100, maxHp: 100, swordDamage: 14, clanId: "", defeated: false });
   const playerIdRef = useRef(null);
   const lastCloudSaveRef = useRef(0);
   const multiplayerLiveRef = useRef({ player: DEFAULT_PLAYER, companyValue: 0, trophies: 0 });
   const pendingDigsRef = useRef([]);
   const sharedHourRef = useRef(null);
+  const defeatHandledRef = useRef(false);
+  const zombieDamageBusyRef = useRef(false);
+  const myCityXRef = useRef(0);
 
   const researchTech = game.researchTech || INITIAL.researchTech;
   const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);
@@ -313,6 +324,8 @@ export default function BetaGameV2() {
   const myCity = multiplayer.me
     ? (multiplayer.cities.find(function (city) { return city.ownerId === multiplayer.me.id; }) || { ownerId: multiplayer.me.id, ownerName: multiplayer.me.name, x: multiplayer.me.cityX, online: true })
     : null;
+  myCityXRef.current = myCity ? Number(myCity.x) || 0 : 0;
+
   const leaderboard = useMemo(function () {
     return RIVALS.map(function (rival) { return { name: rival.name, trophies: rival.trophies, npc: true }; })
       .concat([{ name: "YOU", trophies: game.trophies, npc: false }])
@@ -391,6 +404,37 @@ export default function BetaGameV2() {
       stopped = true;
       if (timer) clearInterval(timer);
     };
+  }, [authUser ? authUser.id : ""]);
+
+  useEffect(function () {
+    if (!authUser || !authUser.id) {
+      setCombatStatus({ hp: 100, maxHp: 100, swordDamage: 14, clanId: "", defeated: false });
+      defeatHandledRef.current = false;
+      return undefined;
+    }
+    let stopped = false;
+    async function tickCombat() {
+      try {
+        const data = await loadCombatStatus();
+        if (stopped) return;
+        setCombatStatus(data);
+        setGame(function (current) {
+          if (current.hp === Number(data.hp) && current.maxHp === Number(data.maxHp)) return current;
+          return { ...current, hp: Number(data.hp), maxHp: Number(data.maxHp) };
+        });
+        if (data.defeated && !defeatHandledRef.current) {
+          defeatHandledRef.current = true;
+          const x = myCityXRef.current;
+          setPlayer({ x: x, y: surfaceHeight(x) - 0.42 });
+          setResetKey(function (value) { return value + 1; });
+          setNotice("You were defeated. Respawning at your city…");
+        }
+        if (!data.defeated && Number(data.hp) > 0) defeatHandledRef.current = false;
+      } catch (_) {}
+    }
+    tickCombat();
+    const timer = setInterval(tickCombat, 900);
+    return function () { stopped = true; clearInterval(timer); };
   }, [authUser ? authUser.id : ""]);
 
   useEffect(function () {
@@ -578,6 +622,34 @@ export default function BetaGameV2() {
       const depth = circle.y - surfaceHeight(circle.x);
       setNotice(depth < 5.5 ? "Excavated a square cut through soil." : depth < 22 ? "Excavated a square cut through compact earth." : "Cut a square section of bedrock.");
     }
+  }
+
+  async function handlePlayerAttack(targetId) {
+    if (!authUser || !authUser.id) { setNotice("Log in before fighting other players."); return; }
+    try {
+      const result = await attackPlayer(targetId);
+      setNotice(result.defeated ? "Player defeated! ⚔" : "Sword hit for " + result.damage + " damage · " + result.targetHp + "/" + result.targetMaxHp + " HP");
+    } catch (error) {
+      setNotice(error && error.message ? error.message : "PvP attack failed.");
+    }
+  }
+
+  async function handleZombieDamage(amount) {
+    if (!authUser || !authUser.id || zombieDamageBusyRef.current) return;
+    zombieDamageBusyRef.current = true;
+    try {
+      const result = await takeZombieDamage(amount);
+      setCombatStatus(function (current) { return { ...current, hp: Number(result.hp), maxHp: Number(result.maxHp), defeated: Boolean(result.defeated) }; });
+      setGame(function (current) { return { ...current, hp: Number(result.hp), maxHp: Number(result.maxHp) }; });
+    } catch (_) {
+    } finally {
+      zombieDamageBusyRef.current = false;
+    }
+  }
+
+  function handleZombieKill() {
+    setGame(function (current) { return { ...current, coins: current.coins + 25 }; });
+    setNotice("Zombie defeated · +$25 bounty.");
   }
 
   function sellCargo() {
@@ -776,7 +848,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
