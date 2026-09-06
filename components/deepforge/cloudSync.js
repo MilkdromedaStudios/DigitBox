@@ -253,15 +253,19 @@ export async function createClan(playerId, name, tag, companyValue, trophies, ac
 }
 
 export async function joinClan(playerId, code, companyValue, trophies) {
+  const token = getCloudAuthToken();
   return clanRequest("/v1/clans/join", {
     method: "POST",
+    headers: token ? { Authorization: "Bearer " + token } : {},
     body: JSON.stringify({ playerId, code, companyValue: Number(companyValue) || 0, trophies: Number(trophies) || 0 }),
   });
 }
 
 export async function joinClanById(playerId, clanId, companyValue, trophies) {
+  const token = getCloudAuthToken();
   return clanRequest("/v1/clans/join", {
     method: "POST",
+    headers: token ? { Authorization: "Bearer " + token } : {},
     body: JSON.stringify({ playerId, clanId, companyValue: Number(companyValue) || 0, trophies: Number(trophies) || 0 }),
   });
 }
