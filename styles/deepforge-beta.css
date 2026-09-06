@@ -2187,3 +2187,25 @@
 
 /* Shared-world city overlay scope */
 .df2-world-screen { position: relative; }
+
+
+/* ===== DEEPFORGE full-screen beta surface ===== */
+.df-beta-page {
+  width: 100vw;
+  height: 100svh;
+  min-height: 100svh;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: #12100d;
+}
+.df2-shell {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
