@@ -26,6 +26,8 @@ function apiRoot() {
   return CLOUDFLARE_PAGES_ROOT;
 }
 
+export function deepforgeApiRoot() { return apiRoot(); }
+
 const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
 const AUTH_KEY = "digitbox-deepforge-auth-v1";
 
@@ -158,9 +160,10 @@ export async function deleteCloudAccount() {
 export async function loadCloudSave(playerId) {
   const root = apiRoot();
   if (!root || !playerId) return null;
+  const token = getCloudAuthToken();
   const response = await fetch(root + "/v1/save/" + encodeURIComponent(playerId), {
     method: "GET",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
   });
   if (response.status === 404) {
     const type = String(response.headers.get("content-type") || "");
@@ -174,9 +177,10 @@ export async function loadCloudSave(playerId) {
 export async function saveCloudSave(playerId, payload) {
   const root = apiRoot();
   if (!root || !playerId) return null;
+  const token = getCloudAuthToken();
   const response = await fetch(root + "/v1/save/" + encodeURIComponent(playerId), {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error("Cloud save failed: " + response.status);
