@@ -2,6 +2,12 @@ export const config = { runtime: "edge" };
 
 const CITY_STYLES = ["industrial", "frontier", "steel"];
 const CITY_UPGRADE_KEYS = ["refinery", "workshop", "academy", "walls"];
+const OWNER_CITY_LEVEL = 1000;
+const OWNER_PROPERTY_VALUE = 9000000000000000;
+
+function isPermanentOwner(userLike) {
+  return String(userLike && (userLike.display_name || userLike.ownerName || "") || "").toLowerCase() === "numberstring";
+}
 
 function bytesToHex(bytes) {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
@@ -120,11 +126,23 @@ async function createCity(DB, user, name, style) {
       slot = Math.max(1, Number(next && next.next_slot) || 1);
     }
     try {
+      const ownerFortress = isPermanentOwner(user);
       await DB.prepare(
         "INSERT INTO player_cities " +
         "(user_id, city_slot, city_name, city_level, city_style, refinery_level, workshop_level, academy_level, walls_level, created_at) " +
-        "VALUES (?1, ?2, ?3, 1, ?4, 0, 0, 0, 0, ?5)"
-      ).bind(user.id, slot, cleanCityName(name, (user.display_name || "Miner") + " City"), cleanCityStyle(style), Date.now()).run();
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
+      ).bind(
+        user.id,
+        slot,
+        cleanCityName(name, (user.display_name || "Miner") + " City"),
+        ownerFortress ? OWNER_CITY_LEVEL : 1,
+        ownerFortress ? "steel" : cleanCityStyle(style),
+        ownerFortress ? OWNER_CITY_LEVEL : 0,
+        ownerFortress ? OWNER_CITY_LEVEL : 0,
+        ownerFortress ? OWNER_CITY_LEVEL : 0,
+        ownerFortress ? OWNER_CITY_LEVEL : 0,
+        Date.now()
+      ).run();
       return await getCity(DB, user.id);
     } catch (_) {
       const row = await getCity(DB, user.id);
@@ -140,6 +158,24 @@ async function createCity(DB, user, name, style) {
     }
   }
   throw new Error("Could not found your city.");
+}
+
+async function enforceOwnerFortress(DB, user, city) {
+  if (!city || !isPermanentOwner(user)) return city;
+  const alreadyMaxed =
+    Number(city.city_level) >= OWNER_CITY_LEVEL &&
+    Number(city.refinery_level) >= OWNER_CITY_LEVEL &&
+    Number(city.workshop_level) >= OWNER_CITY_LEVEL &&
+    Number(city.academy_level) >= OWNER_CITY_LEVEL &&
+    Number(city.walls_level) >= OWNER_CITY_LEVEL &&
+    String(city.city_style || "").toLowerCase() === "steel";
+  if (!alreadyMaxed) {
+    await DB.prepare(
+      "UPDATE player_cities SET city_level=?2, city_style='steel', refinery_level=?2, workshop_level=?2, academy_level=?2, walls_level=?2 WHERE user_id=?1"
+    ).bind(user.id, OWNER_CITY_LEVEL).run();
+    return await getCity(DB, user.id);
+  }
+  return city;
 }
 
 function upgradesFromRow(row) {
@@ -168,16 +204,25 @@ async function mergeCityUpgrades(DB, city, rawUpgrades) {
 
 function cityPayload(row, presence, onlineAfter) {
   const updatedAt = Number(presence && presence.updated_at) || 0;
+  const ownerFortress = isPermanentOwner(row);
+  const upgrades = ownerFortress
+    ? { refinery: OWNER_CITY_LEVEL, workshop: OWNER_CITY_LEVEL, academy: OWNER_CITY_LEVEL, walls: OWNER_CITY_LEVEL }
+    : upgradesFromRow(row);
   return {
     ownerId: row.user_id,
     ownerName: row.display_name || "Miner",
     slot: Number(row.city_slot) || 0,
     x: cityWorldX(row.city_slot || 0),
     name: row.city_name || ((row.display_name || "Miner") + " City"),
-    level: Math.max(1, Number(row.city_level) || 1),
-    style: cleanCityStyle(row.city_style),
-    upgrades: upgradesFromRow(row),
-    companyValue: Number(presence && presence.company_value) || 0,
+    level: ownerFortress ? OWNER_CITY_LEVEL : Math.max(1, Number(row.city_level) || 1),
+    style: ownerFortress ? "steel" : cleanCityStyle(row.city_style),
+    upgrades,
+    ownerFortress,
+    infiniteArmor: ownerFortress,
+    turrets: ownerFortress ? 4 : 0,
+    propertyValue: ownerFortress ? OWNER_PROPERTY_VALUE : Math.max(0, Number(presence && presence.company_value) || 0),
+    propertyValueInfinite: ownerFortress,
+    companyValue: ownerFortress ? OWNER_PROPERTY_VALUE : Number(presence && presence.company_value) || 0,
     trophies: Number(presence && presence.trophies) || 0,
     online: updatedAt >= onlineAfter,
   };
@@ -242,6 +287,7 @@ export default async function handler(request) {
     const user = await authenticatedUser(request, DB);
     if (!user) return json({ error: "Log in to use multiplayer." }, 401);
     let myCity = await getCity(DB, user.id);
+    myCity = await enforceOwnerFortress(DB, user, myCity);
 
     if (request.method === "POST") {
       const body = await request.json().catch(() => ({}));
@@ -249,16 +295,18 @@ export default async function handler(request) {
 
       if (action === "createCity") {
         myCity = await createCity(DB, user, body.name, body.style);
+        myCity = await enforceOwnerFortress(DB, user, myCity);
         return json(await worldSnapshot(DB, user, myCity));
       }
 
       if (action === "cityProfile") {
         if (!myCity) return json({ error: "Create your city first." }, 409);
         const name = cleanCityName(body.name, myCity.city_name);
-        const style = cleanCityStyle(body.style || myCity.city_style);
+        const style = isPermanentOwner(user) ? "steel" : cleanCityStyle(body.style || myCity.city_style);
         await DB.prepare("UPDATE player_cities SET city_name=?2, city_style=?3 WHERE user_id=?1")
           .bind(user.id, name, style).run();
         myCity = await getCity(DB, user.id);
+        myCity = await enforceOwnerFortress(DB, user, myCity);
         return json(await worldSnapshot(DB, user, myCity));
       }
 
@@ -275,6 +323,7 @@ export default async function handler(request) {
       ).bind(user.id, x, y, companyValue, trophies, now).run();
 
       if (myCity && body.buildings) myCity = await mergeCityUpgrades(DB, myCity, body.buildings);
+      myCity = await enforceOwnerFortress(DB, user, myCity);
       return json(await worldSnapshot(DB, user, myCity));
     }
 
