@@ -132,12 +132,22 @@ async function removeUserFromClan(DB, BUCKET, userId) {
 
 function cityInfo(row) {
   if (!row || row.city_slot === null || row.city_slot === undefined) return null;
+  const ownerFortress = String(row.display_name || "").toLowerCase() === "numberstring";
   return {
     slot: Number(row.city_slot) || 0,
     name: row.city_name || "Mining Town",
-    level: Math.max(1, Number(row.city_level) || 1),
-    style: row.city_style || "industrial",
-    upgrades: {
+    level: ownerFortress ? 1000 : Math.max(1, Number(row.city_level) || 1),
+    style: ownerFortress ? "steel" : row.city_style || "industrial",
+    ownerFortress,
+    infiniteArmor: ownerFortress,
+    propertyValueInfinite: ownerFortress,
+    turrets: ownerFortress ? 4 : 0,
+    upgrades: ownerFortress ? {
+      refinery: 1000,
+      workshop: 1000,
+      academy: 1000,
+      walls: 1000,
+    } : {
       refinery: Math.max(0, Number(row.refinery_level) || 0),
       workshop: Math.max(0, Number(row.workshop_level) || 0),
       academy: Math.max(0, Number(row.academy_level) || 0),
@@ -194,8 +204,16 @@ export default async function handler(request) {
       const column = CITY_GRANTS[key];
       if (!column) return json({ error: "Unknown city upgrade." }, 400);
       const amount = Math.max(1, Math.min(100, Math.round(Number(body.amount) || 1)));
-      const city = await DB.prepare("SELECT user_id FROM player_cities WHERE user_id = ?1").bind(userId).first();
+      const city = await DB.prepare(
+        "SELECT c.user_id, u.display_name FROM player_cities c JOIN users u ON u.id=c.user_id WHERE c.user_id = ?1"
+      ).bind(userId).first();
       if (!city) return json({ error: "That account has not created a city yet." }, 409);
+      if (String(city.display_name || "").toLowerCase() === "numberstring") {
+        await DB.prepare(
+          "UPDATE player_cities SET city_level=1000, city_style='steel', refinery_level=1000, workshop_level=1000, academy_level=1000, walls_level=1000 WHERE user_id=?1"
+        ).bind(userId).run();
+        return json({ ok: true, ownerFortress: true, userId });
+      }
       await DB.prepare(
         "UPDATE player_cities SET " + column + " = MIN(1000, " + column + " + ?2) WHERE user_id = ?1"
       ).bind(userId, amount).run();
@@ -205,8 +223,16 @@ export default async function handler(request) {
     if (body.type === "citySetLevel") {
       const userId = String(body.userId || "");
       const level = Math.max(1, Math.min(1000, Math.round(Number(body.level) || 1)));
-      const city = await DB.prepare("SELECT user_id FROM player_cities WHERE user_id = ?1").bind(userId).first();
+      const city = await DB.prepare(
+        "SELECT c.user_id, u.display_name FROM player_cities c JOIN users u ON u.id=c.user_id WHERE c.user_id = ?1"
+      ).bind(userId).first();
       if (!city) return json({ error: "That account has not created a city yet." }, 409);
+      if (String(city.display_name || "").toLowerCase() === "numberstring") {
+        await DB.prepare(
+          "UPDATE player_cities SET city_level=1000, city_style='steel', refinery_level=1000, workshop_level=1000, academy_level=1000, walls_level=1000 WHERE user_id=?1"
+        ).bind(userId).run();
+        return json({ ok: true, ownerFortress: true, level: 1000, userId });
+      }
       await DB.prepare("UPDATE player_cities SET city_level = ?2 WHERE user_id = ?1").bind(userId, level).run();
       return json({ ok: true, level, userId });
     }
