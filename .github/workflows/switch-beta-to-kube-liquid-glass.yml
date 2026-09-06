@@ -1,0 +1,88 @@
+name: Switch Beta to Kube Liquid Glass
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/switch-beta-to-kube-liquid-glass.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Replace Liquid GL with Kube SVG refraction
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('pages/beta.js')
+          source = path.read_text()
+
+          source = source.replace('import Script from "next/script";\n', '')
+          if 'import KubeLiquidGlass from "../components/KubeLiquidGlass";' not in source:
+              source = source.replace(
+                  'import Layout from "../components/Layout";\n',
+                  'import Layout from "../components/Layout";\nimport KubeLiquidGlass from "../components/KubeLiquidGlass";\n',
+                  1,
+              )
+          source = source.replace('  const [liquidReady, setLiquidReady] = useState(false);\n', '')
+
+          pattern = re.compile(
+              r'\n  useEffect\(\(\) => \{\n    if \(!liquidReady.*?\n  \}, \[liquidReady\]\);\n',
+              re.S,
+          )
+          source, count = pattern.subn('\n', source, count=1)
+          if count != 1:
+              raise SystemExit('Could not find the old liquidGL initialization effect')
+
+          script_pattern = re.compile(
+              r'\n      <Script\n        src="https://unpkg\.com/liquid-gl@2\.0\.1/package/liquidGL\.js".*?\n      />\n',
+              re.S,
+          )
+          source, count = script_pattern.subn('\n      <KubeLiquidGlass />\n', source, count=1)
+          if count != 1:
+              raise SystemExit('Could not find the old liquid-gl script tag')
+
+          source = source.replace(
+              'content="The Liquid GL powered preview of DigitBox, including the DEEPFORGE private beta."',
+              'content="DigitBox beta with Kube-style CSS and SVG Liquid Glass refraction, including the DEEPFORGE private beta."',
+              1,
+          )
+
+          path.write_text(source)
+          PY
+      - name: Verify migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'KubeLiquidGlass' pages/beta.js
+          grep -q '<KubeLiquidGlass />' pages/beta.js
+          ! grep -q 'liquid-gl@' pages/beta.js
+          ! grep -q 'window.liquidGL' pages/beta.js
+          grep -q 'feDisplacementMap' components/KubeLiquidGlass.js
+          grep -q 'convexSquircle' components/KubeLiquidGlass.js
+      - name: Typecheck
+        run: |
+          npm ci
+          npm run typecheck
+      - name: Commit migration
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pages/beta.js
+          if git diff --cached --quiet; then
+            echo 'Beta page is already migrated.'
+            exit 0
+          fi
+          git commit -m 'Use Kube SVG refraction for beta liquid glass'
+          git push
