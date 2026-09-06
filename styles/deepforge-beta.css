@@ -323,7 +323,7 @@
 
 .df2-tabs {
   display: grid;
-  grid-template-columns: repeat(5,1fr);
+  grid-template-columns: repeat(4,1fr);
   gap: 5px;
   padding: 6px 8px;
   background: #211c17;
@@ -2183,3 +2183,7 @@
     min-height: 38px;
   }
 }
+
+
+/* Shared-world city overlay scope */
+.df2-world-screen { position: relative; }

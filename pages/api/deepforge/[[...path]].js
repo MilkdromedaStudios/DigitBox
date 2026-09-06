@@ -71,6 +71,8 @@ async function ensureSchema(request, env, incoming) {
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE IF NOT EXISTS deepforge_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS clan_designs (clan_id TEXT PRIMARY KEY, shape TEXT NOT NULL, pattern TEXT NOT NULL, primary_color TEXT NOT NULL, secondary_color TEXT NOT NULL, symbol TEXT NOT NULL, updated_at INTEGER NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS player_cities (user_id TEXT PRIMARY KEY, city_slot INTEGER NOT NULL UNIQUE, created_at INTEGER NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS player_presence (user_id TEXT PRIMARY KEY, x REAL NOT NULL, y REAL NOT NULL, company_value INTEGER NOT NULL DEFAULT 0, trophies INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)"),
   ]);
 }
 async function createSession(env, userId) {
@@ -248,6 +250,8 @@ export default async function handler(request) {
       await env.DB.batch([
         env.DB.prepare("DELETE FROM auth_sessions WHERE user_id = ?1").bind(row.id),
         env.DB.prepare("DELETE FROM player_saves WHERE player_id = ?1").bind(row.id),
+        env.DB.prepare("DELETE FROM player_presence WHERE user_id = ?1").bind(row.id),
+        env.DB.prepare("DELETE FROM player_cities WHERE user_id = ?1").bind(row.id),
         env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(row.id),
       ]);
       return json({ ok: true, deleted: true }, 200);
