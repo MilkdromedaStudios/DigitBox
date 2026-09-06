@@ -28,6 +28,7 @@ function baseSave(raw) {
       ...INITIAL,
       ...game,
       buildings: { ...INITIAL.buildings, ...(game.buildings || {}) },
+      buildingHp: { ...INITIAL.buildingHp, ...(game.buildingHp || {}) },
       researchTech: { ...INITIAL.researchTech, ...(game.researchTech || {}) },
     },
     worldChanges: raw && raw.worldChanges ? raw.worldChanges : emptyWorldChanges(),
@@ -35,6 +36,16 @@ function baseSave(raw) {
 }
 
 function maxedGame(game) {
+  const buildings = Object.fromEntries(
+    Object.keys(INITIAL.buildings).map((key) => [key, Math.max(Number(game.buildings && game.buildings[key]) || 0, INFINITE.buildingLevel)])
+  );
+  const buildingHp = Object.fromEntries(
+    Object.keys(buildings).map((key) => {
+      const base = key === "walls" ? 160 : 100;
+      const perLevel = key === "walls" ? 55 : 45;
+      return [key, base + buildings[key] * perLevel];
+    })
+  );
   return {
     ...game,
     coins: Math.max(Number(game.coins) || 0, INFINITE.coins),
@@ -47,9 +58,8 @@ function maxedGame(game) {
     maxHp: Math.max(Number(game.maxHp) || 0, INFINITE.maxHp),
     hp: Math.max(Number(game.hp) || 0, INFINITE.maxHp),
     boostCharges: Math.max(Number(game.boostCharges) || 0, INFINITE.boostCharges),
-    buildings: Object.fromEntries(
-      Object.keys(INITIAL.buildings).map((key) => [key, Math.max(Number(game.buildings && game.buildings[key]) || 0, INFINITE.buildingLevel)])
-    ),
+    buildings,
+    buildingHp,
     researchTech: Object.fromEntries(
       Object.keys(INITIAL.researchTech).map((key) => [key, Math.max(Number(game.researchTech && game.researchTech[key]) || 0, INFINITE.researchLevel)])
     ),
