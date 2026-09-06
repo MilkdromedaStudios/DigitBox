@@ -6,6 +6,7 @@ const MAX_DIG_RADIUS = 1.25;
 const CITY_PROTECTED_RADIUS = 9;
 const MAX_BATCH_DIGS = 10;
 const MAX_WORLD_CUTS = 18000;
+const MAX_WRITE_RETRIES = 8;
 
 function bytesToHex(bytes) {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
@@ -72,14 +73,22 @@ function normalizeWorld(raw) {
   };
 }
 
-async function loadWorld(BUCKET, key) {
+async function loadWorldVersion(BUCKET, key) {
   const object = await BUCKET.get(key);
-  if (!object) return blankWorld();
+  if (!object) return { world: blankWorld(), etag: "", exists: false };
   try {
-    return normalizeWorld(JSON.parse(await object.text()));
+    return {
+      world: normalizeWorld(JSON.parse(await object.text())),
+      etag: String(object.etag || ""),
+      exists: true,
+    };
   } catch (_) {
-    return blankWorld();
+    return { world: blankWorld(), etag: String(object.etag || ""), exists: true };
   }
+}
+
+async function loadWorld(BUCKET, key) {
+  return (await loadWorldVersion(BUCKET, key)).world;
 }
 
 function chunkKey(cx, cy) {
@@ -133,6 +142,39 @@ async function protectedByCity(DB, x) {
   return (rows.results || []).some((row) => Math.abs(x - cityWorldX(row.city_slot)) <= CITY_PROTECTED_RADIUS);
 }
 
+async function mergeAndWriteWorld(BUCKET, meta, digs, userId) {
+  for (let attempt = 0; attempt < MAX_WRITE_RETRIES; attempt += 1) {
+    const version = await loadWorldVersion(BUCKET, meta.key);
+    const world = version.world;
+    if (cutCount(world) >= MAX_WORLD_CUTS) {
+      return { limited: true, attempts: attempt + 1 };
+    }
+
+    for (const dig of digs) addSquareCut(world, dig);
+
+    // R2 conditional writes prevent two miners from overwriting each other's
+    // read-modify-write update. A failed precondition returns null, so reload,
+    // merge against the winner, and retry.
+    const onlyIf = version.exists && version.etag
+      ? { etagMatches: version.etag }
+      : { etagDoesNotMatch: "*" };
+    const written = await BUCKET.put(meta.key, JSON.stringify(world), {
+      onlyIf,
+      httpMetadata: { contentType: "application/json", cacheControl: "no-store" },
+      customMetadata: {
+        hourKey: String(meta.hourKey),
+        updatedAt: String(Date.now()),
+        updatedBy: String(userId),
+      },
+    });
+
+    if (written) {
+      return { ok: true, attempts: attempt + 1, etag: String(written.etag || "") };
+    }
+  }
+  return { contention: true, attempts: MAX_WRITE_RETRIES };
+}
+
 export default async function handler(request) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: json({}).headers });
   const { DB, BUCKET } = findBindings(process.env);
@@ -152,6 +194,9 @@ export default async function handler(request) {
 
   if (request.method === "GET") {
     const worldChanges = await loadWorld(BUCKET, meta.key);
+    // Keep R2 tidy: the current and previous hour remain available while an
+    // older snapshot is removed opportunistically.
+    BUCKET.delete("world/hour-" + (meta.hourKey - 2) + ".json").catch(() => {});
     return json({
       ok: true,
       r2: true,
@@ -180,21 +225,19 @@ export default async function handler(request) {
     }
   }
 
-  const world = await loadWorld(BUCKET, meta.key);
-  if (cutCount(world) >= MAX_WORLD_CUTS) {
+  const write = await mergeAndWriteWorld(BUCKET, meta, digs, user.id);
+  if (write.limited) {
     return json({ error: "This hourly map has reached its excavation safety limit. It will reset automatically.", resetAt: meta.resetAt }, 429);
   }
-
-  for (const dig of digs) addSquareCut(world, dig);
-  await BUCKET.put(meta.key, JSON.stringify(world), {
-    httpMetadata: { contentType: "application/json", cacheControl: "no-store" },
-    customMetadata: { hourKey: String(meta.hourKey), updatedAt: String(Date.now()), updatedBy: String(user.id) },
-  });
+  if (!write.ok) {
+    return json({ error: "The shared map is very busy. Retry the dig.", contention: true, retryable: true }, 409);
+  }
 
   return json({
     ok: true,
     r2: true,
     accepted: digs.length,
+    attempts: write.attempts,
     hourKey: meta.hourKey,
     resetAt: meta.resetAt,
     serverTime: Date.now(),
