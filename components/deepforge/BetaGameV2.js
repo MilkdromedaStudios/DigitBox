@@ -14,7 +14,7 @@ import {
   surfaceHeight,
 } from "./world";
 import { checkCloudBackend, cloudEnabled, cloudLogin, cloudLogout, cloudSignup, getOrCreatePlayerId, loadCloudAuth, loadCloudSave, saveCloudSave, syncClanProfile } from "./cloudSync";
-import { leaveMultiplayerWorld, syncMultiplayerPresence } from "./multiplayer";
+import { createMultiplayerCity, leaveMultiplayerWorld, syncMultiplayerPresence } from "./multiplayer";
 import { loadSharedWorld, submitSharedDigs } from "./sharedWorld";
 import { attackPlayer, loadCombatStatus, takeZombieDamage } from "./combat";
 
@@ -133,8 +133,10 @@ function WorldScreen(props) {
         cities={props.cities}
         players={props.remotePlayers}
         myCity={props.myCity}
+        myUserId={props.myUserId}
         waypoint={props.waypoint}
         onWaypoint={props.onWaypoint}
+        onCreateCity={props.onCreateCity}
         game={props.game}
         buildingCost={props.buildingCost}
         upgradeBuilding={props.upgradeBuilding}
@@ -342,9 +344,9 @@ export default function BetaGameV2() {
     Object.values(researchTech).reduce(function (a, b) { return a + b; }, 0) * 110
   );
   const warPower = Math.round((raidPower + game.armor * 12 + companyValue * 0.012) * (1 + (researchTech.tactics || 0) * 0.12));
-  multiplayerLiveRef.current = { player, companyValue, trophies: game.trophies };
-  const myCity = multiplayer.me
-    ? (multiplayer.cities.find(function (city) { return city.ownerId === multiplayer.me.id; }) || { ownerId: multiplayer.me.id, ownerName: multiplayer.me.name, x: multiplayer.me.cityX, online: true })
+  multiplayerLiveRef.current = { player, companyValue, trophies: game.trophies, buildings: game.buildings };
+  const myCity = multiplayer.me && multiplayer.me.hasCity
+    ? (multiplayer.cities.find(function (city) { return city.ownerId === multiplayer.me.id; }) || { ownerId: multiplayer.me.id, ownerName: multiplayer.me.name, x: multiplayer.me.cityX, online: true, level: 1, upgrades: {} })
     : null;
   myCityXRef.current = myCity ? Number(myCity.x) || 0 : 0;
 
@@ -402,6 +404,7 @@ export default function BetaGameV2() {
           y: live.player.y,
           companyValue: live.companyValue,
           trophies: live.trophies,
+          buildings: live.buildings,
         });
         if (stopped) return;
         const next = {
@@ -410,6 +413,26 @@ export default function BetaGameV2() {
           me: data.me || null,
         };
         setMultiplayer(next);
+        const syncedCity = next.me && next.me.hasCity
+          ? next.cities.find(function (city) { return city.ownerId === next.me.id; })
+          : null;
+        if (syncedCity && syncedCity.upgrades) {
+          setGame(function (current) {
+            let changed = false;
+            const buildings = { ...current.buildings };
+            const buildingHp = { ...INITIAL.buildingHp, ...(current.buildingHp || {}) };
+            Object.keys(INITIAL.buildings).forEach(function (key) {
+              const serverLevel = Math.max(0, Number(syncedCity.upgrades[key]) || 0);
+              const localLevel = Math.max(0, Number(buildings[key]) || 0);
+              if (serverLevel > localLevel) {
+                buildings[key] = serverLevel;
+                buildingHp[key] = buildingMaxHp(key, serverLevel);
+                changed = true;
+              }
+            });
+            return changed ? { ...current, buildings, buildingHp } : current;
+          });
+        }
         setCityWaypoint(function (current) {
           const own = next.me ? next.cities.find(function (city) { return city.ownerId === next.me.id; }) : null;
           if (!current) return own || null;
@@ -643,6 +666,29 @@ export default function BetaGameV2() {
     } else {
       const depth = circle.y - surfaceHeight(circle.x);
       setNotice(depth < 5.5 ? "Excavated a square cut through soil." : depth < 22 ? "Excavated a square cut through compact earth." : "Cut a square section of bedrock.");
+    }
+  }
+
+  async function handleCreateCity(name, style) {
+    if (!authUser || !authUser.id) {
+      setNotice("Log in before founding a city.");
+      return false;
+    }
+    try {
+      const data = await createMultiplayerCity(name, style);
+      const next = {
+        players: Array.isArray(data.players) ? data.players : [],
+        cities: Array.isArray(data.cities) ? data.cities : [],
+        me: data.me || null,
+      };
+      setMultiplayer(next);
+      const city = next.me ? next.cities.find(function (entry) { return entry.ownerId === next.me.id; }) : null;
+      setCityWaypoint(city || null);
+      setNotice(city ? city.name + " founded. Walk there and start upgrading it." : "City founded.");
+      return true;
+    } catch (error) {
+      setNotice(error && error.message ? error.message : "Could not create city.");
+      return false;
     }
   }
 
@@ -902,7 +948,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} onCreateCity={handleCreateCity} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} />}
