@@ -44,11 +44,19 @@ function normalizeSave(raw) {
             }
             return acc;
           }, {});
+          const buildings = { ...INITIAL.buildings, ...(raw.game.buildings || {}) };
+          const rawBuildingHp = raw.game.buildingHp && typeof raw.game.buildingHp === "object" ? raw.game.buildingHp : {};
+          const buildingHp = Object.keys(INITIAL.buildingHp).reduce(function (acc, key) {
+            const maxHp = buildingMaxHp(key, buildings[key] || 0);
+            const stored = Number(rawBuildingHp[key]);
+            acc[key] = Number.isFinite(stored) ? Math.max(0, Math.min(maxHp, stored)) : maxHp;
+            return acc;
+          }, {});
           return {
             ...INITIAL,
             ...clean,
-            buildings: { ...INITIAL.buildings, ...(raw.game.buildings || {}) },
-            buildingHp: { ...INITIAL.buildingHp, ...(raw.game.buildingHp || {}) },
+            buildings,
+            buildingHp,
             researchTech: { ...INITIAL.researchTech, ...(raw.game.researchTech || {}) },
           };
         })()
