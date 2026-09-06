@@ -416,9 +416,29 @@ function collides(x, y, changes) {
     [-PLAYER_RADIUS * 0.72, PLAYER_RADIUS * 0.72],
     [PLAYER_RADIUS * 0.72, PLAYER_RADIUS * 0.72],
   ];
-  const terrainHit = samples.some(([ox, oy]) => isSolidAt(x + ox, y + oy, changes));
-  if (terrainHit) return true;
-  return Boolean(surfaceBridgeAt(x, y + PLAYER_RADIUS, changes));
+  // Bridges are not solid terrain. They only catch a miner who is falling
+  // onto the deck from above; this keeps the tunnel underneath fully open.
+  return samples.some(([ox, oy]) => isSolidAt(x + ox, y + oy, changes));
+}
+
+function bridgeDeckAtX(x, changes) {
+  const bridges = visibleSurfaceBridges(changes, x - 0.5, x + 0.5);
+  for (const bridge of bridges) {
+    if (Math.abs(x - bridge.x) <= bridge.halfSpan) return bridge;
+  }
+  return null;
+}
+
+function bridgeLandingAt(x, fromY, toY, changes, dropThrough) {
+  if (dropThrough || toY <= fromY) return null;
+  const bridge = bridgeDeckAtX(x, changes);
+  if (!bridge) return null;
+  const fromFoot = fromY + PLAYER_RADIUS;
+  const toFoot = toY + PLAYER_RADIUS;
+  // Only land when crossing the deck from ABOVE. Approaching from below is
+  // intentionally ignored so jumping/walking through the tunnel still works.
+  if (fromFoot <= bridge.y + 0.05 && toFoot >= bridge.y - 0.05) return bridge;
+  return null;
 }
 
 function drawMiner(ctx, x, y, facing, moving, ppu, light, sunAngle) {
@@ -972,7 +992,17 @@ export default function InfiniteWorld(props) {
         }
 
         const ny = p.y + v.y * dt;
-        if (!collides(p.x, ny, changes)) {
+        // S / Down Arrow / downward joystick input intentionally drops through
+        // a bridge instead of landing on it.
+        const dropThroughBridge = inputY > 0.42;
+        const bridgeLanding = v.y > 0
+          ? bridgeLandingAt(p.x, p.y, ny, changes, dropThroughBridge)
+          : null;
+        if (bridgeLanding) {
+          p.y = bridgeLanding.y - PLAYER_RADIUS;
+          groundedRef.current = true;
+          v.y = 0;
+        } else if (!collides(p.x, ny, changes)) {
           p.y = ny;
           groundedRef.current = false;
         } else {
