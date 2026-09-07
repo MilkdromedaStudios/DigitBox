@@ -74,7 +74,6 @@ function Stat(props) {
 function RigPanel(props) {
   const game = props.game;
   const items = [
-    ["drill", "⛏", "Pick & drill", props.drillDamage + " power"],
     ["cargoMax", "▰", "Cargo cart", game.cargoMax + " capacity"],
     ["armor", "🛡", "Work gear", game.maxHp + " protection"],
     ["blaster", "⚔", "Raid gear", "level " + game.blaster],
