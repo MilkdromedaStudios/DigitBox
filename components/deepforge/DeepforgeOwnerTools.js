@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { INITIAL, SAVE_KEY } from "./data";
+import { INITIAL, MINING_TOOLS, SAVE_KEY } from "./data";
 import { getCloudAuthToken, getOrCreatePlayerId, loadCloudAuth, saveCloudSave } from "./cloudSync";
 import { emptyWorldChanges, surfaceHeight } from "./world";
 
@@ -58,6 +58,8 @@ function maxedGame(game) {
     maxHp: Math.max(Number(game.maxHp) || 0, INFINITE.maxHp),
     hp: Math.max(Number(game.hp) || 0, INFINITE.maxHp),
     boostCharges: Math.max(Number(game.boostCharges) || 0, INFINITE.boostCharges),
+    toolsOwned: Object.fromEntries(MINING_TOOLS.map((tool) => [tool.key, true])),
+    equippedTool: "new_drill",
     buildings,
     buildingHp,
     researchTech: Object.fromEntries(
@@ -77,6 +79,8 @@ function needsInfinityRepair(game) {
   if ((Number(game.drill) || 0) < INFINITE.drill) return true;
   if ((Number(game.armor) || 0) < INFINITE.armor) return true;
   if ((Number(game.blaster) || 0) < INFINITE.blaster) return true;
+  if (game.equippedTool !== "new_drill") return true;
+  if (MINING_TOOLS.some((tool) => !(game.toolsOwned && game.toolsOwned[tool.key]))) return true;
   return Object.keys(INITIAL.buildings).some((key) => (Number(game.buildings && game.buildings[key]) || 0) < INFINITE.buildingLevel) ||
     Object.keys(INITIAL.researchTech).some((key) => (Number(game.researchTech && game.researchTech[key]) || 0) < INFINITE.researchLevel);
 }
