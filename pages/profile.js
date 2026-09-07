@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { loadCloudAuth } from "../components/deepforge/cloudSync";
 import {
   DEFAULT_PROFILE_PREFS,
   THEME_PRESETS,
@@ -12,71 +12,133 @@ const TEN_MB = 10 * 1024 * 1024;
 
 export default function ProfilePage() {
   const [prefs, setPrefs] = useState(DEFAULT_PROFILE_PREFS);
+  const [account, setAccount] = useState(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const localPrefs = readProfilePrefsFromCookie();
-    setPrefs(localPrefs);
-    if (!supabase) return;
-    supabase.auth.getUser().then(async ({ data }) => {
-      const user = data?.user;
-      if (!user) return;
-      const { data: existing } = await supabase.from("profiles").select("display_name,identity_label,theme,accent_color,avatar_data_url").eq("id", user.id).maybeSingle();
-      if (existing) {
-        const merged = sanitizeProfilePrefs({
-          displayName: existing.display_name, identityLabel: existing.identity_label, theme: existing.theme, accentColor: existing.accent_color, avatarDataUrl: existing.avatar_data_url
-        });
-        setPrefs(merged);
-        saveProfilePrefsToCookie(merged);
-      }
-    });
+    setPrefs(readProfilePrefsFromCookie());
+    loadCloudAuth().then(setAccount).catch(() => setAccount(null));
   }, []);
 
-  const previewName = useMemo(() => prefs.displayName || "Player", [prefs.displayName]);
-
-  async function syncProfile(next) {
-    if (!supabase) return;
-    const { data } = await supabase.auth.getUser();
-    const user = data?.user;
-    if (!user) return;
-    await supabase.from("profiles").upsert({
-      id: user.id,
-      display_name: next.displayName,
-      identity_label: next.identityLabel,
-      theme: next.theme,
-      accent_color: next.accentColor,
-      avatar_data_url: next.avatarDataUrl,
-      updated_at: new Date().toISOString(),
-    });
-  }
+  const previewName = useMemo(
+    () => prefs.displayName || account?.displayName || "Player",
+    [prefs.displayName, account]
+  );
 
   function updateField(field, value) {
     const next = sanitizeProfilePrefs({ ...prefs, [field]: value });
     setPrefs(next);
     saveProfilePrefsToCookie(next);
-    syncProfile(next);
   }
 
-  function handleAvatarUpload(e) {
-    const file = e.target.files?.[0];
+  function handleAvatarUpload(event) {
+    const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > TEN_MB) return setMessage("Image is too large. Maximum size is 10MB.");
     if (!file.type.startsWith("image/")) return setMessage("Please upload an image file.");
+
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = typeof reader.result === "string" ? reader.result : "";
       updateField("avatarDataUrl", dataUrl);
-      setMessage("Profile image updated.");
+      setMessage("Profile image updated on this device.");
     };
     reader.readAsDataURL(file);
   }
 
-  return <div className="content"><h1>Profile Preferences</h1><p>Customize how other players see you.</p><form className="post-form" style={{ maxWidth: 620 }}>
-<label>Optional username<input className="auth-input" value={prefs.displayName} onChange={(e) => updateField("displayName", e.target.value)} placeholder="Set your public name" maxLength={32}/></label>
-<label>How other players should see you<input className="auth-input" value={prefs.identityLabel} onChange={(e) => updateField("identityLabel", e.target.value)} placeholder="e.g. Builder, PvP Main, Coder" maxLength={48}/></label>
-<label>Profile image (max 10MB)<input className="auth-input" type="file" accept="image/*" onChange={handleAvatarUpload}/></label>
-<div className="theme-row"><label>Theme<select className="auth-input" value={prefs.theme} onChange={(e)=>updateField("theme", e.target.value)}><option value="dark">Dark (default)</option><option value="light">Light</option></select></label>
-<label>Accent color (RGB picker)<input className="auth-input" type="color" value={prefs.accentColor} onChange={(e)=>updateField("accentColor", e.target.value)}/></label></div>
-<div><p style={{ marginBottom: 8 }}>Preset accents</p><div className="theme-presets">{Object.entries(THEME_PRESETS).map(([key,color]) => <button key={key} type="button" className="btn-base" onClick={()=>updateField("accentColor", color)} style={{ borderColor: color }}>{key}</button>)}</div></div></form>
-<div className="section" style={{ maxWidth: 620 }}><h3>Preview</h3><div className="profile-box"><img src={prefs.avatarDataUrl || "https://ui-avatars.com/api/?name=Player&background=333&color=fff"} alt="Avatar preview" className="profile-avatar"/><div className="profile-text"><span className="profile-name">{previewName}</span>{prefs.identityLabel && <span className="admin-badge">{prefs.identityLabel}</span>}</div></div></div>{message && <p style={{ marginTop: 12 }}>{message}</p>}</div>;
+  return (
+    <div className="content profile-liquid-page">
+      <section className="section profile-account-card">
+        <small className="post-meta">DIGITBOX ACCOUNT</small>
+        <h1>{account ? account.displayName || "Player" : "Profile"}</h1>
+        <p>{account ? account.email : "Log in to connect this profile to your DigitBox / DEEPFORGE account."}</p>
+        {account && (
+          <div className="profile-account-flags">
+            <span>{account.owner ? "♛ OWNER" : account.admin ? "◆ ADMIN" : "PLAYER"}</span>
+            <span>Same account used in DEEPFORGE</span>
+          </div>
+        )}
+      </section>
+
+      <section className="section">
+        <h2>Profile preferences</h2>
+        <p>These visual preferences are stored on this device and apply across DigitBox.</p>
+
+        <form className="post-form" style={{ maxWidth: 680 }}>
+          <label>
+            Display nickname
+            <input
+              className="auth-input"
+              value={prefs.displayName}
+              onChange={(event) => updateField("displayName", event.target.value)}
+              placeholder={account?.displayName || "Set a local nickname"}
+              maxLength={32}
+            />
+          </label>
+
+          <label>
+            Public label
+            <input
+              className="auth-input"
+              value={prefs.identityLabel}
+              onChange={(event) => updateField("identityLabel", event.target.value)}
+              placeholder="e.g. Builder, PvP Main, Coder"
+              maxLength={48}
+            />
+          </label>
+
+          <label>
+            Profile image (max 10MB)
+            <input className="auth-input" type="file" accept="image/*" onChange={handleAvatarUpload} />
+          </label>
+
+          <div className="theme-row">
+            <label>
+              Theme
+              <select className="auth-input" value={prefs.theme} onChange={(event) => updateField("theme", event.target.value)}>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </label>
+            <label>
+              Accent color
+              <input className="auth-input" type="color" value={prefs.accentColor} onChange={(event) => updateField("accentColor", event.target.value)} />
+            </label>
+          </div>
+
+          <div>
+            <p style={{ marginBottom: 8 }}>Preset accents</p>
+            <div className="theme-presets">
+              {Object.entries(THEME_PRESETS).map(([key, color]) => (
+                <button key={key} type="button" className="btn-base" onClick={() => updateField("accentColor", color)} style={{ borderColor: color }}>
+                  {key}
+                </button>
+              ))}
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section className="section" style={{ maxWidth: 680 }}>
+        <h3>Preview</h3>
+        <div className="profile-box">
+          <img
+            src={prefs.avatarDataUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(previewName) + "&background=14213d&color=eef7ff"}
+            alt="Avatar preview"
+            className="profile-avatar"
+          />
+          <div className="profile-text">
+            <span className="profile-name">{previewName}</span>
+            {(account?.owner || account?.admin || prefs.identityLabel) && (
+              <span className="admin-badge">
+                {account?.owner ? "OWNER" : account?.admin ? "ADMIN" : prefs.identityLabel}
+              </span>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {message && <p style={{ marginTop: 12 }}>{message}</p>}
+    </div>
+  );
 }
