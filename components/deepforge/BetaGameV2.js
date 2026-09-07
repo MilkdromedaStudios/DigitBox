@@ -3,7 +3,7 @@ import InfiniteWorld from "./InfiniteWorld";
 import WorldCityOverlay from "./WorldCityOverlay";
 import ClanScreen from "./ClanScreen";
 import ClanWarScreen from "./ClanWarScreen";
-import { BUILDINGS, INITIAL, RIVALS, SAVE_KEY, challengeFor, generateResearchMathQuestion } from "./data";
+import { BUILDINGS, INITIAL, MINING_TOOLS, RIVALS, SAVE_KEY, challengeFor, generateResearchMathQuestion, miningToolFor } from "./data";
 import {
   RESOURCE_TYPES,
   addDigCircle,
@@ -57,6 +57,8 @@ function normalizeSave(raw) {
             ...clean,
             buildings,
             buildingHp,
+            toolsOwned: { ...INITIAL.toolsOwned, ...(raw.game.toolsOwned || {}) },
+            equippedTool: miningToolFor(raw.game.equippedTool).key,
             researchTech: { ...INITIAL.researchTech, ...(raw.game.researchTech || {}) },
           };
         })()
@@ -95,6 +97,48 @@ function RigPanel(props) {
   );
 }
 
+function ToolInventory(props) {
+  const [open, setOpen] = useState(false);
+  const owned = props.game.toolsOwned || INITIAL.toolsOwned;
+  const equipped = miningToolFor(props.game.equippedTool);
+
+  return (
+    <div className="df-tool-inventory">
+      <button className="df-tool-inventory-toggle" onClick={function () { setOpen(!open); }}>
+        <span>{equipped.icon}</span>
+        <div><small>EQUIPPED</small><b>{equipped.name}</b></div>
+        <em>INV</em>
+      </button>
+
+      {open && (
+        <aside className="df-tool-inventory-panel">
+          <header>
+            <div><small>MINING INVENTORY</small><b>Choose one active tool</b></div>
+            <button onClick={function () { setOpen(false); }}>×</button>
+          </header>
+          <p>Only one mining tool can be equipped at a time. Purchased tools stay in your inventory.</p>
+          <div className="df-tool-inventory-grid">
+            {MINING_TOOLS.filter(function (tool) { return Boolean(owned[tool.key]); }).map(function (tool) {
+              const active = tool.key === equipped.key;
+              return (
+                <button
+                  key={tool.key}
+                  className={active ? "active" : ""}
+                  onClick={function () { props.equipTool(tool.key); }}
+                >
+                  <span>{tool.icon}</span>
+                  <div><b>{tool.name}</b><small>Power {tool.power} · {tool.interval} ms</small></div>
+                  <em>{active ? "EQUIPPED" : "EQUIP"}</em>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+      )}
+    </div>
+  );
+}
+
 function WorldScreen(props) {
   const game = props.game;
   const [clock, setClock] = useState(Date.now());
@@ -126,6 +170,11 @@ function WorldScreen(props) {
         cityBuildings={game.buildings}
         cityBuildingHp={game.buildingHp}
         onBuildingDamage={props.onBuildingDamage}
+        equippedToolName={props.equippedTool.name}
+        equippedToolIcon={props.equippedTool.icon}
+        toolStaminaCost={props.equippedTool.stamina}
+        drillInterval={props.equippedTool.interval}
+        onStaminaEmpty={props.onStaminaEmpty}
       />
 
       <WorldCityOverlay
@@ -144,7 +193,13 @@ function WorldScreen(props) {
         gearCost={props.gearCost}
         upgradeGear={props.upgradeGear}
         drillDamage={props.drillDamage}
+        miningTools={MINING_TOOLS}
+        equippedTool={props.equippedTool}
+        toolsOwned={game.toolsOwned || INITIAL.toolsOwned}
+        buyTool={props.buyTool}
       />
+
+      <ToolInventory game={game} equipTool={props.equipTool} />
 
       <div className="df2-world-overlay">
         <div className="df2-cargo-strip">
