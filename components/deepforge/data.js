@@ -14,6 +14,20 @@ export const ORES = {
   relic: { icon: "⬢", name: "Relic", value: 90, hp: 8, css: "df-relic" },
 };
 
+export const MINING_TOOLS = [
+  { key: "wood_pick", name: "Wood Pick", icon: "🪵", cost: 0, power: 1, radius: 0.68, interval: 330, stamina: 5.5, desc: "Starter pick. Slow, cheap, and tiring." },
+  { key: "stone_pick", name: "Stone Pick", icon: "🪨", cost: 140, power: 2, radius: 0.74, interval: 285, stamina: 5.2, desc: "A sturdier early mining tool." },
+  { key: "iron_pick", name: "Iron Pick", icon: "⛏", cost: 360, power: 3, radius: 0.81, interval: 245, stamina: 5.0, desc: "Reliable iron head with better reach." },
+  { key: "diamond_pick", name: "Diamond Pick", icon: "💎", cost: 900, power: 5, radius: 0.91, interval: 205, stamina: 4.7, desc: "Fast, sharp, and much more efficient." },
+  { key: "ruby_pick", name: "Ruby Pick", icon: "♦", cost: 2400, power: 7, radius: 1.01, interval: 175, stamina: 4.4, desc: "Rare high-power hand tool." },
+  { key: "rusty_drill", name: "Rusty Drill", icon: "⚙", cost: 5000, power: 9, radius: 1.10, interval: 145, stamina: 3.8, desc: "Old powered drill. Fast but rough." },
+  { key: "new_drill", name: "New Drill", icon: "🔩", cost: 12000, power: 13, radius: 1.20, interval: 105, stamina: 3.0, desc: "Top-tier powered mining rig." },
+];
+
+export function miningToolFor(key) {
+  return MINING_TOOLS.find((tool) => tool.key === key) || MINING_TOOLS[0];
+}
+
 export const BUILDINGS = [
   { key: "refinery", name: "Ore Mill", icon: "⚙", desc: "+12% ore sale value per level", base: 160 },
   { key: "workshop", name: "Machine Shop", icon: "🔧", desc: "+1 mining power every 2 levels", base: 190 },
@@ -36,6 +50,8 @@ export const INITIAL = {
   cargoCount: 0,
   cargoMax: 18,
   drill: 1,
+  toolsOwned: { wood_pick: true },
+  equippedTool: "wood_pick",
   armor: 1,
   blaster: 1,
   hp: 100,
