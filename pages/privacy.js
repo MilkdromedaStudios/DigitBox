@@ -31,20 +31,22 @@ export default function PrivacyPage() {
 
         <h2>Accounts and profile preferences</h2>
         <p>
-          If account features are enabled on the current deployment, Supabase
-          handles authentication and account-related storage. DigitBox may
-          receive the email address needed for authentication and the profile
-          preferences you choose to save, such as a display name, identity
-          label, theme, accent color, or avatar. Do not upload information you
-          do not want associated with your profile.
+          DigitBox accounts use the same Cloudflare D1 authentication system as
+          DEEPFORGE. The account stores the email address needed for login, a
+          display name, password-verification data, and session information.
+          DEEPFORGE progression, cities, clans, and related multiplayer data can
+          be associated with that same account. Visual profile preferences such
+          as theme, accent color, or a local avatar may also be stored in your
+          browser.
         </p>
 
         <h2>Local saves and notes</h2>
         <p>
-          Game autosaves, gallery likes, and the gallery scratchpad are designed
-          to stay in your browser or on your device. Clearing browser storage
-          can remove this local data. Some optional account features may sync
-          information through Supabase when you are signed in.
+          Gallery likes, the gallery scratchpad, and some visual preferences
+          are designed to stay in your browser or on your device. Clearing
+          browser storage can remove this local data. DEEPFORGE account progress
+          can sync through the Cloudflare D1/R2 game backend when you are signed
+          in.
         </p>
 
         <h2>AI and AppGPT</h2>
@@ -84,9 +86,10 @@ export default function PrivacyPage() {
 
         <h2>Third-party services</h2>
         <p>
-          DigitBox links to or may use services including GitHub, Supabase,
+          DigitBox links to or may use services including GitHub, Cloudflare,
           Google AdSense, GitHub Pages, Modrinth, Planet Minecraft, YouTube,
-          Ko-fi, Telegram, and optional Cloudflare or Vercel infrastructure.
+          Ko-fi, Telegram, and Vercel infrastructure. Some legacy publishing or
+          analytics features may also use separately configured services.
           Those services have their own policies and may process requests
           independently when you follow a link or use a feature.
         </p>
