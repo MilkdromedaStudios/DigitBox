@@ -399,6 +399,48 @@
 .df-world-hud span,
 .df-world-hud small { font-size: .58rem; color: #998c7a; text-transform: uppercase; letter-spacing: .08em; }
 .df-world-hud b { font-size: .68rem; }
+.df-stamina-hud {
+  display: grid;
+  gap: 3px;
+  width: 132px;
+  margin-left: 3px;
+  padding-left: 9px;
+  border-left: 1px solid rgba(235,219,188,.09);
+}
+.df-stamina-hud > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+.df-stamina-hud > div span {
+  color: #d4b85f;
+  font-size: .47rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+.df-stamina-hud > div b {
+  color: #e9dba5;
+  font-size: .5rem;
+}
+.df-stamina-hud > i {
+  display: block;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(0,0,0,.34);
+}
+.df-stamina-hud > i > em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg,#b89135,#ebd06e);
+  transition: width .12s linear;
+}
+.df-stamina-hud.low > div span,
+.df-stamina-hud.low > div b { color: #e58b72; }
+.df-stamina-hud.low > i > em { background: linear-gradient(90deg,#a94e3f,#e4866e); }
 
 .df-world-tip {
   position: absolute;
@@ -461,7 +503,135 @@
 }
 .df-drill-action span { font-size: 1.35rem; line-height: 1; }
 .df-drill-action b { font-size: .6rem; letter-spacing: .08em; }
+.df-drill-action small {
+  display: block;
+  max-width: 68px;
+  margin-top: 1px;
+  overflow: hidden;
+  color: rgba(42,30,17,.72);
+  font-size: .42rem;
+  font-weight: 850;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .df-drill-action:active { transform: scale(.94); }
+
+.df-tool-inventory {
+  position: absolute;
+  left: 12px;
+  bottom: 58px;
+  z-index: 24;
+}
+.df-tool-inventory-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 164px;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 1px solid rgba(231,211,176,.12);
+  border-radius: 10px;
+  background: rgba(29,25,21,.9);
+  box-shadow: 0 10px 28px rgba(0,0,0,.34);
+  color: #ded0b9;
+  cursor: pointer;
+}
+.df-tool-inventory-toggle > span { font-size: 1rem; }
+.df-tool-inventory-toggle > div { min-width: 0; flex: 1; text-align: left; }
+.df-tool-inventory-toggle small,
+.df-tool-inventory-toggle b { display: block; }
+.df-tool-inventory-toggle small {
+  color: #8f826f;
+  font-size: .4rem;
+  letter-spacing: .09em;
+}
+.df-tool-inventory-toggle b {
+  margin-top: 1px;
+  overflow: hidden;
+  font-size: .56rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.df-tool-inventory-toggle > em {
+  color: #c8aa64;
+  font-size: .43rem;
+  font-style: normal;
+  font-weight: 950;
+}
+.df-tool-inventory-panel {
+  position: absolute;
+  left: 0;
+  bottom: 50px;
+  width: min(390px,calc(100vw - 24px));
+  padding: 11px;
+  border: 1px solid rgba(231,211,176,.13);
+  border-radius: 12px;
+  background: rgba(25,22,19,.97);
+  box-shadow: 0 20px 56px rgba(0,0,0,.5);
+  color: #ded3c1;
+}
+.df-tool-inventory-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.df-tool-inventory-panel header small,
+.df-tool-inventory-panel header b { display: block; }
+.df-tool-inventory-panel header small {
+  color: #907e5d;
+  font-size: .42rem;
+  letter-spacing: .12em;
+}
+.df-tool-inventory-panel header b { margin-top: 2px; font-size: .7rem; }
+.df-tool-inventory-panel header > button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 7px;
+  background: rgba(255,255,255,.025);
+  color: #b8aa95;
+  cursor: pointer;
+}
+.df-tool-inventory-panel > p {
+  margin: 6px 0 8px;
+  color: #80776b;
+  font-size: .5rem;
+  line-height: 1.4;
+}
+.df-tool-inventory-grid { display: grid; gap: 5px; }
+.df-tool-inventory-grid > button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 7px;
+  border: 1px solid rgba(255,255,255,.055);
+  border-radius: 8px;
+  background: rgba(255,255,255,.02);
+  color: #cfc4b3;
+  text-align: left;
+  cursor: pointer;
+}
+.df-tool-inventory-grid > button.active {
+  border-color: rgba(91,205,137,.23);
+  background: rgba(55,123,81,.08);
+}
+.df-tool-inventory-grid > button > span { font-size: .95rem; }
+.df-tool-inventory-grid > button > div { min-width: 0; flex: 1; }
+.df-tool-inventory-grid b,
+.df-tool-inventory-grid small { display: block; }
+.df-tool-inventory-grid b { font-size: .54rem; }
+.df-tool-inventory-grid small { margin-top: 2px; color: #786f62; font-size: .42rem; }
+.df-tool-inventory-grid em {
+  color: #b99c5d;
+  font-size: .42rem;
+  font-style: normal;
+  font-weight: 900;
+}
+.df-tool-inventory-grid button.active em { color: #87c69f; }
 
 .df2-world-overlay {
   position: absolute;
@@ -2058,6 +2228,12 @@
 }
 
 @media (max-width: 720px) {
+  .df-world-hud { gap: 5px; max-width: calc(100vw - 24px); }
+  .df-stamina-hud { width: 105px; padding-left: 6px; }
+  .df-tool-inventory { left: 8px; bottom: 72px; }
+  .df-tool-inventory-toggle { min-width: 145px; }
+  .df-world-tip { max-width: 74vw; overflow: hidden; text-overflow: ellipsis; }
+
   .df2-account-button {
     min-width: 106px;
     height: 42px;
