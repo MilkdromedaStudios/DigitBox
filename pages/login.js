@@ -1,113 +1,129 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import {
+  cloudLogin,
+  cloudSignup,
+  getCloudAuthToken,
+  loadCloudAuth,
+} from "../components/deepforge/cloudSync";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  useEffect(() => {
+    let mounted = true;
+    async function checkExisting() {
+      if (!getCloudAuthToken()) return;
+      const user = await loadCloudAuth().catch(() => null);
+      if (!mounted || !user) return;
+      const requested = typeof router.query.next === "string" ? router.query.next : "/profile";
+      const safeNext = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/profile";
+      router.replace(safeNext);
+    }
+    checkExisting();
+    return () => { mounted = false; };
+  }, [router]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
     setMessage("");
 
-    if (!email || !password) {
-      setMessage("Please enter both email and password.");
+    if (!email.trim() || !password) {
+      setMessage("Enter your email and password.");
       return;
     }
-
-    if (!supabase) {
-      setMessage("Login is unavailable until Supabase environment variables are configured.");
+    if (mode === "signup" && !displayName.trim()) {
+      setMessage("Choose a display name.");
       return;
     }
 
     setLoading(true);
-
-    if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setMessage(error.message);
+    try {
+      if (mode === "signup") {
+        await cloudSignup(email.trim(), password, displayName.trim());
+        setMessage("Account created — you are signed in.");
       } else {
-        setMessage("Logged in successfully.");
-        const requested = typeof router.query.next === "string" ? router.query.next : "/";
-        const safeNext = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
-        router.replace(safeNext);
+        await cloudLogin(email.trim(), password);
+        setMessage("Signed in.");
       }
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
 
-      if (error) {
-        setMessage(error.message);
-      } else {
-        setMessage("Account created. You can now log in.");
-        setMode("login");
-      }
+      const requested = typeof router.query.next === "string" ? router.query.next : "/";
+      const safeNext = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+      router.replace(safeNext);
+    } catch (error) {
+      setMessage(error?.message || "Could not sign in.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   return (
-    <div className="content">
-      <h1>{mode === "login" ? "Login" : "Create Account"}</h1>
+    <div className="auth-wrapper digitbox-auth-page">
+      <section className="auth-box liquid-auth-card">
+        <div className="auth-brand-orb">DB</div>
+        <small className="auth-kicker">ONE ACCOUNT · ALL DIGITBOX</small>
+        <h1>{mode === "login" ? "Welcome back" : "Create your DigitBox account"}</h1>
+        <p className="auth-subcopy">
+          This is the same account used by DEEPFORGE, including your game identity, clan access, and admin permissions.
+        </p>
 
-      {!isSupabaseConfigured && (
-        <div className="notice notice-warn" role="status">
-          <strong>Login is currently disabled.</strong> This deployment has no
-          Supabase API keys configured, so accounts can&apos;t be created or
-          signed in. You can still play every game and browse the site.
-        </div>
-      )}
+        <form onSubmit={handleSubmit} className="auth-form">
+          {mode === "signup" && (
+            <input
+              className="auth-input"
+              type="text"
+              placeholder="Display name"
+              value={displayName}
+              maxLength={24}
+              onChange={(event) => setDisplayName(event.target.value)}
+              autoComplete="nickname"
+            />
+          )}
 
-      <form onSubmit={handleSubmit} className="post-form" style={{ maxWidth: 460 }}>
-        <input
-          className="auth-input"
-          type="email"
-          placeholder="Your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+          <input
+            className="auth-input"
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="email"
+          />
 
-        <input
-          className="auth-input"
-          type="password"
-          placeholder="Your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          <input
+            className="auth-input"
+            type="password"
+            placeholder="Password"
+            minLength={8}
+            maxLength={128}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+          />
 
-        <button className="auth-btn" type="submit" disabled={loading || !isSupabaseConfigured}>
-          {loading
-            ? "Please wait..."
-            : mode === "login"
-              ? "Login"
-              : "Create Account"}
+          <button className="auth-btn" type="submit" disabled={loading}>
+            {loading ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          className="auth-switch-button"
+          onClick={() => {
+            setMessage("");
+            setMode(mode === "login" ? "signup" : "login");
+          }}
+        >
+          {mode === "login" ? "New to DigitBox? Create an account" : "Already have an account? Log in"}
         </button>
-      </form>
 
-      <div style={{ marginTop: "1rem" }}>
-        {mode === "login" ? (
-          <button className="logout-btn" onClick={() => setMode("signup")}>
-            Need an account? Sign up
-          </button>
-        ) : (
-          <button className="logout-btn" onClick={() => setMode("login")}>
-            Already have an account? Log in
-          </button>
-        )}
-      </div>
-
-      {message && <p style={{ marginTop: "1rem" }}>{message}</p>}
+        {message && <div className="auth-message">{message}</div>}
+      </section>
     </div>
   );
 }
