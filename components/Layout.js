@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import EasterEggs from "./EasterEggs";
-import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
-
-const ADMIN_EMAILS = [
-  "wong.christopher501@gmail.com",
-  "Studio.Milkdromeda@planetmail.net",
-];
+import KubeLiquidGlass from "./KubeLiquidGlass";
+import {
+  CLOUD_AUTH_UPDATED_EVENT,
+  cloudLogout,
+  getCloudAuthToken,
+  loadCloudAuth,
+} from "./deepforge/cloudSync";
+import {
+  PROFILE_PREFS_UPDATED_EVENT,
+  readProfilePrefsFromCookie,
+} from "../lib/profilePreferences";
 
 export default function Layout({ children }) {
   const [user, setUser] = useState(null);
@@ -15,55 +19,66 @@ export default function Layout({ children }) {
   const [profilePrefs, setProfilePrefs] = useState(null);
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
+
     const loadPrefs = () => setProfilePrefs(readProfilePrefsFromCookie());
+    const loadUser = async () => {
+      if (!getCloudAuthToken()) {
+        if (mounted) {
+          setUser(null);
+          setIsAuthLoading(false);
+        }
+        return;
+      }
+      const next = await loadCloudAuth().catch(() => null);
+      if (mounted) {
+        setUser(next);
+        setIsAuthLoading(false);
+      }
+    };
+
+    document.body.classList.add("digitbox-liquid-active");
     loadPrefs();
+    loadUser();
+
     window.addEventListener("focus", loadPrefs);
     window.addEventListener(PROFILE_PREFS_UPDATED_EVENT, loadPrefs);
     window.addEventListener("storage", loadPrefs);
-
-    if (!supabase) {
-      setIsAuthLoading(false);
-      return () => {
-        isMounted = false;
-        window.removeEventListener("focus", loadPrefs);
-        window.removeEventListener(PROFILE_PREFS_UPDATED_EVENT, loadPrefs);
-        window.removeEventListener("storage", loadPrefs);
-      };
-    }
-
-    supabase.auth.getUser().then(({ data }) => {
-      if (!isMounted) return;
-      setUser(data?.user || null);
-      setIsAuthLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
-      setUser(session?.user || null);
-      setIsAuthLoading(false);
-    });
+    window.addEventListener("focus", loadUser);
+    window.addEventListener(CLOUD_AUTH_UPDATED_EVENT, loadUser);
+    window.addEventListener("storage", loadUser);
 
     return () => {
-      isMounted = false;
+      mounted = false;
+      document.body.classList.remove("digitbox-liquid-active");
       window.removeEventListener("focus", loadPrefs);
       window.removeEventListener(PROFILE_PREFS_UPDATED_EVENT, loadPrefs);
       window.removeEventListener("storage", loadPrefs);
-      listener?.subscription?.unsubscribe();
+      window.removeEventListener("focus", loadUser);
+      window.removeEventListener(CLOUD_AUTH_UPDATED_EVENT, loadUser);
+      window.removeEventListener("storage", loadUser);
     };
   }, []);
 
   async function logout() {
-    if (supabase) await supabase.auth.signOut();
+    setIsAuthLoading(true);
+    await cloudLogout().catch(() => null);
     setUser(null);
+    setIsAuthLoading(false);
   }
 
-  const isAdmin = Boolean(user && ADMIN_EMAILS.includes(user.email));
-  const avatar = profilePrefs?.avatarDataUrl || user?.user_metadata?.avatar_url || "https://ui-avatars.com/api/?name=User&background=444&color=fff";
-  const username = profilePrefs?.displayName || user?.user_metadata?.user_name || user?.email?.split("@")[0] || "User";
-  const identityLabel = profilePrefs?.identityLabel || (isAdmin ? "Admin" : "");
+  const permanentOwner = Boolean(user && (user.owner || String(user.displayName || "").toLowerCase() === "numberstring"));
+  const isAdmin = Boolean(user && (user.admin || permanentOwner));
+  const displayName = profilePrefs?.displayName || user?.displayName || user?.email?.split("@")[0] || "Player";
+  const avatar =
+    profilePrefs?.avatarDataUrl ||
+    "https://ui-avatars.com/api/?name=" + encodeURIComponent(displayName) + "&background=14213d&color=eef7ff";
+  const identityLabel = permanentOwner
+    ? "OWNER"
+    : isAdmin
+      ? "ADMIN"
+      : profilePrefs?.identityLabel || "";
 
-  // 🥚 Tap the footer 5 times quickly for a surprise.
   const footerTapRef = useRef({ count: 0, last: 0 });
   function onFooterTap() {
     const now = Date.now();
@@ -77,36 +92,28 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="page">
-      <header className="header">
-        <div className="logo"><Link href="/">digitbox.dev</Link></div>
+    <div className="page digitbox-liquid-page">
+      <KubeLiquidGlass />
+
+      <header className="header digitbox-liquid-header">
+        <div className="logo"><Link href="/">DigitBox</Link></div>
+
         <nav className="nav" aria-label="Primary navigation">
           <Link href="/">Home</Link>
-          <Link href="/gallery">Gallery</Link>
-          <Link href="/ai" className="nav-ai">Digitbox AI</Link>
-          <a href="https://blog.digitbox.dev/">Blogs</a>
+          <Link href="/projects">Projects</Link>
+          <Link href="/posts">Posts</Link>
+          <Link href="/ai" className="nav-ai">DigitBox AI</Link>
+          <Link href="/beta/beta">DEEPFORGE</Link>
           {isAdmin && <Link href="/admin">Admin</Link>}
 
-          {!isAuthLoading && !user && (
-            isSupabaseConfigured ? (
-              <Link href="/login">Login</Link>
-            ) : (
-              <span
-                className="nav-link-disabled"
-                aria-disabled="true"
-                title="Login is disabled because Supabase is not configured on this deployment."
-              >
-                Login
-              </span>
-            )
-          )}
+          {!isAuthLoading && !user && <Link href="/login" className="nav-login">Login</Link>}
 
           {user && (
             <>
               <Link href="/profile" className="profile-box" aria-label="Open profile">
-                <img src={avatar} alt="Profile avatar" className="profile-avatar" />
+                <img src={avatar} alt="" className="profile-avatar" />
                 <div className="profile-text">
-                  <span className="profile-name">{username}</span>
+                  <span className="profile-name">{displayName}</span>
                   {identityLabel && <span className="admin-badge">{identityLabel}</span>}
                 </div>
               </Link>
@@ -115,10 +122,13 @@ export default function Layout({ children }) {
           )}
         </nav>
       </header>
+
       <main className="main"><div className="content">{children}</div></main>
+
       <footer className="footer" onClick={onFooterTap} title="…">
         © {new Date().getFullYear()} digitbox.dev · <Link href="/changelog">Changelog</Link> · <Link href="/about">About</Link> · <Link href="/privacy">Privacy</Link>
       </footer>
+
       <EasterEggs />
     </div>
   );
