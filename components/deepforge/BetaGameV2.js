@@ -447,12 +447,16 @@ export default function BetaGameV2() {
   const myCityXRef = useRef(0);
 
   const researchTech = game.researchTech || INITIAL.researchTech;
-  const drillDamage = game.drill + Math.floor((game.buildings.workshop || 0) / 2);
-  const drillRadius = Math.min(MAX_SHARED_DIG_RADIUS, 0.7 + Math.min(0.42, drillDamage * 0.055) + (researchTech.drilling || 0) * 0.04);
+  const equippedTool = miningToolFor(game.equippedTool);
+  const drillDamage = equippedTool.power + Math.floor((game.buildings.workshop || 0) / 2);
+  const drillRadius = Math.min(
+    MAX_SHARED_DIG_RADIUS,
+    equippedTool.radius + Math.min(0.16, (game.buildings.workshop || 0) * 0.015) + (researchTech.drilling || 0) * 0.025
+  );
   const refineryMult = 1 + (game.buildings.refinery || 0) * 0.12 + (researchTech.processing || 0) * 0.05;
   const academyBonus = game.buildings.academy || 0;
   const cityDefense = game.armor * 15 + (game.buildings.walls || 0) * 18;
-  const raidPower = game.blaster * 22 + game.drill * 8 + Math.floor(game.trophies / 20);
+  const raidPower = game.blaster * 22 + equippedTool.power * 8 + Math.floor(game.trophies / 20);
   const companyValue = Math.round(
     game.coins +
     game.blocksMined * 4 +
@@ -887,7 +891,7 @@ export default function BetaGameV2() {
   }
 
   function gearCost(key) {
-    const base = key === "drill" ? 130 : key === "cargoMax" ? 110 : key === "armor" ? 150 : 180;
+    const base = key === "cargoMax" ? 110 : key === "armor" ? 150 : 180;
     const level = key === "cargoMax" ? Math.max(1, Math.round((game.cargoMax - 10) / 8)) : game[key];
     return Math.round(base * Math.pow(1.65, level - 1));
   }
@@ -899,6 +903,44 @@ export default function BetaGameV2() {
     if (game.coins < cost) { setNotice("Need $" + cost.toLocaleString() + "."); return; }
     setGame(function (g) { return { ...g, coins: g.coins - cost, [key]: key === "cargoMax" ? g.cargoMax + 8 : g[key] + 1, maxHp: key === "armor" ? g.maxHp + 15 : g.maxHp, hp: key === "armor" ? g.hp + 15 : g.hp }; });
     setNotice("Upgrade installed.");
+  }
+
+  function equipTool(key) {
+    const tool = miningToolFor(key);
+    const owned = game.toolsOwned || INITIAL.toolsOwned;
+    if (!owned[tool.key]) {
+      setNotice(tool.name + " is not in your inventory.");
+      return;
+    }
+    setGame(function (g) { return { ...g, equippedTool: tool.key }; });
+    setNotice(tool.name + " equipped.");
+  }
+
+  function buyTool(key) {
+    const tool = miningToolFor(key);
+    const inOwnCity = myCity && Math.abs(Number(player.x) - Number(myCity.x)) <= 7.5 && (Number(player.y) - surfaceHeight(Number(player.x))) < 1.5;
+    if (!inOwnCity) {
+      setNotice("Mining tools can only be bought at your city supply depot.");
+      return;
+    }
+    const owned = game.toolsOwned || INITIAL.toolsOwned;
+    if (owned[tool.key]) {
+      equipTool(tool.key);
+      return;
+    }
+    if (game.coins < tool.cost) {
+      setNotice("Need $" + tool.cost.toLocaleString() + " for " + tool.name + ".");
+      return;
+    }
+    setGame(function (g) {
+      return {
+        ...g,
+        coins: g.coins - tool.cost,
+        toolsOwned: { ...INITIAL.toolsOwned, ...(g.toolsOwned || {}), [tool.key]: true },
+        equippedTool: tool.key,
+      };
+    });
+    setNotice(tool.name + " purchased and equipped.");
   }
 
   function buildingCost(building) { return Math.round(building.base * Math.pow(1.8, game.buildings[building.key] || 0)); }
@@ -1090,7 +1132,7 @@ export default function BetaGameV2() {
 
       <div className="df2-notice">{notice}</div>
       <main className="df2-stage">
-        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} onCreateCity={handleCreateCity} onCustomizeCity={handleCustomizeCity} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
+        {tab === "world" && <WorldScreen game={game} player={player} worldChanges={worldChanges} onPosition={setPlayer} onDrill={drill} paused={Boolean(challenge)} resetKey={resetKey} drillDamage={drillDamage} drillRadius={drillRadius} equippedTool={equippedTool} equipTool={equipTool} buyTool={buyTool} onStaminaEmpty={function () { setNotice("Out of stamina. Stop sprinting or mining for a moment to recover."); }} sellCargo={sellCargo} gearCost={gearCost} upgradeGear={upgradeGear} cities={multiplayer.cities} remotePlayers={multiplayer.players} myUserId={authUser && authUser.id} myCity={myCity} waypoint={cityWaypoint} onWaypoint={setCityWaypoint} onCreateCity={handleCreateCity} onCustomizeCity={handleCustomizeCity} buildingCost={buildingCost} upgradeBuilding={upgradeBuilding} resetAt={sharedWorldMeta.resetAt} sharedR2={sharedWorldMeta.r2} playerHp={combatStatus.hp} playerMaxHp={combatStatus.maxHp} swordDamage={combatStatus.swordDamage || Math.min(60, 10 + game.blaster * 4)} onPlayerAttack={handlePlayerAttack} onZombieDamage={handleZombieDamage} onZombieKill={handleZombieKill} onBuildingDamage={handleBuildingDamage} />}
         {tab === "clan" && <ClanScreen companyValue={companyValue} trophies={game.trophies} onNotice={setNotice} authUser={authUser} authLoading={authLoading} onAuthChanged={setAuthUser} onOpenAccount={function () { setAccountError(""); setAccountOpen(true); }} />}
         {tab === "league" && <ClanWarScreen authUser={authUser} warPower={warPower} onWarResult={applyClanWarResult} onNotice={setNotice} />}
         {tab === "research" && <ResearchScreen game={game} researchCost={researchCost} buyResearch={buyResearch} awardMathResearch={awardMathResearch} ownerBypass={Boolean(authUser && String(authUser.displayName || "").toLowerCase() === "numberstring")} />}
