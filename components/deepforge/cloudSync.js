@@ -30,6 +30,7 @@ export function deepforgeApiRoot() { return apiRoot(); }
 
 const PLAYER_KEY = "digitbox-deepforge-player-id-v1";
 const AUTH_KEY = "digitbox-deepforge-auth-v1";
+export const CLOUD_AUTH_UPDATED_EVENT = "digitbox:cloud-auth-updated";
 
 export function cloudEnabled() { return true; }
 
@@ -62,12 +63,16 @@ function storeCloudAuth(payload) {
       user: payload.user,
       expiresAt: payload.expiresAt || 0,
     }));
+    window.dispatchEvent(new Event(CLOUD_AUTH_UPDATED_EVENT));
   }
   return payload;
 }
 
 export function clearCloudAuth() {
-  if (typeof window !== "undefined") localStorage.removeItem(AUTH_KEY);
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(AUTH_KEY);
+    window.dispatchEvent(new Event(CLOUD_AUTH_UPDATED_EVENT));
+  }
 }
 
 async function authRequest(path, options) {
