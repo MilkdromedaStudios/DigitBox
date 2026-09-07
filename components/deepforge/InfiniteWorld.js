@@ -1022,6 +1022,16 @@ export default function InfiniteWorld(props) {
   const lastZombieSpawnRef = useRef(0);
   const lastZombieBiteRef = useRef(0);
   const swordSwingRef = useRef(0);
+  const staminaRef = useRef(100);
+  const [staminaHud, setStaminaHud] = useState(100);
+  const staminaHudRef = useRef(100);
+  const lastStaminaHudRef = useRef(0);
+  const lastMiningUseRef = useRef(0);
+  const lastDrillActionRef = useRef(0);
+  const lastEmptyNoticeRef = useRef(0);
+  const toolStaminaCostRef = useRef(Math.max(0.5, Number(props.toolStaminaCost) || 5));
+  const drillIntervalRef = useRef(Math.max(80, Number(props.drillInterval) || 240));
+  const staminaEmptyCbRef = useRef(props.onStaminaEmpty);
 
   useEffect(() => { changesRef.current = normalizeWorldChanges(props.worldChanges); }, [props.worldChanges]);
   useEffect(() => { positionCbRef.current = props.onPosition; }, [props.onPosition]);
@@ -1050,6 +1060,9 @@ export default function InfiniteWorld(props) {
   }, [props.cityBuildings]);
   useEffect(() => { cityBuildingHpRef.current = { ...(props.cityBuildingHp || {}) }; }, [props.cityBuildingHp]);
   useEffect(() => { buildingDamageCbRef.current = props.onBuildingDamage; }, [props.onBuildingDamage]);
+  useEffect(() => { toolStaminaCostRef.current = Math.max(0.5, Number(props.toolStaminaCost) || 5); }, [props.toolStaminaCost]);
+  useEffect(() => { drillIntervalRef.current = Math.max(80, Number(props.drillInterval) || 240); }, [props.drillInterval]);
+  useEffect(() => { staminaEmptyCbRef.current = props.onStaminaEmpty; }, [props.onStaminaEmpty]);
 
   useEffect(() => {
     if (Number.isFinite(props.player.x) && Number.isFinite(props.player.y)) {
@@ -1072,6 +1085,11 @@ export default function InfiniteWorld(props) {
     facingRef.current = 1;
     mouseAimRef.current = false;
     lastReportRef.current = 0;
+    staminaRef.current = 100;
+    staminaHudRef.current = 100;
+    setStaminaHud(100);
+    lastMiningUseRef.current = 0;
+    lastDrillActionRef.current = 0;
     setJoystick({ visible: false, x: 0, y: 0, dx: 0, dy: 0 });
     const spawnChunk = chunkFor(props.player.x, props.player.y);
     const nextHud = { chunkX: spawnChunk.x, chunkY: spawnChunk.y, depth: 0, time: "DAY" };
@@ -1085,7 +1103,7 @@ export default function InfiniteWorld(props) {
       if (event.code === "KeyE" && !event.repeat) {
         event.preventDefault();
         fireDrill();
-        if (!drillTimerRef.current) drillTimerRef.current = setInterval(fireDrill, 180);
+        if (!drillTimerRef.current) drillTimerRef.current = setInterval(fireDrill, 70);
       } else if (event.code === "Space" && !event.repeat) {
         event.preventDefault();
         fireDrill();
@@ -1144,6 +1162,16 @@ export default function InfiniteWorld(props) {
 
   function fireDrill() {
     if (pausedRef.current || !drillCbRef.current) return;
+    const now = performance.now();
+    if (now - lastDrillActionRef.current < drillIntervalRef.current) return;
+    const staminaCost = toolStaminaCostRef.current;
+    if (staminaRef.current < staminaCost) {
+      if (now - lastEmptyNoticeRef.current > 1200) {
+        lastEmptyNoticeRef.current = now;
+        if (staminaEmptyCbRef.current) staminaEmptyCbRef.current();
+      }
+      return;
+    }
     const p = playerRef.current;
     let aim = aimRef.current;
     const liveMove = moveRef.current;
@@ -1155,6 +1183,10 @@ export default function InfiniteWorld(props) {
     const radius = drillRadiusRef.current;
     const target = resolveDrillTarget(p, aim, radius, changesRef.current);
     if (!target.hit) return;
+
+    lastDrillActionRef.current = now;
+    lastMiningUseRef.current = now;
+    staminaRef.current = Math.max(0, staminaRef.current - staminaCost);
 
     freshCutsRef.current.push({ x: target.x, y: target.y, r: radius, shape: "square", born: performance.now() });
     if (freshCutsRef.current.length > 18) freshCutsRef.current.splice(0, freshCutsRef.current.length - 18);
@@ -1189,7 +1221,7 @@ export default function InfiniteWorld(props) {
     event.preventDefault();
     fireDrill();
     if (drillTimerRef.current) clearInterval(drillTimerRef.current);
-    drillTimerRef.current = setInterval(fireDrill, 180);
+    drillTimerRef.current = setInterval(fireDrill, 70);
   }
 
   function stopDrilling(event) {
@@ -1264,8 +1296,25 @@ export default function InfiniteWorld(props) {
         const depth = p.y - surface;
         const underground = depth > 0.65;
 
-        const targetSpeed = inputX * (underground ? 3.2 : 4.5);
+        const touchMagnitude = Math.sqrt(moveRef.current.x * moveRef.current.x + moveRef.current.y * moveRef.current.y);
+        const wantsSprint = Boolean(keys.shift || touchMagnitude > 0.92) && Math.abs(inputX) > 0.12;
+        const canSprint = wantsSprint && staminaRef.current > 0.5;
+        const sprintMult = canSprint ? (underground ? 1.38 : 1.58) : 1;
+        const targetSpeed = inputX * (underground ? 3.2 : 4.5) * sprintMult;
         v.x += (targetSpeed - v.x) * Math.min(1, dt * 10);
+
+        if (canSprint) {
+          staminaRef.current = Math.max(0, staminaRef.current - 23 * dt);
+        } else if (now - lastMiningUseRef.current > 420) {
+          staminaRef.current = Math.min(100, staminaRef.current + 18 * dt);
+        }
+
+        const staminaRounded = Math.round(staminaRef.current);
+        if (staminaRounded !== staminaHudRef.current && now - lastStaminaHudRef.current > 90) {
+          staminaHudRef.current = staminaRounded;
+          lastStaminaHudRef.current = now;
+          setStaminaHud(staminaRounded);
+        }
 
         if (inputX < -0.08) facingRef.current = -1;
         else if (inputX > 0.08) facingRef.current = 1;
@@ -1276,7 +1325,7 @@ export default function InfiniteWorld(props) {
         }
         v.y += 12.5 * dt;
 
-        v.x = clamp(v.x, -4.8, 4.8);
+        v.x = clamp(v.x, -7.2, 7.2);
         v.y = clamp(v.y, -7.5, 8.5);
 
         const nx = p.x + v.x * dt;
@@ -1702,6 +1751,10 @@ export default function InfiniteWorld(props) {
         <span>AREA {hud.chunkX},{hud.chunkY}</span>
         <b>{hud.depth < 0.7 ? "SURFACE" : Math.round(hud.depth) + " m DEEP"}</b>
         <small>{hud.time} · HP {Math.max(0, Math.round(Number(props.playerHp) || 0))}/{Math.max(1, Math.round(Number(props.playerMaxHp) || 100))}</small>
+        <div className={"df-stamina-hud" + (staminaHud <= 15 ? " low" : "")}>
+          <div><span>⚡ STAMINA</span><b>{staminaHud}/100</b></div>
+          <i><em style={{ width: staminaHud + "%" }} /></i>
+        </div>
       </div>
 
       <div
@@ -1743,8 +1796,9 @@ export default function InfiniteWorld(props) {
           onPointerLeave={stopDrilling}
           aria-label="Excavate square terrain"
         >
-          <span>⛏</span>
+          <span>{props.equippedToolIcon || "⛏"}</span>
           <b>DIG</b>
+          <small>{props.equippedToolName || "Tool"}</small>
         </button>
 
         <button
@@ -1756,7 +1810,7 @@ export default function InfiniteWorld(props) {
           <b style={{fontSize:9}}>SWORD</b>
         </button>
 
-        <div className="df-world-tip">WASD moves · mouse aims · hold E or DIG · F sword · touch: drag to move</div>
+        <div className="df-world-tip">WASD moves · SHIFT sprints · stamina recovers at rest · hold E or DIG · F sword · touch: full drag sprints</div>
       </div>
     </div>
   );
