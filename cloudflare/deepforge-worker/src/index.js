@@ -553,7 +553,25 @@ export default {
     if (url.pathname === "/v1/auth/me" && request.method === "GET") {
       const authResult = await authenticatedD1User(request, env);
       if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
-      return json({ user: authResult.user }, 200, env);
+
+      const ownerId = await canonicalNumberstringId(env);
+      const adminClan = await canonicalAdminClan(env);
+      const delegated = adminClan
+        ? await env.DB.prepare(
+            "SELECT player_id FROM clan_members WHERE clan_id=?1 AND player_id=?2 LIMIT 1"
+          ).bind(adminClan.id, authResult.user.id).first()
+        : null;
+      const permanentOwner = Boolean(ownerId && authResult.user.id === ownerId);
+      const admin = Boolean(permanentOwner || delegated);
+
+      return json({
+        user: {
+          ...authResult.user,
+          owner: permanentOwner,
+          admin,
+          accessRole: permanentOwner ? "owner" : delegated ? "admin" : "user",
+        },
+      }, 200, env);
     }
 
     if (url.pathname === "/v1/auth/logout" && request.method === "POST") {
