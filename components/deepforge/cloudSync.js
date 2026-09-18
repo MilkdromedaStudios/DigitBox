@@ -197,6 +197,7 @@ export async function uploadCloudAvatar(file) {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || ("Avatar upload failed: " + response.status));
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("digitbox:cloud-auth-updated"));
   return body;
 }
 
@@ -210,6 +211,7 @@ export async function deleteCloudAvatar() {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || ("Avatar delete failed: " + response.status));
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("digitbox:cloud-auth-updated"));
   return body;
 }
 
