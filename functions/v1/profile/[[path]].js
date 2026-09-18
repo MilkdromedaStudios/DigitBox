@@ -51,6 +51,10 @@ async function requireUser(request, db) {
   };
 }
 
+function validUserId(value) {
+  return /^user_[A-Za-z0-9_-]{8,96}$/.test(String(value || ""));
+}
+
 function avatarKey(userId) {
   return "profiles/" + userId + "/avatar";
 }
@@ -85,6 +89,7 @@ export async function onRequest(context) {
   if (publicAvatar && request.method === "GET") {
     if (!bucket) return json({ error: "Avatar storage is unavailable." }, 503);
     const userId = decodeURIComponent(publicAvatar[1]);
+    if (!validUserId(userId)) return json({ error: "Invalid profile id." }, 400);
     const object = await bucket.get(avatarKey(userId));
     if (!object) return json({ error: "Avatar not found." }, 404);
     const headers = new Headers(cors());
