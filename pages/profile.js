@@ -94,7 +94,7 @@ export default function ProfilePage() {
 
       <section className="section">
         <h2>Profile preferences</h2>
-        <p>These visual preferences are stored on this device and apply across DigitBox.</p>
+        <p>Theme preferences are stored on this device. When you are signed in, your profile picture syncs with your DigitBox account and Nexus.</p>
 
         <form className="post-form" style={{ maxWidth: 680 }}>
           <label>
