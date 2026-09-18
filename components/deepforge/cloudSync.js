@@ -162,6 +162,56 @@ export async function deleteCloudAccount() {
   return payload;
 }
 
+export async function loadCloudProfile() {
+  const token = getCloudAuthToken();
+  if (!token) return null;
+  const root = apiRoot();
+  const response = await fetch(root + "/v1/profile/me", {
+    method: "GET",
+    headers: { Accept: "application/json", Authorization: "Bearer " + token },
+    cache: "no-store",
+  });
+  const body = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    clearCloudAuth();
+    return null;
+  }
+  if (!response.ok) throw new Error(body.error || ("Profile request failed: " + response.status));
+  return body && body.user ? body.user : null;
+}
+
+export async function uploadCloudAvatar(file) {
+  const token = getCloudAuthToken();
+  if (!token) throw new Error("Log in before changing your profile picture.");
+  if (!file) throw new Error("Choose an image first.");
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    throw new Error("Use a PNG, JPG, or WebP image.");
+  }
+  if (file.size > 4 * 1024 * 1024) throw new Error("Profile images must be 4 MB or smaller.");
+  const root = apiRoot();
+  const response = await fetch(root + "/v1/profile/avatar", {
+    method: "PUT",
+    headers: { Authorization: "Bearer " + token, "Content-Type": file.type },
+    body: file,
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || ("Avatar upload failed: " + response.status));
+  return body;
+}
+
+export async function deleteCloudAvatar() {
+  const token = getCloudAuthToken();
+  if (!token) throw new Error("Log in before changing your profile picture.");
+  const root = apiRoot();
+  const response = await fetch(root + "/v1/profile/avatar", {
+    method: "DELETE",
+    headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || ("Avatar delete failed: " + response.status));
+  return body;
+}
+
 export async function loadCloudSave(playerId) {
   const root = apiRoot();
   if (!root || !playerId) return null;
