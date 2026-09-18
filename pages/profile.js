@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { loadCloudAuth } from "../components/deepforge/cloudSync";
+import {
+  loadCloudProfile,
+  uploadCloudAvatar,
+  deleteCloudAvatar,
+} from "../components/deepforge/cloudSync";
 import {
   DEFAULT_PROFILE_PREFS,
   THEME_PRESETS,
@@ -8,7 +12,7 @@ import {
   sanitizeProfilePrefs,
 } from "../lib/profilePreferences";
 
-const TEN_MB = 10 * 1024 * 1024;
+const FOUR_MB = 4 * 1024 * 1024;
 
 export default function ProfilePage() {
   const [prefs, setPrefs] = useState(DEFAULT_PROFILE_PREFS);
@@ -17,7 +21,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setPrefs(readProfilePrefsFromCookie());
-    loadCloudAuth().then(setAccount).catch(() => setAccount(null));
+    loadCloudProfile().then(setAccount).catch(() => setAccount(null));
   }, []);
 
   const previewName = useMemo(
@@ -31,19 +35,47 @@ export default function ProfilePage() {
     saveProfilePrefsToCookie(next);
   }
 
-  function handleAvatarUpload(event) {
+  async function handleAvatarUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > TEN_MB) return setMessage("Image is too large. Maximum size is 10MB.");
-    if (!file.type.startsWith("image/")) return setMessage("Please upload an image file.");
+    if (file.size > FOUR_MB) return setMessage("Image is too large. Maximum size is 4MB.");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      return setMessage("Please upload a PNG, JPG, or WebP image.");
+    }
+
+    if (account) {
+      setMessage("Uploading profile image…");
+      try {
+        const result = await uploadCloudAvatar(file);
+        setAccount((current) => ({ ...(current || {}), avatarUrl: result.avatarUrl, avatarVersion: result.avatarVersion }));
+        updateField("avatarDataUrl", "");
+        setMessage("Profile image synced to your DigitBox account.");
+      } catch (error) {
+        setMessage(error?.message || "Could not upload the profile image.");
+      }
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = typeof reader.result === "string" ? reader.result : "";
       updateField("avatarDataUrl", dataUrl);
-      setMessage("Profile image updated on this device.");
+      setMessage("Profile image updated on this device. Sign in to sync it with Nexus.");
     };
     reader.readAsDataURL(file);
+  }
+
+  async function removeAvatar() {
+    if (account) {
+      try {
+        await deleteCloudAvatar();
+        setAccount((current) => ({ ...(current || {}), avatarUrl: "", avatarVersion: 0 }));
+        setMessage("Profile image removed from your DigitBox account.");
+      } catch (error) {
+        setMessage(error?.message || "Could not remove the profile image.");
+      }
+    }
+    updateField("avatarDataUrl", "");
   }
 
   return (
@@ -88,8 +120,13 @@ export default function ProfilePage() {
           </label>
 
           <label>
-            Profile image (max 10MB)
-            <input className="auth-input" type="file" accept="image/*" onChange={handleAvatarUpload} />
+            Profile image (max 4MB)
+            <input className="auth-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} />
+            {(account?.avatarUrl || prefs.avatarDataUrl) && (
+              <button type="button" className="btn-base" onClick={removeAvatar} style={{ marginTop: 8 }}>
+                Remove profile image
+              </button>
+            )}
           </label>
 
           <div className="theme-row">
@@ -123,7 +160,7 @@ export default function ProfilePage() {
         <h3>Preview</h3>
         <div className="profile-box">
           <img
-            src={prefs.avatarDataUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(previewName) + "&background=14213d&color=eef7ff"}
+            src={account?.avatarUrl || prefs.avatarDataUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(previewName) + "&background=14213d&color=eef7ff"}
             alt="Avatar preview"
             className="profile-avatar"
           />
