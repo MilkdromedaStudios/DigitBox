@@ -163,21 +163,22 @@ export async function deleteCloudAccount() {
 }
 
 export async function loadCloudProfile() {
+  const baseUser = await loadCloudAuth();
+  if (!baseUser) return null;
   const token = getCloudAuthToken();
-  if (!token) return null;
   const root = apiRoot();
-  const response = await fetch(root + "/v1/profile/me", {
-    method: "GET",
-    headers: { Accept: "application/json", Authorization: "Bearer " + token },
-    cache: "no-store",
-  });
-  const body = await response.json().catch(() => ({}));
-  if (response.status === 401) {
-    clearCloudAuth();
-    return null;
+  try {
+    const response = await fetch(root + "/v1/profile/me", {
+      method: "GET",
+      headers: { Accept: "application/json", Authorization: "Bearer " + token },
+      cache: "no-store",
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) return baseUser;
+    return { ...baseUser, ...(body && body.user ? body.user : {}) };
+  } catch (_) {
+    return baseUser;
   }
-  if (!response.ok) throw new Error(body.error || ("Profile request failed: " + response.status));
-  return body && body.user ? body.user : null;
 }
 
 export async function uploadCloudAvatar(file) {
