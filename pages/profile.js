@@ -5,6 +5,11 @@ import {
   deleteCloudAvatar,
 } from "../components/deepforge/cloudSync";
 import {
+  loadBillingStatus,
+  startBillingCheckout,
+  openBillingPortal,
+} from "../components/deepforge/billing";
+import {
   DEFAULT_PROFILE_PREFS,
   THEME_PRESETS,
   readProfilePrefsFromCookie,
@@ -14,14 +19,45 @@ import {
 
 const FOUR_MB = 4 * 1024 * 1024;
 
+function formatBillingDate(value) {
+  const timestamp = Number(value || 0);
+  if (!timestamp) return "";
+  try {
+    return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(new Date(timestamp));
+  } catch (_) {
+    return "";
+  }
+}
+
 export default function ProfilePage() {
   const [prefs, setPrefs] = useState(DEFAULT_PROFILE_PREFS);
   const [account, setAccount] = useState(null);
+  const [billing, setBilling] = useState(null);
+  const [billingBusy, setBillingBusy] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    let mounted = true;
     setPrefs(readProfilePrefsFromCookie());
-    loadCloudProfile().then(setAccount).catch(() => setAccount(null));
+
+    async function load() {
+      const nextAccount = await loadCloudProfile().catch(() => null);
+      if (!mounted) return;
+      setAccount(nextAccount);
+      if (!nextAccount) return;
+
+      if (typeof window !== "undefined") {
+        const result = new URLSearchParams(window.location.search).get("billing");
+        if (result === "success") setMessage("Payment received. DigitBox Pro will unlock as soon as Stripe confirms the subscription.");
+        if (result === "cancelled") setMessage("Checkout was cancelled. No subscription changes were made.");
+      }
+
+      const nextBilling = await loadBillingStatus().catch(() => null);
+      if (mounted) setBilling(nextBilling);
+    }
+
+    load();
+    return () => { mounted = false; };
   }, []);
 
   const previewName = useMemo(
@@ -29,10 +65,49 @@ export default function ProfilePage() {
     [prefs.displayName, account]
   );
 
+  const isPro = !!billing?.entitlements?.features?.includes("nexus_pro");
+  const subscriptionStatus = billing?.entitlements?.subscriptionStatus || "none";
+  const renewalDate = formatBillingDate(billing?.entitlements?.currentPeriodEnd);
+
   function updateField(field, value) {
     const next = sanitizeProfilePrefs({ ...prefs, [field]: value });
     setPrefs(next);
     saveProfilePrefsToCookie(next);
+  }
+
+  async function refreshBilling() {
+    try {
+      const next = await loadBillingStatus();
+      setBilling(next);
+      return next;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function beginCheckout(interval) {
+    setBillingBusy(interval);
+    setMessage("");
+    try {
+      const result = await startBillingCheckout(interval);
+      window.location.assign(result.url);
+    } catch (error) {
+      if (error?.code === "subscription_exists") await refreshBilling();
+      setMessage(error?.message || "Could not start Stripe Checkout.");
+      setBillingBusy("");
+    }
+  }
+
+  async function manageSubscription() {
+    setBillingBusy("portal");
+    setMessage("");
+    try {
+      const result = await openBillingPortal();
+      window.location.assign(result.url);
+    } catch (error) {
+      setMessage(error?.message || "Could not open Stripe billing settings.");
+      setBillingBusy("");
+    }
   }
 
   async function handleAvatarUpload(event) {
@@ -87,8 +162,68 @@ export default function ProfilePage() {
         {account && (
           <div className="profile-account-flags">
             <span>{account.owner ? "♛ OWNER" : account.admin ? "◆ ADMIN" : "PLAYER"}</span>
-            <span>Same account used in DEEPFORGE</span>
+            <span>{isPro ? "DIGITBOX PRO" : "FREE MEMBER"}</span>
           </div>
+        )}
+      </section>
+
+      <section className="section" style={{ maxWidth: 760 }} id="digitbox-pro">
+        <small className="post-meta">SUBSCRIPTION</small>
+        <h2>DigitBox Pro</h2>
+        <p>
+          DigitBox Pro unlocks the full Nexus Sidebar. Free DigitBox members keep the same feature limits as Nexus Guest mode.
+        </p>
+
+        {!account ? (
+          <p>Sign in to your DigitBox account before subscribing.</p>
+        ) : isPro ? (
+          <div className="profile-account-card" style={{ marginTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Pro is active</h3>
+            {subscriptionStatus === "past_due" && (
+              <p>Your payment needs attention. Pro remains available while Stripe retries the payment.</p>
+            )}
+            {billing?.entitlements?.cancelAtPeriodEnd ? (
+              <p>Your subscription is set to cancel{renewalDate ? ` on ${renewalDate}` : " at the end of the paid period"}. Pro stays unlocked until then.</p>
+            ) : renewalDate ? (
+              <p>Current paid period runs through {renewalDate}.</p>
+            ) : null}
+            <button type="button" className="btn-base" disabled={!!billingBusy} onClick={manageSubscription}>
+              {billingBusy === "portal" ? "Opening Stripe…" : "Manage subscription"}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 16 }}>
+            <div className="profile-account-card">
+              <small className="post-meta">MONTHLY</small>
+              <h3 style={{ margin: "8px 0" }}>$1.99 / month</h3>
+              <p>Recurring monthly subscription. Cancel anytime; access continues through the paid period.</p>
+              <button
+                type="button"
+                className="btn-base"
+                disabled={!!billingBusy || billing?.configuration?.monthly === false}
+                onClick={() => beginCheckout("monthly")}
+              >
+                {billingBusy === "monthly" ? "Opening Stripe…" : "Choose monthly"}
+              </button>
+            </div>
+            <div className="profile-account-card">
+              <small className="post-meta">YEARLY</small>
+              <h3 style={{ margin: "8px 0" }}>Yearly plan</h3>
+              <p>The annual price is set by the Stripe yearly Price you configure. Checkout will show the exact total before payment.</p>
+              <button
+                type="button"
+                className="btn-base"
+                disabled={!!billingBusy || billing?.configuration?.yearly === false}
+                onClick={() => beginCheckout("yearly")}
+              >
+                {billingBusy === "yearly" ? "Opening Stripe…" : "Choose yearly"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {account && billing?.configuration?.stripe === false && (
+          <p style={{ marginTop: 12 }}>Billing is not active yet. The Stripe server key still needs to be added to the DigitBox Cloudflare environment.</p>
         )}
       </section>
 
