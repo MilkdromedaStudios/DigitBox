@@ -1,6 +1,6 @@
 const DEFAULT_SITE_URL = "https://digitbox.dev";
 const PRO_STATUSES = new Set(["active", "trialing", "past_due"]);
-const OPEN_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", "incomplete", "paused"]);
+const OPEN_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"]);
 let schemaReadyPromise = null;
 
 function normalizeEnv(env, request) {
@@ -248,6 +248,15 @@ async function syncSubscription(env, subscription, fallbackUserId = "") {
   return billingRow(env, userId);
 }
 
+async function retrieveSubscription(env, id) {
+  if (!id) return null;
+  try {
+    return await stripeRequest(env, "GET", "/v1/subscriptions/" + encodeURIComponent(id));
+  } catch (_) {
+    return null;
+  }
+}
+
 async function findOpenStripeSubscription(env, stripeCustomerId) {
   const result = await stripeRequest(env, "GET", "/v1/subscriptions", {
     customer: stripeCustomerId,
@@ -285,7 +294,8 @@ async function handleCheckout(request, env) {
   const { customerId: stripeCustomerId } = await ensureCustomer(env, auth.user);
   const existing = await findOpenStripeSubscription(env, stripeCustomerId);
   if (existing) {
-    await syncSubscription(env, existing, auth.user.id);
+    const current = await retrieveSubscription(env, existing.id) || existing;
+    await syncSubscription(env, current, auth.user.id);
     return json({ error: "This DigitBox account already has a subscription. Use Manage subscription instead.", code: "subscription_exists" }, 409, env);
   }
 
@@ -362,7 +372,8 @@ async function handleWebhook(request, env) {
   const event = JSON.parse(rawBody);
   const object = event?.data?.object;
   if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event?.type)) {
-    await syncSubscription(env, object);
+    const current = await retrieveSubscription(env, subscriptionId(object)) || object;
+    await syncSubscription(env, current);
   } else if (event?.type === "checkout.session.completed" && object?.mode === "subscription") {
     const userId = String(object?.metadata?.digitbox_user_id || object?.client_reference_id || "");
     const stripeCustomerId = customerId(object?.customer);
@@ -375,8 +386,8 @@ async function handleWebhook(request, env) {
     }
     const subId = subscriptionId(object?.subscription);
     if (subId) {
-      const subscription = await stripeRequest(env, "GET", "/v1/subscriptions/" + encodeURIComponent(subId));
-      await syncSubscription(env, subscription, userId);
+      const subscription = await retrieveSubscription(env, subId);
+      if (subscription) await syncSubscription(env, subscription, userId);
     }
   }
 
