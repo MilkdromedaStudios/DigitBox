@@ -13,9 +13,24 @@ DigitBox Pro uses the existing DigitBox account/session system. Stripe billing l
 - If a subscription is scheduled to cancel, Pro remains enabled through the paid billing period.
 - Pro is disabled when the Stripe subscription is no longer entitled (for example `unpaid` or `canceled`).
 
+## Stripe environments
+
+DigitBox does **not** require Stripe test mode or a Stripe sandbox. The backend is environment-agnostic: Stripe determines the environment from the credentials and Price IDs you configure.
+
+You may configure DigitBox directly with live Stripe values:
+
+- live secret key: `sk_live_...`
+- live monthly Price ID: `price_...`
+- live yearly Price ID: `price_...`
+- live webhook signing secret: `whsec_...`
+
+All Stripe resources used together must belong to the same environment. Do not mix a live secret key with sandbox/test Price IDs or a sandbox/test webhook secret.
+
+Sandbox/test mode remains optional if you want to verify the purchase flow without creating real charges.
+
 ## 1. Create the Stripe product and Prices
 
-In Stripe **test mode** first:
+In the Stripe environment you intend to use (live is supported directly):
 
 1. Create a product named **DigitBox Pro**.
 2. Add a recurring monthly Price for **$1.99 USD**, billed monthly.
@@ -30,20 +45,20 @@ This project currently deploys through Cloudflare's Git integration. GitHub repo
 
 ### Secrets
 
-- `STRIPE_SECRET_KEY` — start with the Stripe test-mode `sk_test_...` key.
-- `STRIPE_WEBHOOK_SECRET` — the `whsec_...` secret for the webhook endpoint created in step 3.
+- `STRIPE_SECRET_KEY` — use the secret key for your chosen Stripe environment. For direct production setup, use the live `sk_live_...` key.
+- `STRIPE_WEBHOOK_SECRET` — the `whsec_...` secret for the webhook endpoint created in step 3 in that same environment.
 
 ### Variables
 
-- `STRIPE_PRICE_ID_MONTHLY` — monthly `$1.99` Stripe Price ID.
-- `STRIPE_PRICE_ID_YEARLY` — yearly Stripe Price ID.
+- `STRIPE_PRICE_ID_MONTHLY` — monthly `$1.99` Stripe Price ID from the same Stripe environment.
+- `STRIPE_PRICE_ID_YEARLY` — yearly Stripe Price ID from the same Stripe environment.
 - `DIGITBOX_SITE_URL=https://digitbox.dev`
 
 Do not put `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` in source code, `.env.local.example`, Nexus Sidebar, or any browser bundle.
 
 ## 3. Add the Stripe webhook
 
-Create a webhook endpoint in the same Stripe mode as the configured secret key:
+Create a webhook endpoint in the same Stripe environment as the configured secret key:
 
 `https://digitbox.pages.dev/v1/billing/webhook`
 
@@ -60,7 +75,7 @@ The webhook is the source of truth for updating the D1 subscription record. Retu
 
 ## 4. Configure Stripe Customer Portal
 
-Enable Stripe Customer Portal for the same Stripe mode. At minimum allow customers to:
+Enable Stripe Customer Portal for the same Stripe environment. At minimum allow customers to:
 
 - update payment methods;
 - view billing history;
@@ -70,18 +85,21 @@ Configure subscription cancellation for **at the end of the billing period**, no
 
 The DigitBox profile page creates Portal sessions server-side for existing Pro subscribers.
 
-## 5. Test before going live
+## 5. Live setup
 
-1. Deploy DigitBox with the test-mode Cloudflare values.
-2. Log into a normal DigitBox account.
-3. Open `/profile` and choose the monthly or yearly DigitBox Pro plan.
-4. Complete Stripe Checkout with a Stripe test payment method.
-5. Confirm `/v1/billing/status` reports `plan: "pro"` and feature `nexus_pro` for that account.
-6. Reload Nexus Sidebar and confirm the full Nexus feature set unlocks.
-7. Cancel in Customer Portal and confirm Pro remains enabled until the current period end.
-8. Test a failed-payment lifecycle and confirm `past_due` retains Pro while `unpaid`/`canceled` does not.
+You can launch directly in Stripe live mode:
 
-After the complete flow is verified, create/use the live Product/Prices and webhook, then replace the Cloudflare test values with live-mode values (`sk_live_...`, live `price_...` IDs, and the live webhook's `whsec_...`).
+1. Activate your Stripe account for live payments if Stripe requires any remaining business/account details.
+2. Create the live DigitBox Pro product and live monthly/yearly Prices.
+3. Configure Cloudflare with the live `sk_live_...` key and live `price_...` IDs.
+4. Create the webhook in Stripe's live environment and configure its live `whsec_...` in Cloudflare.
+5. Configure Customer Portal in the live environment.
+6. Log into a normal DigitBox account and open `/profile`.
+7. Choose the monthly or yearly DigitBox Pro plan and complete Checkout with a real payment method.
+8. Confirm `/v1/billing/status` reports `plan: "pro"` and feature `nexus_pro` for that account.
+9. Reload Nexus Sidebar and confirm the full Nexus feature set unlocks.
+
+A direct live checkout creates a real Stripe customer/subscription and can create a real charge. If you want a no-charge rehearsal first, use Stripe's sandbox/test environment with a complete matching set of sandbox/test keys, Prices, webhook, and Portal configuration, then swap the entire set to live values afterward.
 
 ## API routes
 
