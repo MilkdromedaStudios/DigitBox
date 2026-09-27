@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Eaglercraft Launcher · DigitBox</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07111f;--panel:#0f1d31;--line:rgba(255,255,255,.14);--text:#eef7ff;--muted:#9fb1c7;--cyan:#75e9ff;--green:#91f5b5;--violet:#b49cff}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at 12% 0,rgba(74,221,255,.18),transparent 34%),radial-gradient(circle at 90% 8%,rgba(156,111,255,.18),transparent 34%),linear-gradient(150deg,#07111f,#0c1830 52%,#160d2c);color:var(--text)}
+    body{padding:clamp(16px,4vw,46px)}a{color:inherit}.shell{width:min(1120px,100%);margin:auto}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:16px}.back,.credits{padding:9px 13px;border:1px solid var(--line);border-radius:12px;text-decoration:none;background:rgba(255,255,255,.05);font-weight:750}.hero{padding:clamp(24px,5vw,54px);border:1px solid var(--line);border-radius:30px;background:rgba(10,22,41,.7);box-shadow:0 28px 80px rgba(0,0,0,.3);backdrop-filter:blur(22px)}
+    .kicker{font-size:12px;letter-spacing:.16em;font-weight:900;color:var(--cyan)}h1{font-size:clamp(38px,7vw,76px);line-height:.95;letter-spacing:-.055em;margin:10px 0 14px}.hero p{max-width:760px;color:#c1d0e1;line-height:1.65;margin:0}.source{margin-top:13px;font-size:12px;color:var(--muted)}.source a{color:var(--cyan)}
+    .bar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:18px 0;flex-wrap:wrap}.search{flex:1;min-width:220px;padding:13px 15px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);outline:none}.count{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{display:grid;grid-template-columns:58px 1fr auto;gap:14px;align-items:center;padding:16px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,rgba(255,255,255,.085),rgba(255,255,255,.035));box-shadow:0 15px 45px rgba(0,0,0,.18)}
+    .icon{width:58px;height:58px;border-radius:14px;object-fit:cover;background:#12233a}.title{font-weight:850;font-size:16px}.version{color:var(--cyan);font-size:13px;margin-top:4px}.tag{display:inline-block;margin-top:7px;font-size:10px;font-weight:900;letter-spacing:.08em;padding:5px 7px;border-radius:999px;background:rgba(145,245,181,.1);color:var(--green)}.tag.legacy{background:rgba(180,156,255,.11);color:#d8ccff}
+    .play{border:0;border-radius:14px;padding:12px 15px;background:linear-gradient(135deg,var(--cyan),var(--green));color:#07111f;font-weight:900;cursor:pointer;white-space:nowrap}.play:hover{filter:brightness(1.07);transform:translateY(-1px)}.empty{padding:24px;border:1px solid var(--line);border-radius:20px;color:var(--muted);background:rgba(255,255,255,.04)}.hidden{display:none!important}.foot{margin-top:20px;padding:15px;border:1px solid var(--line);border-radius:18px;color:var(--muted);font-size:12px;line-height:1.6;background:rgba(255,255,255,.035)}
+    @media(max-width:760px){body{padding:14px}.grid{grid-template-columns:1fr}.card{grid-template-columns:50px 1fr}.icon{width:50px;height:50px}.play{grid-column:1/-1;width:100%}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="top"><a class="back" href="/projects">← Projects</a><a class="credits" href="./credits.html">Credits</a></div>
+  <section class="hero">
+    <div class="kicker">DIGITBOX PROJECT · DIRECT FILES</div>
+    <h1>Eaglercraft Launcher</h1>
+    <p>Launch the Eaglercraft builds stored inside DigitBox. These buttons open the local project files directly on digitbox.dev; the launcher does not embed the RedFlamz site.</p>
+    <div class="source">Launcher concept/source reference: <a href="https://github.com/RedFlamz/Eaglercraft-Launcher" target="_blank" rel="noreferrer">RedFlamz / Eaglercraft-Launcher</a> · <a href="https://redflamz.github.io/Eaglercraft-Launcher/" target="_blank" rel="noreferrer">original site</a></div>
+  </section>
+  <div class="bar"><input id="search" class="search" type="search" placeholder="Search versions…" autocomplete="off"><div id="count" class="count"></div></div>
+  <section id="grid" class="grid"></section><div id="empty" class="empty hidden">No versions match that search.</div>
+  <div class="foot">This DigitBox launcher is an independent integration using project files already stored in this repository. Eaglercraft builds and Minecraft-related assets retain their respective authorship and rights. See Credits for attribution.</div>
+</main>
+<script>
+const ROOT='/projects/Eaglercraft-Launcher-main/';
+const versions=[
+ {id:'1.12.2',title:'Latest release',version:'1.12.2-u2',icon:'assets/images/mc-icons/grass.png',active:true},
+ {id:'1.12.2-wasm',title:'Latest release WASM',version:'1.12.2-u2-wasm',icon:'assets/images/mc-icons/grass-wasm.png',active:true},
+ {id:'tuffclient',title:'TuffClient',version:'1.12.2',icon:'assets/images/mc-icons/tuff.png',active:true,resolved:true},
+ {id:'tuffclient-wasm',title:'TuffClient WASM',version:'1.12.2-wasm',icon:'assets/images/mc-icons/tuff-wasm.png',active:true,resolved:true},
+ {id:'1.8.8',title:'Previous release',version:'1.8.8-u51',icon:'assets/images/mc-icons/dirt.png',active:true},
+ {id:'1.8.8-wasm',title:'Previous release WASM',version:'1.8.8-u51-wasm',icon:'assets/images/mc-icons/dirt-wasm.png',active:true},
+ {id:'1.6.4',title:'Eaglercraft 1.6.4',version:'1.6.4-25w17a',icon:'assets/images/mc-icons/hay-bale.png'},
+ {id:'1.5.2',title:'Older release',version:'1.5.2-sp2.01',icon:'assets/images/mc-icons/hopper.png',active:true},
+ {id:'1.2.5',title:'Eaglercraft 1.2.5',version:'1.2.5',icon:'assets/images/mc-icons/jungle-log.png'},
+ {id:'b1.7.3',title:'Eaglercraft Beta 1.7.3',version:'b1.7.3',icon:'assets/images/mc-icons/sticky-piston.png'},
+ {id:'b1.4',title:'Eaglercraft Beta 1.4',version:'b1.4_01-25w21b',icon:'assets/images/mc-icons/trapped-chest.png'},
+ {id:'b1.3',title:'Eaglercraft Beta 1.3',version:'b1.3_01-23w49a',icon:'assets/images/mc-icons/red-bed.png'},
+ {id:'b1.1',title:'Eaglercraft Beta 1.1',version:'b1.1_02-25w20a',icon:'assets/images/mc-icons/oak-leaves.png'},
+ {id:'a1.2.6',title:'Eaglercraft Alpha 1.2.6',version:'a1.2.6',icon:'assets/images/mc-icons/jack-o-lantern.png'},
+ {id:'a1.1.2',title:'Eaglercraft Alpha 1.1.2',version:'a1.1.2_01-25w20b',icon:'assets/images/mc-icons/clay.png'},
+ {id:'infdev',title:'Eaglercraft Infdev',version:'inf',icon:'assets/images/mc-icons/monster-spawner.png'},
+ {id:'infdev-wasm',title:'Eaglercraft Infdev WASM',version:'inf-wasm',icon:'assets/images/mc-icons/monster-spawner-wasm.png'},
+ {id:'indev',title:'Eaglercraft Indev',version:'inv',icon:'assets/images/mc-icons/furnace.png'},
+ {id:'c0.30',title:'Eaglercraft Classic 0.30',version:'c0.30',icon:'assets/images/mc-icons/tnt.png'},
+ {id:'c0.30-wasm',title:'Eaglercraft Classic 0.30 WASM',version:'c0.30-wasm',icon:'assets/images/mc-icons/tnt-wasm.png'}
+];
+const grid=document.getElementById('grid'),search=document.getElementById('search'),count=document.getElementById('count'),empty=document.getElementById('empty');
+function launch(v){
+ if(v.resolved){location.href='/api/content/file?path='+encodeURIComponent('public/projects/Eaglercraft-Launcher-main/mc/'+v.id+'/index.html');return;}
+ location.href='./play.html?v='+encodeURIComponent(v.id);
+}
+function render(){
+ const q=search.value.trim().toLowerCase();const shown=versions.filter(v=>(v.title+' '+v.version+' '+v.id).toLowerCase().includes(q));grid.textContent='';
+ shown.forEach(v=>{const c=document.createElement('article');c.className='card';const img=document.createElement('img');img.className='icon';img.alt='';img.src=ROOT+v.icon;const info=document.createElement('div');const t=document.createElement('div');t.className='title';t.textContent=v.title;const ver=document.createElement('div');ver.className='version';ver.textContent=v.version;const tag=document.createElement('span');tag.className='tag'+(v.active?'':' legacy');tag.textContent=v.active?'ACTIVE':'LEGACY / OPTIONAL';info.append(t,ver,tag);const b=document.createElement('button');b.className='play';b.textContent='Play';b.onclick=()=>launch(v);c.append(img,info,b);grid.append(c)});
+ count.textContent=shown.length===versions.length?versions.length+' versions':shown.length+' of '+versions.length+' versions';empty.classList.toggle('hidden',shown.length!==0);
+}
+search.addEventListener('input',render);render();
+</script>
+</body>
+</html>
