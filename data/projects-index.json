@@ -1,5 +1,11 @@
 [
   {
+    "title": "Eaglercraft Launcher",
+    "slug": "eaglercraft-launcher",
+    "path": "public/projects/eaglercraft-launcher.html",
+    "excerpt": "Launch every Eaglercraft version already included in DigitBox from one project."
+  },
+  {
     "title": "Five Nights at Freddy's Launcher",
     "slug": "fnaf-launcher"
   },
