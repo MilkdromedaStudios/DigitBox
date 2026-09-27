@@ -16,13 +16,13 @@ The Telegram onboarding bot lives in `appgpt-bot/` and defaults to the DigitBox 
 
 ## Eaglercraft Launcher credit
 
-DigitBox includes an **Eaglercraft Launcher** project that embeds the hosted launcher from [RedFlamz/Eaglercraft-Launcher](https://github.com/RedFlamz/Eaglercraft-Launcher):
+DigitBox includes an independently written **Eaglercraft Catalog** project that references the public version/client listings from [RedFlamz/Eaglercraft-Launcher](https://github.com/RedFlamz/Eaglercraft-Launcher) and opens the corresponding upstream-hosted builds at:
 
 `https://redflamz.github.io/Eaglercraft-Launcher/`
 
-Credit for that launcher and its bundled Eaglercraft builds belongs to RedFlamz and the respective Eaglercraft/client developers and contributors. DigitBox is not the original author of those files and is not presented as an official Minecraft or Eaglercraft distribution.
+The upstream launcher repository does not currently publish a license for its launcher code, so DigitBox does not copy that site's source code or artwork. The DigitBox page uses its own interface and links to upstream-hosted builds, clients, packs, and the upstream mod marketplace.
 
-If the upstream author requests removal of the embedded launcher, DigitBox will remove the integration.
+Credit for the upstream launcher and its bundled Eaglercraft builds belongs to RedFlamz and the respective Eaglercraft/client/mod developers and contributors. DigitBox is not presented as an official Minecraft or Eaglercraft distribution.
 
 ## Game files (fetched from GitHub at runtime)
 
