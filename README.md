@@ -14,6 +14,16 @@ AppGPT supports persistent chat-based app creation, one evolving app per chat, v
 
 The Telegram onboarding bot lives in `appgpt-bot/` and defaults to the DigitBox AppGPT URL. See `appgpt-bot/README.md` for deployment/setup.
 
+## Eaglercraft Launcher credit
+
+DigitBox includes an **Eaglercraft Launcher** project that embeds the hosted launcher from [RedFlamz/Eaglercraft-Launcher](https://github.com/RedFlamz/Eaglercraft-Launcher):
+
+`https://redflamz.github.io/Eaglercraft-Launcher/`
+
+Credit for that launcher and its bundled Eaglercraft builds belongs to RedFlamz and the respective Eaglercraft/client developers and contributors. DigitBox is not the original author of those files and is not presented as an official Minecraft or Eaglercraft distribution.
+
+If the upstream author requests removal of the embedded launcher, DigitBox will remove the integration.
+
 ## Game files (fetched from GitHub at runtime)
 
 The game HTML files live in `public/projects/` as **Git LFS** files, but they
