@@ -16,23 +16,19 @@ The Telegram onboarding bot lives in `appgpt-bot/` and defaults to the DigitBox 
 
 ## Eaglercraft Launcher credit
 
-DigitBox includes an independently written **Eaglercraft Catalog** project that references the public version/client listings from [RedFlamz/Eaglercraft-Launcher](https://github.com/RedFlamz/Eaglercraft-Launcher) and opens the corresponding upstream-hosted builds at:
+DigitBox includes an independently written **Eaglercraft** launcher/catalog. The launcher UI is DigitBox code, while the browser game/client files are stored locally under:
 
-`https://redflamz.github.io/Eaglercraft-Launcher/`
+`public/projects/Eaglercraft-Launcher-main/`
 
-The upstream launcher repository does not currently publish a license for its launcher code, so DigitBox does not copy that site's source code or artwork. The DigitBox page uses its own interface and links to upstream-hosted builds, clients, packs, and the upstream mod marketplace.
+The version/client set was sourced from [RedFlamz/Eaglercraft-Launcher](https://github.com/RedFlamz/Eaglercraft-Launcher). DigitBox does not copy the upstream launcher's page source or artwork as its own interface. The Play buttons use DigitBox-local game assets and a local bootloader instead of redirecting to the RedFlamz website.
 
-Credit for the upstream launcher and its bundled Eaglercraft builds belongs to RedFlamz and the respective Eaglercraft/client/mod developers and contributors. DigitBox is not presented as an official Minecraft or Eaglercraft distribution.
+Credit for Eaglercraft builds, community clients, mods, and Minecraft-related assets belongs to their respective developers and rights holders. DigitBox is not presented as an official Minecraft or Eaglercraft distribution.
 
 ## Game files (fetched from GitHub at runtime)
 
-The game HTML files live in `public/projects/` as **Git LFS** files, but they
-are too large to bundle into the build (several are 25–100+ MB), so builds
-never include them. A GitHub Action mirrors them onto the `game-assets`
-GitHub Release automatically, and the deployed site fetches them from GitHub
-at runtime when a game is opened, then renders them in the game iframe.
-Everything runs on GitHub — no local uploads needed. See
-[docs/GITHUB_RELEASE_ASSETS.md](docs/GITHUB_RELEASE_ASSETS.md).
+Large game HTML files in `public/projects/` may be tracked with **Git LFS**. A GitHub Action mirrors LFS-backed game files onto the `game-assets` GitHub Release, and DigitBox's content endpoint can retrieve those files at runtime. Eaglercraft's multi-file browser builds additionally keep their JS/EPK/WASM/resources directly in `public/projects/Eaglercraft-Launcher-main/` and are started by `public/projects/eaglercraft-runtime/play.html`.
+
+See [docs/GITHUB_RELEASE_ASSETS.md](docs/GITHUB_RELEASE_ASSETS.md) for the release-asset setup.
 
 A Cloudflare R2 bucket can optionally serve the same files (checked before
 GitHub) — see [docs/CLOUDFLARE_R2_SETUP.md](docs/CLOUDFLARE_R2_SETUP.md).
