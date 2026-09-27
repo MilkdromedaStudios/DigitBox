@@ -34,9 +34,11 @@ export async function getServerSideProps({ params }) {
 
   if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
     return {
-      redirect: {
-        destination: "/projects/eaglercraft-launcher/index.html",
-        permanent: false,
+      props: {
+        src: "https://redflamz.github.io/Eaglercraft-Launcher/",
+        title: "Eaglercraft Launcher",
+        slug: "eaglercraft-launcher",
+        isExternal: true,
       },
     };
   }
