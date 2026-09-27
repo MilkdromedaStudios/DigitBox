@@ -35,7 +35,7 @@ export async function getServerSideProps({ params }) {
   if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
     return {
       redirect: {
-        destination: "/projects/eaglercraft-launcher/",
+        destination: "/projects/eaglercraft-launcher/index.html",
         permanent: false,
       },
     };
