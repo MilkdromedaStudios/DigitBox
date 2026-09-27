@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" style="width:100%;height:100%;background:#000">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <title>Eaglercraft · DigitBox</title>
+  <style>
+    html,body,#game_frame,#game{margin:0;width:100%;height:100%;overflow:hidden;background:#000}
+    #boot{position:fixed;inset:0;display:grid;place-items:center;background:#07111f;color:#eef7ff;font:15px system-ui,sans-serif;z-index:20}
+    #boot>div{max-width:560px;padding:24px;text-align:center}.muted{color:#9fb1c7;line-height:1.55}.back{display:inline-block;margin-top:14px;color:#75e9ff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div id="game_frame"></div>
+  <div id="boot"><div><strong id="status">Starting Eaglercraft…</strong><p class="muted" id="detail">Loading local DigitBox project files.</p><a class="back" href="./">← Back to launcher</a></div></div>
+<script>
+(() => {
+  'use strict';
+  const ROOT='/projects/Eaglercraft-Launcher-main/mc/';
+  const id=new URLSearchParams(location.search).get('v')||'';
+  const specs={
+    '1.12.2':{kind:'x112',scripts:['classes.js'],asset:'assets.epk'},
+    '1.12.2-wasm':{kind:'x112wasm',scripts:['bootstrap.js'],asset:'assets.epw'},
+    '1.8.8':{kind:'x188',scripts:['classes.js'],asset:'assets.epk',locales:'lang/'},
+    '1.8.8-wasm':{kind:'x188wasm',scripts:['bootstrap.js'],asset:'assets.epw'},
+    '1.6.4':{kind:'legacyEagler',scripts:['classes.js','eagswebrtc.js'],asset:'assets.epk'},
+    '1.5.2':{kind:'legacyEagler',scripts:['classes.js','eagswebrtc.js'],asset:'assets.epk'},
+    '1.2.5':{kind:'assetsOnly',scripts:['classes.js'],asset:'assets.epk'},
+    'b1.7.3':{kind:'oldConfig',scripts:['js/app.js'],asset:'resources.mc'},
+    'b1.4':{kind:'genericX',scripts:['classes.js'],asset:'assets.epk'},
+    'b1.3':{kind:'minecraftOpts',scripts:['classes.js'],asset:'assets.epk'},
+    'b1.1':{kind:'genericX',scripts:['classes.js'],asset:'assets.epk'},
+    'a1.2.6':{kind:'oldConfig',scripts:['js/app.js'],asset:'resources.mc'},
+    'a1.1.2':{kind:'genericX',scripts:['classes.js'],asset:'assets.epk'},
+    'infdev':{kind:'genericX',scripts:['classes.js'],asset:'assets.epk'},
+    'infdev-wasm':{kind:'genericXWasm',scripts:['bootstrap.js'],asset:'assets.epw'},
+    'indev':{kind:'classic',scripts:['app.js'],asset:'resources.mc'},
+    'c0.30':{kind:'genericX',scripts:['classes.js'],asset:'assets.epk'},
+    'c0.30-wasm':{kind:'genericXWasm',scripts:['bootstrap.js'],asset:'assets.epw'}
+  };
+  const spec=specs[id];
+  const boot=document.getElementById('boot');
+  const status=document.getElementById('status');
+  const detail=document.getElementById('detail');
+  if(!spec){status.textContent='Unknown Eaglercraft version';detail.textContent='Return to the launcher and choose a listed build.';return;}
+  const base=ROOT+id+'/';
+  document.title='Eaglercraft '+id+' · DigitBox';
+
+  function fail(message){status.textContent='Could not start '+id;detail.textContent=message||'A required local project file failed to load.';boot.style.display='grid';}
+  function loadScript(path){return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=base+path;s.async=false;s.onload=resolve;s.onerror=()=>reject(new Error(path));document.head.appendChild(s);});}
+  function serverQuery(opts){const server=new URLSearchParams(location.search).get('server');if(server)opts.joinServer=server;}
+  function configure(){
+    const asset=base+spec.asset;
+    if(spec.kind==='x112'||spec.kind==='x112wasm'){
+      window.eaglercraftXOpts={demoMode:false,container:'game_frame',assetsURI:asset,worldsDB:'worlds',servers:[{addr:'wss://play.zelz.net',name:'ZelzNet'},{addr:'wss://mc.arch.lol',name:'ArchMC'},{addr:'wss://beta.arch.lol',name:'ArchMC Beta'}]};
+      if(spec.kind==='x112')window.eaglercraftXOpts.localesURI=base+'lang/';
+      serverQuery(window.eaglercraftXOpts);return;
+    }
+    if(spec.kind==='x188'||spec.kind==='x188wasm'){
+      const relayId=Math.floor(Math.random()*3);
+      window.eaglercraftXOpts={demoMode:false,container:'game_frame',assetsURI:asset,worldsDB:'worlds',servers:[],relays:[{addr:'wss://relay.deev.is/',comment:'relay #1',primary:relayId===0},{addr:'wss://relay.lax1dude.net/',comment:'relay #2',primary:relayId===1},{addr:'wss://relay.shhnowisnottheti.me/',comment:'relay #3',primary:relayId===2}]};
+      if(spec.locales)window.eaglercraftXOpts.localesURI=base+spec.locales;
+      serverQuery(window.eaglercraftXOpts);return;
+    }
+    if(spec.kind==='legacyEagler'){
+      window.eaglercraftOpts={container:'game_frame',assetsURI:asset,serverWorkerURI:base+'worker_bootstrap.js',worldsFolder:'MAIN'};serverQuery(window.eaglercraftOpts);return;
+    }
+    if(spec.kind==='genericX'||spec.kind==='genericXWasm'){
+      window.eaglercraftXOpts={container:'game_frame',assetsURI:asset,serverWorkerURI:base+'worker_bootstrap.js',worldsFolder:'MAIN'};serverQuery(window.eaglercraftXOpts);return;
+    }
+    if(spec.kind==='assetsOnly'){window.assetsURI=asset;return;}
+    if(spec.kind==='minecraftOpts'){
+      const downloadHint=location.origin+'/?download='+btoa(encodeURIComponent(id));
+      window.minecraftOpts=['game_frame',asset,downloadHint];return;
+    }
+    if(spec.kind==='oldConfig'){
+      document.getElementById('game_frame').id='game';
+      window.config={gameContainer:'game',assetsLocation:asset,playerUsername:null,serverIP:null,joinServerOnLaunch:false};return;
+    }
+    if(spec.kind==='classic'){window.classicConfig=['game_frame',asset];}
+  }
+  async function start(){
+    try{
+      status.textContent='Loading '+id+'…';
+      for(const script of spec.scripts)await loadScript(script);
+      configure();
+      if(typeof window.main!=='function')throw new Error('The game entry function was not found.');
+      boot.style.display='none';
+      window.main();
+    }catch(err){fail('Failed while loading '+(err&&err.message?err.message:'a required file')+'.');}
+  }
+  start();
+})();
+</script>
+</body>
+</html>
