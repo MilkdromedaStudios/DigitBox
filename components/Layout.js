@@ -101,7 +101,6 @@ export default function Layout({ children }) {
         <nav className="nav" aria-label="Primary navigation">
           <Link href="/">Home</Link>
           <Link href="/projects">Projects</Link>
-          <Link href="/eaglercraft">Eaglercraft</Link>
           <Link href="/posts">Posts</Link>
           <Link href="/ai" className="nav-ai">DigitBox AI</Link>
           <Link href="/beta/beta">DEEPFORGE</Link>
