@@ -38,6 +38,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     let mounted = true;
+    let billingTimer = null;
     setPrefs(readProfilePrefsFromCookie());
 
     async function load() {
@@ -46,18 +47,51 @@ export default function ProfilePage() {
       setAccount(nextAccount);
       if (!nextAccount) return;
 
+      let billingResult = "";
       if (typeof window !== "undefined") {
-        const result = new URLSearchParams(window.location.search).get("billing");
-        if (result === "success") setMessage("Payment received. DigitBox Pro will unlock as soon as Stripe confirms the subscription.");
-        if (result === "cancelled") setMessage("Checkout was cancelled. No subscription changes were made.");
+        billingResult = new URLSearchParams(window.location.search).get("billing") || "";
+        if (billingResult === "success") {
+          setMessage("Payment received. Waiting for Stripe to confirm your DigitBox Pro subscription…");
+        }
+        if (billingResult === "cancelled") {
+          setMessage("Checkout was cancelled. No subscription changes were made.");
+        }
       }
 
       const nextBilling = await loadBillingStatus().catch(() => null);
-      if (mounted) setBilling(nextBilling);
+      if (!mounted) return;
+      setBilling(nextBilling);
+
+      // Stripe webhooks can arrive a moment after Checkout redirects back.
+      // Poll briefly so Pro unlocks automatically without making the user reload.
+      if (billingResult === "success" && !nextBilling?.entitlements?.features?.includes("nexus_pro")) {
+        let attempts = 0;
+        const poll = async () => {
+          if (!mounted) return;
+          attempts += 1;
+          const refreshed = await loadBillingStatus().catch(() => null);
+          if (!mounted) return;
+          if (refreshed) setBilling(refreshed);
+          const active = !!refreshed?.entitlements?.features?.includes("nexus_pro");
+          if (active) {
+            setMessage("DigitBox Pro is active. Welcome to VIP!");
+            return;
+          }
+          if (attempts < 10) {
+            billingTimer = window.setTimeout(poll, 2000);
+          } else {
+            setMessage("Payment was received, but Stripe confirmation is still pending. Refresh this page in a moment.");
+          }
+        };
+        billingTimer = window.setTimeout(poll, 1500);
+      }
     }
 
     load();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+      if (billingTimer && typeof window !== "undefined") window.clearTimeout(billingTimer);
+    };
   }, []);
 
   const previewName = useMemo(
