@@ -34,6 +34,7 @@ export default function ProfilePage() {
   const [account, setAccount] = useState(null);
   const [billing, setBilling] = useState(null);
   const [billingBusy, setBillingBusy] = useState("");
+  const [billingError, setBillingError] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -58,7 +59,13 @@ export default function ProfilePage() {
         }
       }
 
-      const nextBilling = await loadBillingStatus().catch(() => null);
+      let nextBilling = null;
+      try {
+        nextBilling = await loadBillingStatus();
+        if (mounted) setBillingError("");
+      } catch (error) {
+        if (mounted) setBillingError(error?.message || "Could not reach the DigitBox billing backend.");
+      }
       if (!mounted) return;
       setBilling(nextBilling);
 
@@ -113,15 +120,33 @@ export default function ProfilePage() {
     try {
       const next = await loadBillingStatus();
       setBilling(next);
+      setBillingError("");
       return next;
-    } catch (_) {
+    } catch (error) {
+      setBillingError(error?.message || "Could not reach the DigitBox billing backend.");
       return null;
     }
   }
 
   async function beginCheckout(interval) {
-    setBillingBusy(interval);
     setMessage("");
+    setBillingError("");
+
+    const configuration = billing?.configuration;
+    if (configuration?.stripe === false) {
+      setMessage("Stripe is not active on the deployed DigitBox backend. Check STRIPE_SECRET_KEY in the Cloudflare Pages production environment and redeploy.");
+      return;
+    }
+    if (interval === "monthly" && configuration?.monthly === false) {
+      setMessage("The monthly Stripe Price ID is missing on the deployed backend. Check STRIPE_PRICE_ID_MONTHLY in Cloudflare Pages and redeploy.");
+      return;
+    }
+    if (interval === "yearly" && configuration?.yearly === false) {
+      setMessage("The yearly Stripe Price ID is missing on the deployed backend. Check STRIPE_PRICE_ID_YEARLY in Cloudflare Pages and redeploy.");
+      return;
+    }
+
+    setBillingBusy(interval);
     try {
       const result = await startBillingCheckout(interval);
       window.location.assign(result.url);
@@ -234,7 +259,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 className="btn-base"
-                disabled={!!billingBusy || billing?.configuration?.monthly === false}
+                disabled={!!billingBusy}
                 onClick={() => beginCheckout("monthly")}
               >
                 {billingBusy === "monthly" ? "Opening Stripe…" : "Choose monthly"}
@@ -247,7 +272,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 className="btn-base"
-                disabled={!!billingBusy || billing?.configuration?.yearly === false}
+                disabled={!!billingBusy}
                 onClick={() => beginCheckout("yearly")}
               >
                 {billingBusy === "yearly" ? "Opening Stripe…" : "Choose yearly"}
@@ -258,6 +283,12 @@ export default function ProfilePage() {
 
         {account && billing?.configuration?.stripe === false && (
           <p style={{ marginTop: 12 }}>Billing is not active yet. The Stripe server key still needs to be added to the DigitBox Cloudflare environment.</p>
+        )}
+        {billingError && (
+          <p style={{ marginTop: 12 }}><b>Billing connection error:</b> {billingError}</p>
+        )}
+        {message && (
+          <p style={{ marginTop: 12 }}><b>Billing status:</b> {message}</p>
         )}
       </section>
 
@@ -293,7 +324,7 @@ export default function ProfilePage() {
             <button type="button" className="btn-base" disabled={!!billingBusy} onClick={refreshBilling}>
               Refresh VIP status
             </button>
-            {!isPro && billing?.configuration?.monthly !== false && (
+            {!isPro && (
               <button type="button" className="btn-base" disabled={!!billingBusy} onClick={() => beginCheckout("monthly")}>
                 {billingBusy === "monthly" ? "Opening Stripe…" : "Test monthly checkout"}
               </button>
@@ -399,7 +430,6 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      {message && <p style={{ marginTop: 12 }}>{message}</p>}
     </div>
   );
 }
