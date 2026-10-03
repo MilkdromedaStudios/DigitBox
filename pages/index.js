@@ -124,6 +124,36 @@ export default function BetaPage() {
             </div>
           </section>
 
+          <section className="section beta-liquid-section" id="digitbox-pro">
+            <div className="beta-section-heading">
+              <div>
+                <span className="beta-kicker">DIGITBOX VIP</span>
+                <h2>Unlock DigitBox Pro</h2>
+              </div>
+              <Link href="/profile#digitbox-pro" className="beta-mini-pill">See plans →</Link>
+            </div>
+            <p>
+              DigitBox Pro is the VIP membership for signed-in DigitBox users. It unlocks the full Nexus Sidebar experience while keeping billing and subscription controls in your account.
+            </p>
+            <div className="card-grid">
+              <article className="card beta-liquid-card">
+                <h3>Full Nexus access</h3>
+                <p>Use the complete Nexus Sidebar feature set instead of the limited Guest/Free experience.</p>
+              </article>
+              <article className="card beta-liquid-card">
+                <h3>Account-based VIP</h3>
+                <p>Your Pro status is attached to your DigitBox account, so the site can recognize your membership after you sign in.</p>
+              </article>
+              <article className="card beta-liquid-card">
+                <h3>Manage it yourself</h3>
+                <p>Open Stripe&apos;s secure billing portal from your profile to manage payment details, view billing history, or cancel.</p>
+              </article>
+            </div>
+            <p style={{ marginTop: 16 }}>
+              <Link href="/profile#digitbox-pro" className="btn-base">View DigitBox Pro</Link>
+            </p>
+          </section>
+
           <section className="section beta-liquid-section">
             <div className="beta-section-heading"><div><span className="beta-kicker">LIVE FEED</span><h2>Latest News</h2></div><Link href="/posts" className="beta-mini-pill">All posts →</Link></div>
             <p>New projects and posts appear here as they are published.</p>
