@@ -276,7 +276,6 @@ async function handleStatus(request, env) {
     configuration: {
       stripe: stripeConfigured(env),
       monthly: !!String(env.STRIPE_PRICE_ID_MONTHLY || "").trim(),
-      yearly: !!String(env.STRIPE_PRICE_ID_YEARLY || "").trim(),
     },
   }, 200, env);
 }
@@ -286,10 +285,10 @@ async function handleCheckout(request, env) {
   if (auth.error) return json({ error: auth.error }, auth.status, env);
   if (!stripeConfigured(env)) return json({ error: "DigitBox Pro billing is not configured yet." }, 503, env);
 
-  const body = await request.json().catch(() => ({}));
-  const interval = body?.interval === "yearly" ? "yearly" : "monthly";
-  const priceId = String(interval === "yearly" ? env.STRIPE_PRICE_ID_YEARLY || "" : env.STRIPE_PRICE_ID_MONTHLY || "").trim();
-  if (!priceId) return json({ error: interval === "yearly" ? "The yearly DigitBox Pro plan is not configured yet." : "The monthly DigitBox Pro plan is not configured yet." }, 503, env);
+  await request.json().catch(() => ({}));
+  const interval = "monthly";
+  const priceId = String(env.STRIPE_PRICE_ID_MONTHLY || "").trim();
+  if (!priceId) return json({ error: "The monthly DigitBox Pro plan is not configured yet." }, 503, env);
 
   const { customerId: stripeCustomerId } = await ensureCustomer(env, auth.user);
   const existing = await findOpenStripeSubscription(env, stripeCustomerId);
