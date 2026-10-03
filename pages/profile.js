@@ -261,6 +261,61 @@ export default function ProfilePage() {
         )}
       </section>
 
+      <section className="section" style={{ maxWidth: 760 }} id="vip-test">
+        <small className="post-meta">VIP TEST CENTER</small>
+        <h2>Test DigitBox Pro</h2>
+        <p>
+          This checks the real DigitBox billing connection. It does not bypass Stripe or force-enable VIP.
+          If your Stripe environment is in test/sandbox mode, you can safely run Checkout without a real charge.
+          If it is live, Checkout can create a real subscription and charge a real payment method.
+        </p>
+
+        <div className="card-grid" style={{ marginTop: 14 }}>
+          <div className="card">
+            <h3>Connection</h3>
+            <p><b>Stripe backend:</b> {billing?.configuration?.stripe ? "Connected" : "Not configured"}</p>
+            <p><b>Monthly price:</b> {billing?.configuration?.monthly ? "Configured" : "Missing"}</p>
+            <p><b>Yearly price:</b> {billing?.configuration?.yearly ? "Configured" : "Missing"}</p>
+          </div>
+
+          <div className="card">
+            <h3>Current account</h3>
+            <p><b>Plan:</b> {isPro ? "DigitBox Pro" : "Free"}</p>
+            <p><b>Stripe status:</b> {subscriptionStatus}</p>
+            {renewalDate && <p><b>Paid through:</b> {renewalDate}</p>}
+          </div>
+        </div>
+
+        {!account ? (
+          <p style={{ marginTop: 14 }}>Sign in first so DigitBox can attach the test subscription to your account.</p>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+            <button type="button" className="btn-base" disabled={!!billingBusy} onClick={refreshBilling}>
+              Refresh VIP status
+            </button>
+            {!isPro && billing?.configuration?.monthly !== false && (
+              <button type="button" className="btn-base" disabled={!!billingBusy} onClick={() => beginCheckout("monthly")}>
+                {billingBusy === "monthly" ? "Opening Stripe…" : "Test monthly checkout"}
+              </button>
+            )}
+            {!isPro && billing?.configuration?.yearly && (
+              <button type="button" className="btn-base" disabled={!!billingBusy} onClick={() => beginCheckout("yearly")}>
+                {billingBusy === "yearly" ? "Opening Stripe…" : "Test yearly checkout"}
+              </button>
+            )}
+            {isPro && (
+              <button type="button" className="btn-base" disabled={!!billingBusy} onClick={manageSubscription}>
+                {billingBusy === "portal" ? "Opening Stripe…" : "Open billing portal"}
+              </button>
+            )}
+          </div>
+        )}
+
+        <p className="post-meta" style={{ marginTop: 14 }}>
+          A successful end-to-end test is: Checkout completes → Stripe sends the webhook → this page changes to DigitBox Pro → Nexus unlocks.
+        </p>
+      </section>
+
       <section className="section">
         <h2>Profile preferences</h2>
         <p>Theme preferences are stored on this device. When you are signed in, your profile picture syncs with your DigitBox account and Nexus.</p>
