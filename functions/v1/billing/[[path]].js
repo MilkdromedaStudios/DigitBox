@@ -19,7 +19,19 @@ function normalizeEnv(env, request) {
       /^https:\/\/[a-z0-9-]+\.digitbox\.pages\.dev$/i.test(origin))
       ? origin
       : "";
-  return { ...(env || {}), DB: db, __requestOrigin: allowedOrigin };
+  // Cloudflare's env object can contain runtime bindings/secrets that should be
+  // read directly. Copy the billing values explicitly instead of relying only
+  // on object spread, which can drop non-enumerable/runtime-provided bindings.
+  return {
+    ...(env || {}),
+    DB: db,
+    STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: env?.STRIPE_WEBHOOK_SECRET,
+    STRIPE_PRICE_ID_MONTHLY: env?.STRIPE_PRICE_ID_MONTHLY,
+    DIGITBOX_SITE_URL: env?.DIGITBOX_SITE_URL,
+    ALLOWED_ORIGIN: env?.ALLOWED_ORIGIN,
+    __requestOrigin: allowedOrigin,
+  };
 }
 
 function cors(env) {
