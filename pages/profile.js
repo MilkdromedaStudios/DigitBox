@@ -287,6 +287,16 @@ export default function ProfilePage() {
             <h3>Connection</h3>
             <p><b>Stripe backend:</b> {billing?.configuration?.stripe ? "Connected" : "Not configured"}</p>
             <p><b>Monthly price:</b> {billing?.configuration?.monthly ? "Configured" : "Missing"}</p>
+            {billing?.configuration?.runtimeHost && (
+              <p><b>Runtime host:</b> {billing.configuration.runtimeHost}</p>
+            )}
+            {billing?.configuration?.environmentKeys && (
+              <>
+                <p><b>Secret binding present:</b> {billing.configuration.environmentKeys.stripeSecret ? "Yes" : "No"}</p>
+                <p><b>Monthly binding present:</b> {billing.configuration.environmentKeys.monthlyPrice ? "Yes" : "No"}</p>
+                <p><b>Webhook binding present:</b> {billing.configuration.environmentKeys.webhookSecret ? "Yes" : "No"}</p>
+              </>
+            )}
           </div>
 
           <div className="card">
