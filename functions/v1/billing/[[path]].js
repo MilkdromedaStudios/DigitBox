@@ -288,6 +288,12 @@ async function handleStatus(request, env) {
     configuration: {
       stripe: stripeConfigured(env),
       monthly: !!String(env.STRIPE_PRICE_ID_MONTHLY || "").trim(),
+      runtimeHost: new URL(request.url).host,
+      environmentKeys: {
+        stripeSecret: Object.prototype.hasOwnProperty.call(env, "STRIPE_SECRET_KEY") || !!env.STRIPE_SECRET_KEY,
+        monthlyPrice: Object.prototype.hasOwnProperty.call(env, "STRIPE_PRICE_ID_MONTHLY") || !!env.STRIPE_PRICE_ID_MONTHLY,
+        webhookSecret: Object.prototype.hasOwnProperty.call(env, "STRIPE_WEBHOOK_SECRET") || !!env.STRIPE_WEBHOOK_SECRET,
+      },
     },
   }, 200, env);
 }
