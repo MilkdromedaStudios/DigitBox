@@ -128,7 +128,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function beginCheckout(interval) {
+  async function beginCheckout() {
     setMessage("");
     setBillingError("");
 
@@ -137,18 +137,14 @@ export default function ProfilePage() {
       setMessage("Stripe is not active on the deployed DigitBox backend. Check STRIPE_SECRET_KEY in the Cloudflare Pages production environment and redeploy.");
       return;
     }
-    if (interval === "monthly" && configuration?.monthly === false) {
+    if (configuration?.monthly === false) {
       setMessage("The monthly Stripe Price ID is missing on the deployed backend. Check STRIPE_PRICE_ID_MONTHLY in Cloudflare Pages and redeploy.");
       return;
     }
-    if (interval === "yearly" && configuration?.yearly === false) {
-      setMessage("The yearly Stripe Price ID is missing on the deployed backend. Check STRIPE_PRICE_ID_YEARLY in Cloudflare Pages and redeploy.");
-      return;
-    }
 
-    setBillingBusy(interval);
+    setBillingBusy("monthly");
     try {
-      const result = await startBillingCheckout(interval);
+      const result = await startBillingCheckout("monthly");
       window.location.assign(result.url);
     } catch (error) {
       if (error?.code === "subscription_exists") await refreshBilling();
@@ -251,33 +247,18 @@ export default function ProfilePage() {
             </button>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 16 }}>
-            <div className="profile-account-card">
-              <small className="post-meta">MONTHLY</small>
-              <h3 style={{ margin: "8px 0" }}>$1.99 / month</h3>
-              <p>Recurring monthly subscription. Cancel anytime; access continues through the paid period.</p>
-              <button
-                type="button"
-                className="btn-base"
-                disabled={!!billingBusy}
-                onClick={() => beginCheckout("monthly")}
-              >
-                {billingBusy === "monthly" ? "Opening Stripe…" : "Choose monthly"}
-              </button>
-            </div>
-            <div className="profile-account-card">
-              <small className="post-meta">YEARLY</small>
-              <h3 style={{ margin: "8px 0" }}>Yearly plan</h3>
-              <p>The annual price is set by the Stripe yearly Price you configure. Checkout will show the exact total before payment.</p>
-              <button
-                type="button"
-                className="btn-base"
-                disabled={!!billingBusy}
-                onClick={() => beginCheckout("yearly")}
-              >
-                {billingBusy === "yearly" ? "Opening Stripe…" : "Choose yearly"}
-              </button>
-            </div>
+          <div className="profile-account-card" style={{ marginTop: 16, maxWidth: 360 }}>
+            <small className="post-meta">MONTHLY</small>
+            <h3 style={{ margin: "8px 0" }}>$1.99 / month</h3>
+            <p>Recurring monthly subscription. Cancel anytime; access continues through the paid period.</p>
+            <button
+              type="button"
+              className="btn-base"
+              disabled={!!billingBusy}
+              onClick={beginCheckout}
+            >
+              {billingBusy === "monthly" ? "Opening Stripe…" : "Upgrade to Pro"}
+            </button>
           </div>
         )}
 
@@ -306,7 +287,6 @@ export default function ProfilePage() {
             <h3>Connection</h3>
             <p><b>Stripe backend:</b> {billing?.configuration?.stripe ? "Connected" : "Not configured"}</p>
             <p><b>Monthly price:</b> {billing?.configuration?.monthly ? "Configured" : "Missing"}</p>
-            <p><b>Yearly price:</b> {billing?.configuration?.yearly ? "Configured" : "Missing"}</p>
           </div>
 
           <div className="card">
@@ -325,13 +305,8 @@ export default function ProfilePage() {
               Refresh VIP status
             </button>
             {!isPro && (
-              <button type="button" className="btn-base" disabled={!!billingBusy} onClick={() => beginCheckout("monthly")}>
-                {billingBusy === "monthly" ? "Opening Stripe…" : "Test monthly checkout"}
-              </button>
-            )}
-            {!isPro && billing?.configuration?.yearly && (
-              <button type="button" className="btn-base" disabled={!!billingBusy} onClick={() => beginCheckout("yearly")}>
-                {billingBusy === "yearly" ? "Opening Stripe…" : "Test yearly checkout"}
+              <button type="button" className="btn-base" disabled={!!billingBusy} onClick={beginCheckout}>
+                {billingBusy === "monthly" ? "Opening Stripe…" : "Test checkout"}
               </button>
             )}
             {isPro && (
