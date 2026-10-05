@@ -62,6 +62,81 @@ function json(body, status, env) {
   });
 }
 
+
+const GITHUB_PROJECT_OWNER = "MilkdromedaStudios";
+const GITHUB_PROJECT_REPO = "DigitBox";
+const GITHUB_PROJECT_BRANCH = "main";
+
+function safeGithubProjectPath(value) {
+  const path = String(value || "").replace(/^\/+/, "");
+  if (!path.startsWith("public/projects/")) return "";
+  if (path.includes("..") || path.includes("\\") || path.includes("\0")) return "";
+  return path;
+}
+
+function githubProjectContentType(path, upstreamType) {
+  const clean = String(upstreamType || "").split(";")[0].trim();
+  if (clean && clean !== "application/octet-stream") return upstreamType;
+  const p = String(path || "").toLowerCase();
+  if (p.endsWith(".html")) return "text/html; charset=utf-8";
+  if (p.endsWith(".js") || p.endsWith(".mjs")) return "text/javascript; charset=utf-8";
+  if (p.endsWith(".css")) return "text/css; charset=utf-8";
+  if (p.endsWith(".json")) return "application/json; charset=utf-8";
+  if (p.endsWith(".wasm")) return "application/wasm";
+  if (p.endsWith(".zip")) return "application/zip";
+  if (p.endsWith(".png")) return "image/png";
+  if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+  if (p.endsWith(".webp")) return "image/webp";
+  if (p.endsWith(".svg")) return "image/svg+xml";
+  return upstreamType || "application/octet-stream";
+}
+
+async function githubProjectResponse(request, repoPath, env) {
+  const safePath = safeGithubProjectPath(repoPath);
+  if (!safePath) return json({ error: "Invalid project path" }, 400, env);
+
+  const encoded = safePath.split("/").map(encodeURIComponent).join("/");
+  // media.githubusercontent.com resolves Git LFS objects as real file bytes,
+  // while still serving ordinary Git-tracked files. That lets the large game
+  // tree stay in GitHub instead of being packed into the Cloudflare deployment.
+  const upstreamUrl =
+    "https://media.githubusercontent.com/media/" +
+    GITHUB_PROJECT_OWNER + "/" +
+    GITHUB_PROJECT_REPO + "/" +
+    encodeURIComponent(GITHUB_PROJECT_BRANCH) + "/" +
+    encoded;
+
+  const headers = new Headers({ Accept: "*/*" });
+  const range = request.headers.get("Range");
+  const ifNoneMatch = request.headers.get("If-None-Match");
+  const ifModifiedSince = request.headers.get("If-Modified-Since");
+  if (range) headers.set("Range", range);
+  if (ifNoneMatch) headers.set("If-None-Match", ifNoneMatch);
+  if (ifModifiedSince) headers.set("If-Modified-Since", ifModifiedSince);
+
+  const upstream = await fetch(upstreamUrl, { method: "GET", headers, redirect: "follow" });
+  if (upstream.status === 404) return json({ error: "Project file not found" }, 404, env);
+
+  const responseHeaders = new Headers();
+  for (const name of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders.set(name, value);
+  }
+  responseHeaders.set(
+    "Content-Type",
+    githubProjectContentType(safePath, upstream.headers.get("Content-Type"))
+  );
+  responseHeaders.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
+  responseHeaders.set("Access-Control-Allow-Origin", env.__requestOrigin || env.ALLOWED_ORIGIN || "https://digitbox.dev");
+  responseHeaders.set("Vary", "Origin");
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
+    headers: responseHeaders,
+  });
+}
+
 function validPlayerId(value) {
   return typeof value === "string" && /^[a-zA-Z0-9_-]{8,96}$/.test(value);
 }
@@ -714,6 +789,28 @@ export default {
   async fetch(request, env) {
     env = normalizeBindings(env, request);
     const url = new URL(request.url);
+
+    // Eaglercraft and the rest of the large project tree live in GitHub rather
+    // than Cloudflare's static asset bundle. Serve them on-demand so the public
+    // URL stays same-origin and the Pages deployment remains small.
+    if (url.pathname === "/projects/eaglercraft-launcher" || url.pathname === "/projects/eaglercraft-launcher/") {
+      return githubProjectResponse(request, "public/projects/eaglercraft-launcher.html", env);
+    }
+
+    if (
+      url.pathname === "/projects/eaglercraft-launcher.html" ||
+      url.pathname.startsWith("/projects/Eaglercraft-Launcher-main/") ||
+      url.pathname.startsWith("/projects/eaglercraft-runtime/")
+    ) {
+      return githubProjectResponse(request, "public" + url.pathname, env);
+    }
+
+    if (url.pathname === "/api/content/file" && request.method === "GET") {
+      const requestedPath = String(url.searchParams.get("path") || "");
+      if (requestedPath.startsWith("public/projects/")) {
+        return githubProjectResponse(request, requestedPath, env);
+      }
+    }
 
     if (!url.pathname.startsWith("/v1/")) {
       if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
