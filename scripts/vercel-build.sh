@@ -32,12 +32,12 @@ fi
 # pull Git LFS objects — LFS bandwidth is limited and the files are huge.
 export GIT_LFS_SKIP_SMUDGE=1
 
-# public/projects holds the games as Git LFS pointers (real files on dev
-# machines that pulled them). Either way the directory must not be in
-# public/ when the build output is packaged: Cloudflare Pages rejects static
-# files over 25 MB, and even pointer text should not be deployed. Move it
-# aside; on CI (ephemeral checkout) it stays out so the packaging steps that
-# run after this script cannot pick it up, locally it is restored on exit.
+# public/projects contains large game files. Cloudflare Pages has no reason to
+# upload or cache those files because the production worker streams them from
+# GitHub on demand. On CI, DELETE the checkout copy instead of moving it to a
+# hidden directory: moving it made Cloudflare's post-build cache upload scan a
+# huge .build-excluded-projects tree and could leave deployments stuck at
+# "Uploading to build output cache".
 EXCLUDED_GAMES_DIR=".build-excluded-projects"
 restore_excluded_games() {
   if [ -d "${EXCLUDED_GAMES_DIR}" ]; then
@@ -46,13 +46,14 @@ restore_excluded_games() {
   fi
 }
 
+rm -rf "${EXCLUDED_GAMES_DIR}"
 if [ -d "public/projects" ]; then
-  rm -rf "${EXCLUDED_GAMES_DIR}"
-  mv public/projects "${EXCLUDED_GAMES_DIR}"
   if [ -n "${IS_CI_BUILD}" ]; then
-    echo "[build] CI build: leaving public/projects out of the tree (game files are fetched from GitHub at runtime)"
+    rm -rf public/projects
+    echo "[build] CI build: removed public/projects before build/cache upload; project files are streamed from GitHub at runtime"
   else
-    echo "[build] Excluding public/projects for the duration of the build (moved to ${EXCLUDED_GAMES_DIR})"
+    mv public/projects "${EXCLUDED_GAMES_DIR}"
+    echo "[build] Local build: temporarily excluding public/projects (moved to ${EXCLUDED_GAMES_DIR})"
     trap restore_excluded_games EXIT
   fi
 fi
