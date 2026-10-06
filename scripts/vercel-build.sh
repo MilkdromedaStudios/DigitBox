@@ -68,3 +68,11 @@ fi
 
 echo "[build] Running next build..."
 next build
+
+# Vercel/CI can spend a long time uploading Next's incremental build cache
+# after a successful build. It is not required to run the deployed site, so
+# drop it in CI to keep deployments from hanging at "Uploading build output cache".
+if [ -n "${IS_CI_BUILD}" ]; then
+  rm -rf .next/cache
+  echo "[build] Removed .next/cache before CI cache upload"
+fi
