@@ -114,7 +114,18 @@ async function githubProjectResponse(request, repoPath, env) {
   if (ifNoneMatch) headers.set("If-None-Match", ifNoneMatch);
   if (ifModifiedSince) headers.set("If-Modified-Since", ifModifiedSince);
 
-  const upstream = await fetch(upstreamUrl, { method: "GET", headers, redirect: "follow" });
+  let upstream = await fetch(upstreamUrl, { method: "GET", headers, redirect: "follow" });
+
+  if (upstream.status === 404) {
+    const rawUrl =
+      "https://raw.githubusercontent.com/" +
+      GITHUB_PROJECT_OWNER + "/" +
+      GITHUB_PROJECT_REPO + "/" +
+      encodeURIComponent(GITHUB_PROJECT_BRANCH) + "/" +
+      encoded;
+    upstream = await fetch(rawUrl, { method: "GET", headers, redirect: "follow" });
+  }
+
   if (upstream.status === 404) return json({ error: "Project file not found" }, 404, env);
 
   const responseHeaders = new Headers();
