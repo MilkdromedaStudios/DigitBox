@@ -60,11 +60,25 @@ export default async function handler(request) {
     if (value) headers.set(name, value);
   }
 
-  const upstream = await fetch(upstreamUrl, {
+  let upstream = await fetch(upstreamUrl, {
     method: request.method,
     headers,
     redirect: "follow",
   });
+
+  // media.githubusercontent.com is ideal for Git LFS objects, but ordinary
+  // Git-tracked files (such as our launcher HTML) can return 404 there.
+  // Fall back to raw.githubusercontent.com for those normal repository files.
+  if (upstream.status === 404) {
+    const rawUrl =
+      "https://raw.githubusercontent.com/" +
+      OWNER + "/" + REPO + "/" + encodeURIComponent(BRANCH) + "/" + encodedPath;
+    upstream = await fetch(rawUrl, {
+      method: request.method,
+      headers,
+      redirect: "follow",
+    });
+  }
 
   if (upstream.status === 404) return json({ error: "Project file not found", path: repoPath }, 404);
 
