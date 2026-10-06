@@ -4,7 +4,7 @@
 <style>html,body,#game_frame,#game{margin:0;width:100%;height:100%;overflow:hidden;background:#000}#boot{position:fixed;inset:0;display:grid;place-items:center;background:#07111f;color:#eef7ff;font:15px system-ui,sans-serif;z-index:20}#boot>div{max-width:560px;padding:24px;text-align:center}.muted{color:#9fb1c7;line-height:1.55}.back{display:inline-block;margin-top:14px;color:#75e9ff;text-decoration:none}</style></head>
 <body><div id="game_frame"></div><div id="boot"><div><strong id="status">Starting Eaglercraft…</strong><p class="muted" id="detail">Loading game files from DigitBox.</p><a class="back" href="/projects/eaglercraft-launcher">← Back to launcher</a></div></div>
 <script>(()=>{'use strict';
-const ROOT='/projects/Eaglercraft-Launcher-main/mc/';
+const ROOT='/api/project-file/Eaglercraft-Launcher-main/mc/';
 const id=new URLSearchParams(location.search).get('v')||'';
 const specs={
 '1.12.2':{kind:'x112',scripts:['classes.js'],asset:'assets.epk'},'1.12.2-wasm':{kind:'x112',scripts:['bootstrap.js'],asset:'assets.epw'},
