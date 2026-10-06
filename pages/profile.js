@@ -106,7 +106,8 @@ export default function ProfilePage() {
     [prefs.displayName, account]
   );
 
-  const isPro = !!billing?.entitlements?.features?.includes("nexus_pro");
+  const isOwner = !!account?.owner;
+  const isPro = isOwner || !!billing?.entitlements?.features?.includes("nexus_pro");
   const subscriptionStatus = billing?.entitlements?.subscriptionStatus || "none";
   const renewalDate = formatBillingDate(billing?.entitlements?.currentPeriodEnd);
 
@@ -131,6 +132,11 @@ export default function ProfilePage() {
   async function beginCheckout() {
     setMessage("");
     setBillingError("");
+
+    if (isOwner) {
+      setMessage("Owner accounts include DigitBox Pro at no charge.");
+      return;
+    }
 
     const configuration = billing?.configuration;
     if (configuration?.stripe === false) {
@@ -234,17 +240,23 @@ export default function ProfilePage() {
         ) : isPro ? (
           <div className="profile-account-card" style={{ marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Pro is active</h3>
-            {subscriptionStatus === "past_due" && (
-              <p>Your payment needs attention. Pro remains available while Stripe retries the payment.</p>
+            {isOwner ? (
+              <p>Owner access includes DigitBox Pro for free. No Stripe subscription is required.</p>
+            ) : (
+              <>
+                {subscriptionStatus === "past_due" && (
+                  <p>Your payment needs attention. Pro remains available while Stripe retries the payment.</p>
+                )}
+                {billing?.entitlements?.cancelAtPeriodEnd ? (
+                  <p>Your subscription is set to cancel{renewalDate ? ` on ${renewalDate}` : " at the end of the paid period"}. Pro stays unlocked until then.</p>
+                ) : renewalDate ? (
+                  <p>Current paid period runs through {renewalDate}.</p>
+                ) : null}
+                <button type="button" className="btn-base" disabled={!!billingBusy} onClick={manageSubscription}>
+                  {billingBusy === "portal" ? "Opening Stripe…" : "Manage subscription"}
+                </button>
+              </>
             )}
-            {billing?.entitlements?.cancelAtPeriodEnd ? (
-              <p>Your subscription is set to cancel{renewalDate ? ` on ${renewalDate}` : " at the end of the paid period"}. Pro stays unlocked until then.</p>
-            ) : renewalDate ? (
-              <p>Current paid period runs through {renewalDate}.</p>
-            ) : null}
-            <button type="button" className="btn-base" disabled={!!billingBusy} onClick={manageSubscription}>
-              {billingBusy === "portal" ? "Opening Stripe…" : "Manage subscription"}
-            </button>
           </div>
         ) : (
           <div className="profile-account-card" style={{ marginTop: 16, maxWidth: 360 }}>
