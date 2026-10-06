@@ -1,4 +1,5 @@
 import deepforgeWorker from "../../../cloudflare/deepforge-worker/src/index.js";
+import { onRequest as billingWorker } from "../../../functions/v1/billing/[[path]].js";
 
 export const config = { runtime: "edge" };
 
@@ -171,6 +172,14 @@ export default async function handler(request) {
 
   const env = findBindings(process.env);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: json({}).headers });
+
+  // /v1/* is rewritten by next.config.js into this Edge API route. Billing
+  // therefore has to be dispatched here; Pages Functions under /functions
+  // are not the live handler for these rewritten requests.
+  if (incoming.pathname.startsWith("/v1/billing/")) {
+    const forwardedBillingRequest = new Request(incoming.toString(), request);
+    return billingWorker({ request: forwardedBillingRequest, env });
+  }
 
   try {
     if (incoming.pathname === "/v1/health" && request.method === "GET") {
