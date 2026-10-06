@@ -1,10 +1,12 @@
 import { deepforgeApiRoot, getCloudAuthToken } from "./cloudSync";
 
+const CLOUDFLARE_BILLING_ROOT = "https://digitbox.pages.dev";
+
 function billingApiRoot() {
-  // DigitBox's account/D1 backend lives on the Cloudflare Pages deployment.
-  // The public digitbox.dev frontend is deployed separately, so Stripe runtime
-  // secrets configured in Cloudflare are only visible at this API root.
-  return deepforgeApiRoot();
+  // Billing is pinned to the Cloudflare Pages backend because that deployment
+  // owns the D1 account data and Stripe runtime secrets. Do not inherit a
+  // NEXT_PUBLIC_DEEPFORGE_API preview override here.
+  return CLOUDFLARE_BILLING_ROOT;
 }
 
 async function billingRequest(path, options = {}) {
