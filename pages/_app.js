@@ -7,7 +7,18 @@ import Layout from "../components/Layout";
 import PageTransition from "../components/PageTransition";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
+// Pages with a YouTube player must not run ad or tracking scripts (YouTube's
+// Made for Kids rules). _document.js only adds ads to a few server-rendered
+// routes, but client-side navigation keeps a loaded ad script running, so a
+// player page reached from an ad page reloads itself without it.
+const PLAYER_ROUTES = new Set(["/watch", "/shorts"]);
+
 export default function MyApp({ Component, pageProps, router }) {
+  const pathname = router?.pathname;
+  useEffect(() => {
+    if (PLAYER_ROUTES.has(pathname) && document.querySelector('script[src*="adsbygoogle"]')) window.location.reload();
+  }, [pathname]);
+
   useEffect(() => {
     const applyTheme = () => {
       const prefs = readProfilePrefsFromCookie();
