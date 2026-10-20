@@ -1,3 +1,6 @@
+import { isBlockedFile } from "../../../lib/hubProjects";
+import { getD1 } from "../../../lib/serverAuth";
+
 export const config = { runtime: "edge" };
 
 const OWNER = "MilkdromedaStudios";
@@ -48,6 +51,8 @@ export default async function handler(request) {
   const url = new URL(request.url);
   const repoPath = requestedRepoPath(url);
   if (!repoPath) return json({ error: "Invalid project path" }, 400);
+  // A game deleted or hidden from the admin page (lib/hubProjects.js).
+  if (await isBlockedFile(getD1(), repoPath)) return json({ error: "This game isn't available." }, 404);
 
   const encodedPath = repoPath.split("/").map(encodeURIComponent).join("/");
   const upstreamUrl =

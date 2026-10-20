@@ -1109,8 +1109,12 @@ body[data-theme="light"] .hub-pill-btn.is-danger:hover { color: #991b1b; }
 .admin-project-text { display: grid; gap: 6px; min-width: 0; }
 .admin-project-text strong { overflow: hidden; font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
 .admin-project-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
-.admin-badge { padding: 2px 8px; border-radius: 999px; background: var(--hub-hover); color: var(--text); font-size: .72rem; font-weight: 700; }
-.admin-badge.is-live { background: color-mix(in srgb, #22c55e 22%, transparent); }
+.admin-state { padding: 2px 8px; border-radius: 999px; background: var(--hub-hover); color: var(--text); font-size: .72rem; font-weight: 700; }
+.admin-state.is-live { background: color-mix(in srgb, #22c55e 22%, transparent); }
+.admin-project.is-deleted { border-style: dashed; background: transparent; }
+.admin-project.is-deleted .admin-project-cover { filter: grayscale(1); opacity: .55; }
+.admin-page .hub-shelf { margin-bottom: 36px; }
+.admin-user-id code { padding: 2px 6px; border-radius: 6px; background: var(--hub-soft); font-size: .85rem; user-select: all; }
 .admin-project-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 .admin-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 28px; align-items: start; }

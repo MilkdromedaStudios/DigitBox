@@ -6,7 +6,7 @@ import { GameCard, PostCard, ShortCard, SkeletonGrid, VideoCard } from "../compo
 import { CHANNELS, POSTS, byFeature, channelUrl, likeKey, uniqueVideos } from "../lib/catalog";
 import { formatViews, timeAgo } from "../lib/format";
 import { useLikes } from "../lib/useLikes";
-import { useAllGames } from "../lib/useHubProjects";
+import { useGameCatalog } from "../lib/useHubProjects";
 import { useVideos } from "../lib/useVideos";
 import { useYouTubeFeed } from "../lib/useYouTube";
 import { YouTubeAttribution } from "../components/YouTubeLogo";
@@ -102,7 +102,7 @@ export default function HomePage() {
 
   const ownLong = useMemo(() => ownVideos.filter((video) => !video.short), [ownVideos]);
   const ownShorts = useMemo(() => ownVideos.filter((video) => video.short), [ownVideos]);
-  const allGames = useAllGames();
+  const { games: allGames, ready: gamesReady } = useGameCatalog();
   const gamesByFeature = useMemo(() => byFeature(allGames), [allGames]);
 
   // YouTube feeds when the API key is set up and answering; otherwise the
@@ -171,7 +171,7 @@ export default function HomePage() {
             )}
 
             <Shelf icon="games" title="Games" href="/games" linkLabel="All games">
-              <div className="hub-row">{gamesByFeature.map(renderGame)}</div>
+              {gamesReady ? <div className="hub-row">{gamesByFeature.map(renderGame)}</div> : <SkeletonGrid count={4} />}
             </Shelf>
 
             {youtubeOn && feed.length > 9 && (
@@ -248,7 +248,7 @@ export default function HomePage() {
           </Shelf>
         )}
 
-        {chip === "Games" && <div className="hub-grid">{gamesByFeature.map(renderGame)}</div>}
+        {chip === "Games" && (gamesReady ? <div className="hub-grid">{gamesByFeature.map(renderGame)}</div> : <SkeletonGrid count={8} />)}
       </div>
     </>
   );

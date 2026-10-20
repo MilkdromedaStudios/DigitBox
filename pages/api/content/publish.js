@@ -35,7 +35,8 @@ function slugify(input) {
 export default async function handler(req) {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
   // Publishing writes HTML that is served from this site, so admins only.
-  const auth = await requireAdmin(req);
+  // Uses GitHub/R2, not D1, so hosts without D1 check the account remotely.
+  const auth = await requireAdmin(req, { storage: false });
   if (auth.response) return auth.response;
 
   try {

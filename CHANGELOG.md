@@ -5,6 +5,24 @@ most recent work is at the top.
 
 ## Admin projects
 
+- **Edit, hide or delete the built-in games** from `/admin/projects`, for
+  example to take a game down after a copyright complaint. A deleted game
+  leaves every list, its page answers "not found" and its files stop being
+  served, straight away and without a rebuild. It can be restored. Lists only
+  show built-in games once these changes have loaded, so a deleted game never
+  flashes up.
+- Games are uploaded and loaded in pieces of about 1 MB, which keeps every
+  request inside the Workers Free plan's CPU limit.
+- Extra admins are listed by account ID (`ADMIN_USER_IDS`) instead of email,
+  since signing up doesn't verify emails.
+- **Fixes to added games' saves:** progress survives the game reloading
+  itself, saves made as you leave are kept, and two tabs no longer overwrite
+  each other. `localStorage` behaves like the real thing (`hasOwnProperty`,
+  `instanceof Storage`), and links a game opens work normally.
+- **Other fixes:** a "not found" page for removed games, names in any script,
+  the admin dashboard on deployments without D1, and lists refreshing reliably
+  after changes.
+
 - **Add games from the admin page.** `/admin/projects` creates a project from
   a name, an emoji, a colour theme and its HTML (upload or paste, up to 5 MB),
   with an optional description and genre. It can also edit, test, hide and
@@ -15,7 +33,7 @@ most recent work is at the top.
   cookies or login tokens. Their `localStorage` and cookies still work and
   are saved per game, with a **Reset progress** button.
 - **Admin access is checked on the server:** the site owner, plus accounts
-  listed in `ADMIN_EMAILS`.
+  listed in `ADMIN_USER_IDS`.
 - **Security fixes:** publishing and deleting content (`/api/content/publish`,
   `/api/content/delete`) now requires an admin; before, anyone could call
   them. `/api/content/file` rejects `..` paths. Game saves no longer copy the
