@@ -13,7 +13,7 @@ export default function CloudGamesPage() {
   const [chip, setChip] = useState("All");
 
   const games = useMemo(() => {
-    if (chip === "Liked") return GAMES.filter((game) => likes.includes(likeKey(game)));
+    if (chip === "Saved") return GAMES.filter((game) => likes.includes(likeKey(game)));
     if (chip === "All") return GAMES;
     return GAMES.filter((game) => game.tags.includes(chip));
   }, [chip, likes]);
@@ -29,7 +29,7 @@ export default function CloudGamesPage() {
 
       <div className="hub-page">
         <div className="hub-chips" role="tablist" aria-label="Filter games">
-          {["All", "Liked", ...GAME_TAGS].map((label) => (
+          {["All", "Saved", ...GAME_TAGS].map((label) => (
             <button
               key={label}
               type="button"
@@ -38,7 +38,7 @@ export default function CloudGamesPage() {
               className={"hub-chip" + (chip === label ? " is-active" : "")}
               onClick={() => setChip(label)}
             >
-              {label === "Liked" ? "♥ Liked" : label}
+              {label === "Saved" ? "♥ Saved" : label}
             </button>
           ))}
         </div>
@@ -54,7 +54,7 @@ export default function CloudGamesPage() {
                 <Link href={FEATURED.href} className="hub-pill-btn is-primary"><Icon name="play" size={18} />Play now</Link>
                 <button type="button" className={"hub-pill-btn" + (featuredLiked ? " is-liked" : "")} aria-pressed={featuredLiked} onClick={() => toggleLike(FEATURED)}>
                   <Icon name={featuredLiked ? "heartFill" : "heart"} size={18} />
-                  {featuredLiked ? "Liked" : "Like"}
+                  {featuredLiked ? "Saved" : "Save"}
                 </button>
               </div>
             </div>
@@ -68,7 +68,7 @@ export default function CloudGamesPage() {
         <div className="hub-page-head">
           <div>
             <span className="hub-kicker">CLOUD GAMES</span>
-            <h1>{chip === "All" ? "Play instantly" : chip === "Liked" ? "Your liked games" : chip + " games"}</h1>
+            <h1>{chip === "All" ? "Play instantly" : chip === "Saved" ? "Your saved games" : chip + " games"}</h1>
             <p>Every game loads from the DigitBox cloud and runs right in your browser. No downloads or installs, and most games can autosave on this device.</p>
           </div>
           <span className="hub-count" aria-live="polite">{games.length} {games.length === 1 ? "game" : "games"}</span>
@@ -83,7 +83,7 @@ export default function CloudGamesPage() {
         ) : (
           <div className="hub-empty">
             <Icon name="heart" />
-            <h3>No liked games yet</h3>
+            <h3>No saved games yet</h3>
             <p>Tap the heart on any game to keep it here.</p>
           </div>
         )}

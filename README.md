@@ -9,14 +9,26 @@ and DEEPFORGE) is archived in [`archive/`](archive/README.md).
 
 ## Videos
 
-`/videos`, `/shorts` and `/watch?v=<id>` list uploads from the channels in
-`data/videos.json`. `GET /api/videos` reads each channel's public YouTube RSS
-feed (no API key) and merges in the `videos` array from the same file, so:
+The home page (Recommended, Videos, Shorts, Games), `/videos`, `/shorts`,
+search and `/watch?v=<id>` show YouTube videos through the **YouTube Data API
+v3**, served by `GET /api/youtube` (`lib/youtube.js`). It needs one server-side
+variable, `YOUTUBE_API_KEY`. **[docs/YOUTUBE_API_SETUP.md](docs/YOUTUBE_API_SETUP.md)**
+covers creating the key, where to set it on Cloudflare Pages / Vercel, and
+checking it with `/api/youtube?feed=status`. Without a key, the site shows only
+the DigitBox channel's own videos.
 
-- **Add a channel:** add `{ "id": "UC…", "name": "…", "url": "…" }` to `channels`.
-- **Pin or add a video:** add an entry to `videos` (its `id` is the 11-character
-  YouTube id; set `"short": true` for Shorts). Entries also act as the fallback
-  list if YouTube's feed is unreachable.
+The channel's own uploads (the "From …" section near the bottom of the home
+page) come from `GET /api/videos`. It uses the API when the key is set and the
+public RSS feed otherwise. Edit `data/videos.json` to change it:
+
+- **Featured channel:** `channels` (`{ "id": "UC…", "name": "…", "url": "…" }`).
+- **Fallback list:** `videos` (11-character YouTube ids; `"short": true` for
+  Shorts), shown if YouTube can't be reached.
+
+Responses are cached in Cloudflare's Cache API (`lib/edgeCache.js`) and on
+Vercel's CDN, so normal traffic stays well inside the free daily quota.
+Videos play in YouTube's own player (click to play) with YouTube attribution,
+as YouTube's API policies require. Those policies don't allow removing YouTube's ads.
 
 ## Cloud games
 

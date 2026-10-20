@@ -26,20 +26,40 @@ export default function PrivacyPage() {
           You can watch videos, play cloud games, and read posts without
           creating an account. Game and post files may be read from the
           DigitBox GitHub repository, GitHub release assets, or an optional
-          content bucket used by the deployment. The video list is built from
-          YouTube&apos;s public channel feeds by the DigitBox server.
+          content bucket used by the deployment.
+        </p>
+
+        <h2>YouTube API Services</h2>
+        <p>
+          DigitBox uses YouTube API Services to find and show videos. By
+          watching videos on DigitBox you agree to the{" "}
+          <a className="text-link" href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">
+            YouTube Terms of Service
+          </a>
+          , and Google&apos;s use of data is covered by the{" "}
+          <a className="text-link" href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">
+            Google Privacy Policy
+          </a>
+          .
+        </p>
+        <p>
+          When you search, the DigitBox server sends your search words to
+          YouTube to get matching videos. To show what is trending where you
+          are, it also uses the country your request comes from (not your
+          precise location). DigitBox does not send YouTube your account,
+          email address, or anything that identifies you, and it keeps video
+          details from YouTube only briefly, in a cache, to stay within
+          YouTube&apos;s usage limits.
         </p>
 
         <h2>The video player</h2>
         <p>
           Videos play in YouTube&apos;s embedded player, loaded from
-          youtube-nocookie.com. When you play a video, your browser connects to
-          YouTube, and YouTube may use cookies or similar technologies under
-          {" "}
-          <a className="text-link" href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">
-            Google&apos;s privacy policy
-          </a>
-          . Thumbnails are loaded from YouTube&apos;s image servers.
+          youtube-nocookie.com. The player only loads when you press play.
+          From then on your browser connects to YouTube, and YouTube may show
+          ads and use cookies or similar technologies under Google&apos;s
+          privacy policy. Thumbnails and channel pictures are loaded from
+          YouTube&apos;s image servers.
         </p>
 
         <h2>Accounts and profile preferences</h2>
@@ -115,6 +135,7 @@ export default function PrivacyPage() {
 
         <div className="gallery-actions">
           <Link href="/" className="auth-btn action-btn">Back to DigitBox</Link>
+          <Link href="/terms" className="auth-btn action-btn">Terms</Link>
           <Link href="/about" className="auth-btn action-btn">About DigitBox</Link>
         </div>
       </article>

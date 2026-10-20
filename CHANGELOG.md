@@ -3,6 +3,23 @@
 All notable changes to **digitbox.dev**. This list is grouped by feature; the
 most recent work is at the top.
 
+## YouTube videos
+
+- **Videos from all of YouTube.** With a YouTube Data API key
+  (`YOUTUBE_API_KEY`, see `docs/YOUTUBE_API_SETUP.md`) the site shows popular
+  videos for each visitor's country, Shorts, and YouTube search.
+- **Sections:** the home page is organised as **Recommended** (first),
+  **Videos**, **Shorts** and **Games**. Videos has category filters, such as
+  Gaming and Music, where YouTube has a chart.
+- **The DigitBox channel** has its own section near the bottom of the home page
+  and a chip on the Videos page.
+- Videos show their length, LIVE status and channel picture. Videos whose owners
+  block playback on other sites show a "Watch on YouTube" button instead of a broken player.
+- The watch page loads YouTube's player only when you press play.
+- "Like" is now **Save** (it saves to your Library, not to YouTube). New
+  **Terms** page, and YouTube attribution where videos appear.
+- The DigitBox logo in the header is now the box mark from the favicon.
+
 ## Entertainment hub
 
 DigitBox is now an entertainment site for videos and cloud games instead of a

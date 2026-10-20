@@ -17,15 +17,15 @@ import {
 
 const PRIMARY_LINKS = [
   { href: "/", icon: "home", label: "Home" },
-  { href: "/shorts", icon: "shorts", label: "Shorts" },
-  { href: "/games", icon: "games", label: "Cloud Games" },
   { href: "/videos", icon: "videos", label: "Videos" },
+  { href: "/shorts", icon: "shorts", label: "Shorts" },
+  { href: "/games", icon: "games", label: "Games" },
 ];
 
 const YOU_LINKS = [
   { href: "/library", icon: "user", label: "Library", mobileLabel: "You" },
   { href: "/library#history", icon: "history", label: "History" },
-  { href: "/library#liked", icon: "heart", label: "Liked" },
+  { href: "/library#liked", icon: "heart", label: "Saved" },
 ];
 
 function isActive(pathname, href) {
@@ -171,7 +171,7 @@ export default function Layout({ children }) {
             <Icon name="menu" />
           </button>
           <Link href="/" className="hub-logo" aria-label="DigitBox home">
-            <span className="hub-logo-mark"><Icon name="play" size={16} /></span>
+            <img className="hub-logo-mark" src="/favicon.svg" alt="" width={28} height={28} />
             <span className="hub-logo-word">DigitBox</span>
           </Link>
         </div>
@@ -258,8 +258,14 @@ export default function Layout({ children }) {
           <div>
             <Link href="/about">About</Link>
             <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
             <Link href="/changelog">Changelog</Link>
           </div>
+          <span>
+            Videos are provided by YouTube. By using DigitBox you agree to the{" "}
+            <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube Terms of Service</a>, our{" "}
+            <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy Policy</Link>.
+          </span>
           <span>© {new Date().getFullYear()} digitbox.dev</span>
         </footer>
       </aside>
@@ -272,7 +278,7 @@ export default function Layout({ children }) {
           return (
             <Link key={link.href} href={link.href} className={"hub-tab" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined}>
               <Icon name={link.icon} />
-              <span>{link.mobileLabel || (link.label === "Cloud Games" ? "Games" : link.label)}</span>
+              <span>{link.mobileLabel || link.label}</span>
             </Link>
           );
         })}

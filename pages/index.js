@@ -2,26 +2,37 @@ import Head from "next/head";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
-import { GameCard, PostCard, ShortCard, VideoCard } from "../components/Cards";
-import { GAMES, GAME_TAGS, POSTS, likeKey } from "../lib/catalog";
+import { GameCard, PostCard, ShortCard, SkeletonGrid, VideoCard } from "../components/Cards";
+import { CHANNELS, GAMES, POSTS, channelUrl, likeKey, uniqueVideos } from "../lib/catalog";
 import { formatViews, timeAgo } from "../lib/format";
 import { useLikes } from "../lib/useLikes";
 import { useVideos } from "../lib/useVideos";
+import { useYouTubeFeed } from "../lib/useYouTube";
+import { YouTubeAttribution } from "../components/YouTubeLogo";
 
-const CHIPS = ["All", "Videos", "Shorts", "Cloud Games", ...GAME_TAGS.filter((tag) => tag !== "Scratch"), "Community"];
+const CHIPS = ["Recommended", "Videos", "Shorts", "Games"];
+const CHANNEL = CHANNELS[0];
 
 // Featured games lead the shelf; the rest keep their index order.
 const GAMES_BY_FEATURE = [...GAMES].sort((a, b) => Number(b.featured) - Number(a.featured) || a.order - b.order);
 
-function Shelf({ icon, title, href, linkLabel = "View all", children }) {
+function Shelf({ icon, title, subtitle, href, linkLabel = "View all", action, children }) {
   return (
     <section className="hub-shelf">
       <div className="hub-shelf-head">
-        <h2><Icon name={icon} />{title}</h2>
-        {href && (
-          <Link href={href} className="hub-pill-btn">
-            {linkLabel} <Icon name="chevron" size={16} />
-          </Link>
+        <div>
+          <h2><Icon name={icon} />{title}</h2>
+          {subtitle && <p className="hub-shelf-sub">{subtitle}</p>}
+        </div>
+        {(action || href) && (
+          <div className="hub-shelf-actions">
+            {action}
+            {href && (
+              <Link href={href} className="hub-pill-btn">
+                {linkLabel} <Icon name="chevron" size={16} />
+              </Link>
+            )}
+          </div>
         )}
       </div>
       {children}
@@ -29,12 +40,12 @@ function Shelf({ icon, title, href, linkLabel = "View all", children }) {
   );
 }
 
-function Spotlight({ video }) {
+function Spotlight({ video, kicker }) {
   if (!video) return null;
   return (
     <section className="hub-spotlight" aria-label="Featured video">
       <div className="hub-spotlight-copy">
-        <span className="hub-kicker">NEW ON DIGITBOX</span>
+        <span className="hub-kicker">{kicker}</span>
         <h1>{video.title}</h1>
         <div className="hub-spotlight-meta">
           {video.channel}
@@ -42,10 +53,10 @@ function Spotlight({ video }) {
           {video.published ? " • " : ""}
           <span suppressHydrationWarning>{timeAgo(video.published)}</span>
         </div>
-        <p>{video.description || "The latest upload from " + video.channel + ", playing right here on DigitBox."}</p>
+        <p>{video.description || "Playing right here on DigitBox."}</p>
         <div className="hub-spotlight-actions">
           <Link href={video.href} className="hub-pill-btn is-primary"><Icon name="play" size={18} />Watch now</Link>
-          <Link href="/games" className="hub-pill-btn"><Icon name="games" size={18} />Play cloud games</Link>
+          <Link href="/games" className="hub-pill-btn"><Icon name="games" size={18} />Play games</Link>
         </div>
       </div>
       <Link href={video.href} className="hub-spotlight-media" aria-label={"Watch " + video.title}>
@@ -56,34 +67,62 @@ function Spotlight({ video }) {
   );
 }
 
-export default function HomePage() {
-  const videos = useVideos();
-  const [likes, toggleLike] = useLikes();
-  const [chip, setChip] = useState("All");
+function SpotlightSkeleton() {
+  return (
+    <section className="hub-spotlight" aria-hidden="true">
+      <div className="hub-spotlight-copy">
+        <span className="skeleton-line is-short" />
+        <span className="skeleton-line" style={{ height: 34 }} />
+        <span className="skeleton-line" />
+      </div>
+      <span className="hub-spotlight-media skeleton" />
+    </section>
+  );
+}
 
-  const longVideos = useMemo(() => videos.filter((video) => !video.short), [videos]);
-  const shorts = useMemo(() => videos.filter((video) => video.short), [videos]);
-  const minecraftGames = GAMES_BY_FEATURE.filter((game) => game.tags.includes("Minecraft"));
+function MoreButton({ feed, label = "Show more" }) {
+  if (!feed.hasMore) return null;
+  return (
+    <div className="hub-more">
+      <button type="button" className="hub-pill-btn" onClick={feed.loadMore} disabled={feed.loading}>
+        {feed.loading ? "Loading…" : label}
+      </button>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  const [chip, setChip] = useState("Recommended");
+  const [likes, toggleLike] = useLikes();
+  const ownVideos = useVideos();
+  const recommended = useYouTubeFeed("recommended");
+  const ytShorts = useYouTubeFeed("shorts", {}, { enabled: chip === "Recommended" || chip === "Shorts" });
+  const popular = useYouTubeFeed("videos", {}, { enabled: chip === "Videos" });
+
+  const ownLong = useMemo(() => ownVideos.filter((video) => !video.short), [ownVideos]);
+  const ownShorts = useMemo(() => ownVideos.filter((video) => video.short), [ownVideos]);
+
+  // YouTube feeds when the API key is set up and answering; otherwise the
+  // channel's own uploads, so the page is never empty.
+  const youtubeOn = recommended.videos.length > 0;
+  const waiting = recommended.loading && !youtubeOn;
+  const feed = youtubeOn ? recommended.videos : ownLong;
+  const shorts = uniqueVideos(ytShorts.videos, ownShorts);
+  const popularList = popular.videos.length ? popular.videos.filter((video) => !video.short) : popular.loading ? [] : ownLong;
 
   const renderGame = (game) => (
     <GameCard key={game.key} game={game} liked={likes.includes(likeKey(game))} onToggleLike={toggleLike} />
   );
 
-  let filtered = null;
-  if (chip === "Videos") filtered = longVideos.map((video) => <VideoCard key={video.key} video={video} />);
-  else if (chip === "Cloud Games") filtered = GAMES_BY_FEATURE.map(renderGame);
-  else if (chip === "Community") filtered = POSTS.map((post) => <PostCard key={post.key} post={post} />);
-  else if (chip !== "All" && chip !== "Shorts") filtered = GAMES_BY_FEATURE.filter((game) => game.tags.includes(chip)).map(renderGame);
-
   return (
     <>
       <Head>
-        <title>DigitBox — Videos &amp; Cloud Games</title>
-        <meta name="description" content="Watch videos and play cloud games in your browser. No downloads, no installs: DigitBox entertainment." />
+        <title>DigitBox — Videos, Shorts &amp; Games</title>
+        <meta name="description" content="Watch videos and Shorts and play cloud games in your browser. No downloads, no installs: DigitBox entertainment." />
       </Head>
 
       <div className="hub-page">
-        <div className="hub-chips" role="tablist" aria-label="Browse by category">
+        <div className="hub-chips" role="tablist" aria-label="Sections">
           {CHIPS.map((label) => (
             <button
               key={label}
@@ -98,31 +137,55 @@ export default function HomePage() {
           ))}
         </div>
 
-        {chip === "All" && (
+        {chip === "Recommended" && (
           <>
-            <Spotlight video={longVideos[0]} />
+            {waiting ? <SpotlightSkeleton /> : <Spotlight video={feed[0]} kicker={youtubeOn ? "RECOMMENDED" : "NEW ON DIGITBOX"} />}
 
-            <Shelf icon="games" title="Cloud Games" href="/games" linkLabel="All games">
-              <div className="hub-row">{GAMES_BY_FEATURE.map(renderGame)}</div>
+            <Shelf icon="videos" title="Recommended" href="/videos" linkLabel="All videos" action={<YouTubeAttribution />}>
+              {waiting ? (
+                <SkeletonGrid count={8} />
+              ) : (
+                <div className="hub-grid">{feed.slice(1, 9).map((video) => <VideoCard key={video.key} video={video} />)}</div>
+              )}
             </Shelf>
 
-            <Shelf icon="videos" title="Latest videos" href="/videos">
-              <div className="hub-grid">
-                {longVideos.slice(0, 8).map((video) => <VideoCard key={video.key} video={video} />)}
-              </div>
-            </Shelf>
-
-            {shorts.length > 0 && (
-              <Shelf icon="shorts" title="Shorts" href="/shorts" linkLabel="Watch Shorts">
+            {(shorts.length > 0 || ytShorts.loading) && (
+              <Shelf icon="shorts" title="Shorts" href="/shorts" linkLabel="Watch Shorts" action={<YouTubeAttribution label="Shorts from" />}>
                 <div className="hub-row hub-row-shorts">
-                  {shorts.map((video) => <ShortCard key={video.key} video={video} />)}
+                  {shorts.length
+                    ? shorts.slice(0, 12).map((video) => <ShortCard key={video.key} video={video} />)
+                    : Array.from({ length: 6 }, (_, index) => <span key={index} className="short-card skeleton" />)}
                 </div>
               </Shelf>
             )}
 
-            {minecraftGames.length > 0 && (
-              <Shelf icon="cloud" title="Minecraft in your browser">
-                <div className="hub-row">{minecraftGames.map(renderGame)}</div>
+            <Shelf icon="games" title="Games" href="/games" linkLabel="All games">
+              <div className="hub-row">{GAMES_BY_FEATURE.map(renderGame)}</div>
+            </Shelf>
+
+            {youtubeOn && feed.length > 9 && (
+              <Shelf icon="videos" title="More to watch" href="/videos" linkLabel="All videos" action={<YouTubeAttribution />}>
+                <div className="hub-grid">{feed.slice(9, 21).map((video) => <VideoCard key={video.key} video={video} />)}</div>
+              </Shelf>
+            )}
+
+            {youtubeOn && CHANNEL && (ownLong.length > 0 || ownShorts.length > 0) && (
+              <Shelf
+                icon="user"
+                title={"From " + CHANNEL.name}
+                subtitle="DigitBox's own channel"
+                action={
+                  <>
+                    <YouTubeAttribution href={channelUrl(CHANNEL.id)} label="Channel on" />
+                    <a className="hub-pill-btn is-inverse" href={channelUrl(CHANNEL.id) + "?sub_confirmation=1"} target="_blank" rel="noopener noreferrer">
+                      Subscribe
+                    </a>
+                  </>
+                }
+              >
+                <div className="hub-channel-card">
+                  <div className="hub-row">{uniqueVideos(ownLong, ownShorts).map((video) => <VideoCard key={video.key} video={video} />)}</div>
+                </div>
               </Shelf>
             )}
 
@@ -146,23 +209,29 @@ export default function HomePage() {
           </>
         )}
 
-        {chip === "Shorts" && (
-          shorts.length > 0 ? (
-            <div className="hub-grid hub-grid-shorts">
-              {shorts.map((video) => <ShortCard key={video.key} video={video} />)}
-            </div>
+        {chip === "Videos" &&
+          (popular.loading && !popular.videos.length ? (
+            <SkeletonGrid count={12} />
           ) : (
-            <div className="hub-empty"><Icon name="shorts" /><h3>No Shorts yet</h3><p>New Shorts from the channel will show up here.</p></div>
-          )
-        )}
+            <>
+              <div className="hub-grid">{popularList.map((video) => <VideoCard key={video.key} video={video} />)}</div>
+              <MoreButton feed={popular} />
+            </>
+          ))}
 
-        {filtered && (
-          filtered.length > 0 ? (
-            <div className={"hub-grid" + (chip === "Community" ? " hub-grid-posts" : "")}>{filtered}</div>
+        {chip === "Shorts" &&
+          (shorts.length > 0 ? (
+            <>
+              <div className="hub-grid hub-grid-shorts">{shorts.map((video) => <ShortCard key={video.key} video={video} />)}</div>
+              <MoreButton feed={ytShorts} />
+            </>
+          ) : ytShorts.loading ? (
+            <SkeletonGrid count={10} shorts />
           ) : (
-            <div className="hub-empty"><Icon name="search" /><h3>Nothing here yet</h3><p>Try another category.</p></div>
-          )
-        )}
+            <div className="hub-empty"><Icon name="shorts" /><h3>No Shorts yet</h3><p>Check back soon.</p></div>
+          ))}
+
+        {chip === "Games" && <div className="hub-grid">{GAMES_BY_FEATURE.map(renderGame)}</div>}
       </div>
     </>
   );

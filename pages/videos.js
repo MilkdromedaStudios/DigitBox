@@ -1,66 +1,110 @@
 import Head from "next/head";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "../components/Icon";
-import { ShortCard, VideoCard } from "../components/Cards";
-import { CHANNELS } from "../lib/catalog";
+import { SkeletonGrid, VideoCard } from "../components/Cards";
+import { CHANNELS, YOUTUBE_CATEGORIES, channelUrl } from "../lib/catalog";
 import { useVideos } from "../lib/useVideos";
+import { useYouTubeFeed } from "../lib/useYouTube";
+import { YouTubeAttribution } from "../components/YouTubeLogo";
 
-const CHIPS = ["Latest", "Most viewed", "Shorts"];
+const CHANNEL = CHANNELS[0];
+const CHANNEL_CHIP = "channel";
+const POPULAR = { id: "", label: "Popular" };
+
+// Only categories YouTube currently has a chart for (they vary by country).
+let categoryCache = null;
+function useCategories() {
+  const [categories, setCategories] = useState(categoryCache || []);
+  useEffect(() => {
+    if (categoryCache) return undefined;
+    let active = true;
+    fetch("/api/youtube?feed=categories")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        const ids = new Set((body?.categories || []).map((category) => category.id));
+        categoryCache = YOUTUBE_CATEGORIES.filter((category) => ids.has(category.id));
+        if (active) setCategories(categoryCache);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  return categories;
+}
 
 export default function VideosPage() {
-  const videos = useVideos();
-  const [chip, setChip] = useState("Latest");
-  const channel = CHANNELS[0];
+  const [chip, setChip] = useState("");
+  const categories = useCategories();
+  const chips = [POPULAR, ...categories, ...(CHANNEL ? [{ id: CHANNEL_CHIP, label: CHANNEL.name }] : [])];
+  const ownVideos = useVideos();
+  const onChannel = chip === CHANNEL_CHIP;
+  const feed = useYouTubeFeed("videos", { category: chip }, { enabled: !onChannel });
 
-  const list = useMemo(() => {
-    if (chip === "Shorts") return videos.filter((video) => video.short);
-    const longForm = videos.filter((video) => !video.short);
-    if (chip === "Most viewed") return [...longForm].sort((a, b) => (b.views || 0) - (a.views || 0));
-    return longForm;
-  }, [videos, chip]);
+  const ownLong = useMemo(() => ownVideos.filter((video) => !video.short), [ownVideos]);
+  // Before the API key is set up (or if YouTube is unavailable) the page
+  // shows the channel's uploads instead of an empty grid.
+  const youtubeOff = feed.configured === false || (Boolean(feed.error) && !feed.videos.length && !feed.loading);
+  const showChannel = onChannel || youtubeOff;
+  const list = showChannel ? ownLong : feed.videos.filter((video) => !video.short);
+  const label = showChannel ? (CHANNEL ? CHANNEL.name : "Videos") : chips.find((item) => item.id === chip)?.label || "Popular";
 
   return (
     <>
       <Head>
         <title>Videos - DigitBox</title>
-        <meta name="description" content="Watch the latest DigitBox videos and Shorts, updated automatically from the channel." />
+        <meta name="description" content="Popular videos across gaming, music, movies and more, plus uploads from the DigitBox channel." />
       </Head>
 
       <div className="hub-page">
-        <div className="hub-chips" role="tablist" aria-label="Sort videos">
-          {CHIPS.map((label) => (
-            <button
-              key={label}
-              type="button"
-              role="tab"
-              aria-selected={chip === label}
-              className={"hub-chip" + (chip === label ? " is-active" : "")}
-              onClick={() => setChip(label)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {feed.configured !== false && (
+          <div className="hub-chips" role="tablist" aria-label="Video categories">
+            {chips.map((item) => (
+              <button
+                key={item.id || "popular"}
+                type="button"
+                role="tab"
+                aria-selected={chip === item.id}
+                className={"hub-chip" + (chip === item.id ? " is-active" : "")}
+                onClick={() => setChip(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="hub-page-head">
           <div>
             <span className="hub-kicker">VIDEOS</span>
-            <h1>{chip === "Shorts" ? "Shorts" : "Videos"}</h1>
-            <p>New uploads from {channel ? channel.name : "the channel"} appear here automatically.</p>
+            <h1>{label}</h1>
+            <p>{showChannel ? "Uploads from DigitBox's own channel." : "What's popular on YouTube right now."}</p>
           </div>
-          {channel && (
-            <a className="hub-pill-btn is-inverse" href={channel.url + "?sub_confirmation=1"} target="_blank" rel="noopener noreferrer">
-              Subscribe on YouTube
-            </a>
-          )}
+          <div className="hub-shelf-actions">
+            <YouTubeAttribution href={showChannel && CHANNEL ? channelUrl(CHANNEL.id) : undefined} />
+            {showChannel && CHANNEL && (
+              <a className="hub-pill-btn is-inverse" href={channelUrl(CHANNEL.id) + "?sub_confirmation=1"} target="_blank" rel="noopener noreferrer">
+                Subscribe
+              </a>
+            )}
+          </div>
         </div>
 
-        {list.length === 0 ? (
-          <div className="hub-empty"><Icon name="videos" /><h3>No videos yet</h3><p>New uploads will show up here.</p></div>
-        ) : chip === "Shorts" ? (
-          <div className="hub-grid hub-grid-shorts">{list.map((video) => <ShortCard key={video.key} video={video} />)}</div>
+        {!showChannel && feed.loading && !feed.videos.length ? (
+          <SkeletonGrid count={12} />
+        ) : list.length === 0 ? (
+          <div className="hub-empty"><Icon name="videos" /><h3>Nothing here right now</h3><p>Try another category.</p></div>
         ) : (
-          <div className="hub-grid">{list.map((video) => <VideoCard key={video.key} video={video} />)}</div>
+          <>
+            <div className="hub-grid">{list.map((video) => <VideoCard key={video.key} video={video} />)}</div>
+            {!showChannel && feed.hasMore && (
+              <div className="hub-more">
+                <button type="button" className="hub-pill-btn" onClick={feed.loadMore} disabled={feed.loading}>
+                  {feed.loading ? "Loading…" : "Show more"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </>
