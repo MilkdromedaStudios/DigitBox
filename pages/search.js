@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import { CatalogCard, SkeletonGrid } from "../components/Cards";
 import { CHANNELS, channelUrl, likeKey, searchCatalog } from "../lib/catalog";
+import { useAllGames } from "../lib/useHubProjects";
 import { useLikes } from "../lib/useLikes";
 import { useVideos } from "../lib/useVideos";
 import { useYouTubeFeed } from "../lib/useYouTube";
@@ -31,7 +32,8 @@ export default function SearchPage() {
   // YouTube's policies don't allow other content to be mixed into YouTube
   // results, so DigitBox's games and posts, and the channel's own uploads,
   // each get their own section.
-  const matches = useMemo(() => searchCatalog(query, ownVideos), [query, ownVideos]);
+  const allGames = useAllGames();
+  const matches = useMemo(() => searchCatalog(query, ownVideos, allGames), [query, ownVideos, allGames]);
   const local = matches.filter((item) => item.kind !== "video");
   const localShown = kind === "all" ? local : local.filter((item) => item.kind === kind);
   const ownMatches = matches.filter((item) => item.kind === "video");

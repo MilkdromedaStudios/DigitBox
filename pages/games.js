@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import { GameCard, GameCover } from "../components/Cards";
-import { GAMES, GAME_TAGS, likeKey } from "../lib/catalog";
+import { GAMES, gameTags, likeKey } from "../lib/catalog";
+import { useAllGames } from "../lib/useHubProjects";
 import { useLikes } from "../lib/useLikes";
 
 const FEATURED = GAMES.find((game) => game.featured) || GAMES[0];
@@ -11,12 +12,14 @@ const FEATURED = GAMES.find((game) => game.featured) || GAMES[0];
 export default function CloudGamesPage() {
   const [likes, toggleLike] = useLikes();
   const [chip, setChip] = useState("All");
+  const allGames = useAllGames();
+  const tags = useMemo(() => gameTags(allGames), [allGames]);
 
   const games = useMemo(() => {
-    if (chip === "Saved") return GAMES.filter((game) => likes.includes(likeKey(game)));
-    if (chip === "All") return GAMES;
-    return GAMES.filter((game) => game.tags.includes(chip));
-  }, [chip, likes]);
+    if (chip === "Saved") return allGames.filter((game) => likes.includes(likeKey(game)));
+    if (chip === "All") return allGames;
+    return allGames.filter((game) => game.tags.includes(chip));
+  }, [chip, likes, allGames]);
 
   const featuredLiked = FEATURED ? likes.includes(likeKey(FEATURED)) : false;
 
@@ -29,7 +32,7 @@ export default function CloudGamesPage() {
 
       <div className="hub-page">
         <div className="hub-chips" role="tablist" aria-label="Filter games">
-          {["All", "Saved", ...GAME_TAGS].map((label) => (
+          {["All", "Saved", ...tags].map((label) => (
             <button
               key={label}
               type="button"

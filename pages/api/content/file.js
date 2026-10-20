@@ -96,6 +96,12 @@ export default async function handler(req) {
     if (!filePath.startsWith("public/projects/") && !filePath.startsWith("public/posts/")) {
       return jsonResponse({ error: "Invalid path" }, 400);
     }
+    // "..", backslashes or encoded slashes could walk out of these folders
+    // (e.g. to another repo on raw.githubusercontent.com) once the path is
+    // put in a URL.
+    if (filePath.split("/").some((part) => part === ".." || part === ".") || /[\\%]/.test(filePath)) {
+      return jsonResponse({ error: "Invalid path" }, 400);
+    }
 
     // Serve from the Cloudflare R2 bucket first when it is configured (free
     // egress, no LFS bandwidth), then from the GitHub release that holds the

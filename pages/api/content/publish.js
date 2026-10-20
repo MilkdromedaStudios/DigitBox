@@ -1,6 +1,7 @@
 import { upsertRepoFile } from "../../../lib/githubContent";
 import { jsonResponse } from "../../../lib/apiResponse";
 import { getContentBucket, toR2Key } from "../../../lib/r2";
+import { requireAdmin } from "../../../lib/serverAuth";
 import postsIndex from "../../../data/posts-index.json";
 import projectsIndex from "../../../data/projects-index.json";
 
@@ -33,6 +34,9 @@ function slugify(input) {
 
 export default async function handler(req) {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  // Publishing writes HTML that is served from this site, so admins only.
+  const auth = await requireAdmin(req);
+  if (auth.response) return auth.response;
 
   try {
     const { type, title, html, markdown } = (await req.json().catch(() => null)) || {};

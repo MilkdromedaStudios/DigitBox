@@ -3,23 +3,24 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../components/Icon";
 import { CatalogCard } from "../components/Cards";
-import { GAMES, likeKey, normalizeVideo } from "../lib/catalog";
+import { likeKey, normalizeVideo } from "../lib/catalog";
 import { HISTORY_UPDATED_EVENT, clearHistory, readHistory } from "../lib/history";
 import { readNotes, writeNotes } from "../lib/notes";
+import { useAllGames } from "../lib/useHubProjects";
 import { useLikes } from "../lib/useLikes";
 import { useVideos } from "../lib/useVideos";
 import { findLoadedVideo, lookupYouTube } from "../lib/useYouTube";
 import { YouTubeAttribution } from "../components/YouTubeLogo";
 
 // Resolve a stored "video:<id>" / "game:<slug>" key back to a catalog item.
-function resolve(key, title, videos, lookedUp) {
+function resolve(key, title, videos, lookedUp, games) {
   const [kind, ...rest] = String(key).split(":");
   const id = rest.join(":");
   if (kind === "video") {
     return videos.find((video) => video.id === id) || lookedUp.get(id) || findLoadedVideo(id) || normalizeVideo({ id, title });
   }
-  if (kind === "game") return GAMES.find((game) => game.slug === id) || null;
-  return GAMES.find((game) => game.slug === key) || null;
+  if (kind === "game") return games.find((game) => game.slug === id) || null;
+  return games.find((game) => game.slug === key) || null;
 }
 
 // Videos and games in separate groups, so the YouTube attribution sits right
@@ -62,6 +63,7 @@ function Section({ id, icon, title, action, children }) {
 
 export default function LibraryPage() {
   const videos = useVideos();
+  const allGames = useAllGames();
   const [likes, toggleLike] = useLikes();
   const [history, setHistory] = useState([]);
   const [notes, setNotes] = useState("");
@@ -109,12 +111,12 @@ export default function LibraryPage() {
   }, [history, likes, videos]);
 
   const historyItems = useMemo(
-    () => history.map((entry) => resolve(entry.key, entry.title, videos, lookedUp)).filter(Boolean),
-    [history, videos, lookedUp]
+    () => history.map((entry) => resolve(entry.key, entry.title, videos, lookedUp, allGames)).filter(Boolean),
+    [history, videos, lookedUp, allGames]
   );
   const likedItems = useMemo(
-    () => likes.map((key) => resolve(key, "", videos, lookedUp)).filter(Boolean),
-    [likes, videos, lookedUp]
+    () => likes.map((key) => resolve(key, "", videos, lookedUp, allGames)).filter(Boolean),
+    [likes, videos, lookedUp, allGames]
   );
 
   const card = (item) => (
