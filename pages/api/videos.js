@@ -46,11 +46,12 @@ function parseFeed(xml, channel) {
 }
 
 // YouTube's feed endpoint intermittently answers 404/500 for channels that
-// exist, so give each channel a few attempts before falling back.
+// exist, so give each channel a few attempts, spaced out a little.
 async function fetchChannel(channel) {
   const url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + encodeURIComponent(channel.id);
   let lastError = null;
   for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
     try {
       const response = await fetch(url, { headers: { Accept: "application/atom+xml, application/xml;q=0.9" } });
       if (response.ok) return parseFeed(await response.text(), channel);
@@ -62,11 +63,62 @@ async function fetchChannel(channel) {
   throw lastError;
 }
 
-export default async function handler(req) {
-  if (req.method !== "GET") return jsonResponse({ error: "Method not allowed" }, 405);
+// The last good feed, kept in the Cloudflare Cache API: served as-is while
+// fresh, and in place of the stored list when YouTube is failing. Cloudflare
+// doesn't cache function responses from Cache-Control alone, so without this
+// every visitor would hit the flaky feed. Where there is no Cache API (e.g.
+// Vercel) these are no-ops.
+const FEED_CACHE_KEY = "https://digitbox.dev/__cache/api-videos-feed-v1";
+const FRESH_MS = 15 * 60 * 1000;
+
+function feedCache() {
+  try {
+    return globalThis.caches && globalThis.caches.default ? globalThis.caches.default : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readFeedCache() {
+  try {
+    const hit = await feedCache()?.match(FEED_CACHE_KEY);
+    const body = hit ? await hit.json() : null;
+    return body && Array.isArray(body.videos) && body.videos.length ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeFeedCache(videos) {
+  try {
+    await feedCache()?.put(
+      FEED_CACHE_KEY,
+      new Response(JSON.stringify({ videos, fetchedAt: Date.now() }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=604800" },
+      })
+    );
+  } catch {
+    /* caching is best-effort */
+  }
+}
+
+async function liveVideos() {
+  const cached = await readFeedCache();
+  if (cached && Date.now() - cached.fetchedAt < FRESH_MS) return cached.videos;
 
   const results = await Promise.allSettled(videoData.channels.map(fetchChannel));
   const live = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+  if (live.length) {
+    await writeFeedCache(live);
+    return live;
+  }
+  return cached ? cached.videos : [];
+}
+
+export default async function handler(req) {
+  if (req.method !== "GET") return jsonResponse({ error: "Method not allowed" }, 405);
+
+  const live = await liveVideos();
 
   // Live data first so fresh titles/view counts win over the stored copy.
   const byId = new Map();
