@@ -28,7 +28,7 @@ export default function CloudGamesPage() {
     <>
       <Head>
         <title>Cloud Games - DigitBox</title>
-        <meta name="description" content="Play DigitBox cloud games instantly in your browser: Eaglercraft, Bedwars, 3D Scratch games and more. No downloads." />
+        <meta name="description" content="Play DigitBox cloud games instantly in your browser, from 3D adventures to Scratch games. No downloads." />
       </Head>
 
       <div className="hub-page">

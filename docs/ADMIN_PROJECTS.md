@@ -56,12 +56,13 @@ The **Built-in games** section lists the games DigitBox ships with (from
 - **Edit** changes the name, emoji, colour, description and genre. The game's
   files stay as they are. **Reset to original** undoes every change.
 - **Hide** takes the game off the site until you **Show** it again.
-- **Delete** takes the game down at once, for example for a copyright
-  complaint:
+- **Delete** takes the game down within a few seconds, for example for a
+  copyright complaint:
   - it leaves every list, including search and the Library;
   - its page answers "not found";
   - its game files (`/api/content/file`, `/api/projects/…`,
-    `/api/project-file/…`) stop being served.
+    `/api/project-file/…`) stop being served, whatever folder, case or
+    spelling of the file name a link uses.
 
   A deleted game stays in the admin list with **Restore**.
 
