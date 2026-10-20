@@ -1,4 +1,6 @@
 import { jsonResponse } from "../../../lib/apiResponse";
+import { isBlockedFile } from "../../../lib/hubProjects";
+import { getD1 } from "../../../lib/serverAuth";
 import { getContentBucket, toR2Key, r2PublicUrlForKey } from "../../../lib/r2";
 import { isGitLfsPointer } from "../../../lib/r2Content";
 import { fetchGithubReleaseAsset } from "../../../lib/githubAssets";
@@ -102,6 +104,8 @@ export default async function handler(req) {
     if (filePath.split("/").some((part) => part === ".." || part === ".") || /[\\%]/.test(filePath)) {
       return jsonResponse({ error: "Invalid path" }, 400);
     }
+    // A game deleted or hidden from the admin page (lib/hubProjects.js).
+    if (await isBlockedFile(getD1(), filePath)) return jsonResponse({ error: "This game isn't available." }, 404);
 
     // Serve from the Cloudflare R2 bucket first when it is configured (free
     // egress, no LFS bandwidth), then from the GitHub release that holds the

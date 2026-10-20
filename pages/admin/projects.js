@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "../../components/Icon";
 import { GameCard, GameCover } from "../../components/Cards";
-import { SandboxedGame } from "../../components/HubProjectFrame";
+import { SandboxedGame, fetchProjectHtml } from "../../components/HubProjectFrame";
 import { getCloudAuthToken } from "../../lib/account";
 import { toHubGame } from "../../lib/catalog";
 import {
@@ -14,24 +14,26 @@ import {
   MAX_NAME_LENGTH,
   THEME_PRESETS,
   formatBytes,
-  slugify,
+  projectSlug,
+  splitText,
   utf8Bytes,
   validateProjectFields,
 } from "../../lib/projectRules";
 import { refreshHubProjects } from "../../lib/useHubProjects";
 
 // /admin/projects: add, edit, hide and delete the projects (cloud games)
-// shown across DigitBox. Every change is checked on the server too
-// (lib/serverAuth.js); this page only decides what to show.
+// shown across DigitBox, both the ones added here and the built-in ones.
+// Every change is checked on the server too (lib/serverAuth.js); this page
+// only decides what to show.
+
+function authHeaders(extra) {
+  return { Authorization: "Bearer " + getCloudAuthToken(), ...extra };
+}
 
 async function adminApi(path, { method = "GET", json, body, headers } = {}) {
   const response = await fetch("/api/admin/" + path, {
     method,
-    headers: {
-      Authorization: "Bearer " + getCloudAuthToken(),
-      ...(json !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...headers,
-    },
+    headers: authHeaders({ ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...headers }),
     body: json !== undefined ? JSON.stringify(json) : body,
   });
   const payload = await response.json().catch(() => ({}));
@@ -39,10 +41,35 @@ async function adminApi(path, { method = "GET", json, body, headers } = {}) {
     const error = new Error(payload.error || "Something went wrong. Try again.");
     error.status = response.status;
     error.code = payload.code;
+    error.userId = payload.userId;
     error.fields = payload.fields || {};
     throw error;
   }
   return payload;
+}
+
+function randomUploadId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// Upload HTML piece by piece (see lib/hubProjects.js); the last piece swaps
+// it in. Each piece is retried once if the connection drops.
+async function uploadHtml(slug, html, onProgress) {
+  const parts = splitText(html);
+  const upload = randomUploadId();
+  let project = null;
+  for (let part = 0; part < parts.length; part += 1) {
+    onProgress(part, parts.length);
+    const path = "projects/" + encodeURIComponent(slug) + "/html?upload=" + upload + "&part=" + part + "&parts=" + parts.length;
+    const send = () => adminApi(path, { method: "PUT", body: parts[part], headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    const result = await send().catch((error) => (error.status ? Promise.reject(error) : send()));
+    if (result.project) project = result.project;
+  }
+  return project;
+}
+
+function loadCurrentHtml(slug, parts) {
+  return fetchProjectHtml("/api/admin/projects/" + encodeURIComponent(slug) + "/html", parts, "", { headers: authHeaders() });
 }
 
 const EMPTY_FORM = { name: "", emoji: "🎮", hue: THEME_PRESETS[0].hue, description: "", genre: "", visible: true };
@@ -63,15 +90,18 @@ function Field({ label, hint, error, htmlFor, children }) {
   );
 }
 
-function ProjectEditor({ project, onDone, onCancel }) {
-  const isNew = !project;
-  const [form, setForm] = useState(() => formFrom(project));
+// Editor for an added project (`project`, or a new one when null) or a
+// built-in game (`builtIn`), which keeps its own files: no HTML section.
+function ProjectEditor({ project, builtIn, onDone, onCancel }) {
+  const item = project || builtIn;
+  const isNew = !item;
+  const [form, setForm] = useState(() => formFrom(item));
   const [htmlMode, setHtmlMode] = useState(isNew ? "file" : "keep");
   const [htmlText, setHtmlText] = useState("");
   const [fileName, setFileName] = useState("");
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState("");
   const [preview, setPreview] = useState(null);
 
   const set = (field) => (event) => {
@@ -80,12 +110,12 @@ function ProjectEditor({ project, onDone, onCancel }) {
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const slug = project ? project.slug : slugify(form.name);
+  const slug = item ? item.slug : projectSlug(form.name);
   const previewGame = useMemo(
     () => toHubGame({ slug: slug || "new-project", name: form.name.trim() || "Project name", emoji: form.emoji || "🎮", hue: Number(form.hue), description: form.description, genre: form.genre }),
     [slug, form]
   );
-  const replacingHtml = htmlMode === "file" || htmlMode === "paste";
+  const replacingHtml = !builtIn && (htmlMode === "file" || htmlMode === "paste");
   const htmlBytes = replacingHtml ? utf8Bytes(htmlText) : 0;
 
   async function onFile(event) {
@@ -104,6 +134,10 @@ function ProjectEditor({ project, onDone, onCancel }) {
 
   async function showPreview() {
     setMessage("");
+    if (builtIn) {
+      window.open(builtIn.href, "_blank", "noopener");
+      return;
+    }
     if (replacingHtml) {
       if (!htmlText.trim()) {
         setErrors((current) => ({ ...current, html: "Add the game's HTML first." }));
@@ -113,13 +147,26 @@ function ProjectEditor({ project, onDone, onCancel }) {
       return;
     }
     try {
-      const response = await fetch("/api/admin/projects/" + encodeURIComponent(project.slug) + "/html", {
-        headers: { Authorization: "Bearer " + getCloudAuthToken() },
-      });
-      if (!response.ok) throw new Error();
-      setPreview(await response.text());
+      setPreview(await loadCurrentHtml(project.slug, project.htmlParts));
     } catch {
       setMessage("Couldn't load the current game to preview.");
+    }
+  }
+
+  async function saveBuiltIn(fields) {
+    const { change } = await adminApi("builtins/" + encodeURIComponent(builtIn.slug), { method: "PATCH", json: fields });
+    refreshHubProjects();
+    onDone({ ...builtIn, name: fields.name || builtIn.name }, change === null ? "reset" : "saved");
+  }
+
+  async function resetBuiltIn() {
+    if (!window.confirm(`Undo every change to ${builtIn.original.name}? Its name, emoji, colour, description and genre go back to the originals, and it's shown again.`)) return;
+    setSaving("Resetting…");
+    try {
+      await saveBuiltIn({ reset: true });
+    } catch (error) {
+      setMessage(error.message);
+      setSaving("");
     }
   }
 
@@ -135,41 +182,51 @@ function ProjectEditor({ project, onDone, onCancel }) {
       return;
     }
 
-    setSaving(true);
-    let saved = project;
+    setSaving("Saving…");
+    if (builtIn) {
+      try {
+        await saveBuiltIn(checked.value);
+      } catch (error) {
+        setErrors(error.fields || {});
+        setMessage(error.message);
+        setSaving("");
+      }
+      return;
+    }
+
+    let saved = null;
     try {
       saved = isNew
         ? (await adminApi("projects", { method: "POST", json: checked.value })).project
         : (await adminApi("projects/" + encodeURIComponent(project.slug), { method: "PATCH", json: checked.value })).project;
       if (replacingHtml) {
-        saved = (
-          await adminApi("projects/" + encodeURIComponent(saved.slug) + "/html", {
-            method: "PUT",
-            body: htmlText,
-            headers: { "Content-Type": "text/html; charset=utf-8" },
-          })
-        ).project;
+        saved = await uploadHtml(saved.slug, htmlText, (part, parts) => setSaving(parts > 1 ? `Uploading ${part + 1} of ${parts}…` : "Uploading…"));
       }
       refreshHubProjects();
       onDone(saved, isNew ? "added" : "saved");
     } catch (error) {
-      setErrors(error.fields || {});
-      // A new project whose HTML failed to upload still exists: keep editing it.
-      if (isNew && saved && saved.slug) {
+      if (saved) {
+        // The details were saved; only the HTML upload failed.
         refreshHubProjects();
         onDone(saved, "html-failed", error.message);
         return;
       }
+      setErrors(error.fields || {});
       setMessage(error.message);
-    } finally {
-      setSaving(false);
+      setSaving("");
     }
   }
 
   return (
     <form className="admin-editor" onSubmit={save} noValidate>
       <div className="admin-editor-main">
-        <Field label="Name" htmlFor="project-name" error={errors.name} hint={project ? "Its address stays /projects/" + project.slug : slug ? "Address: /projects/" + slug : ""}>
+        {builtIn && (
+          <p className="admin-message">
+            A built-in game: you can change how it&apos;s shown here. Its game files stay as they are; to swap the game itself, delete this one and add a new project.
+          </p>
+        )}
+
+        <Field label="Name" htmlFor="project-name" error={errors.name} hint={item ? "Its address stays " + (builtIn ? builtIn.href : "/projects/" + item.slug) : "Address: /projects/" + slug}>
           <input id="project-name" className="admin-input" value={form.name} onChange={set("name")} maxLength={MAX_NAME_LENGTH} autoComplete="off" required />
         </Field>
 
@@ -213,43 +270,45 @@ function ProjectEditor({ project, onDone, onCancel }) {
           <input id="project-genre" className="admin-input" value={form.genre} onChange={set("genre")} maxLength={MAX_GENRE_LENGTH} autoComplete="off" />
         </Field>
 
-        <Field label="Game HTML" htmlFor="project-html" error={errors.html} hint="One self-contained .html file, up to 5 MB. Its images, sounds and scripts must be inside the file or loaded from full https:// links.">
-          <div className="admin-html-modes" role="group" aria-label="How to add the HTML">
-            {!isNew && (
-              <button type="button" className={"hub-chip" + (htmlMode === "keep" ? " is-active" : "")} aria-pressed={htmlMode === "keep"} onClick={() => setHtmlMode("keep")}>
-                Keep current game
+        {!builtIn && (
+          <Field label="Game HTML" htmlFor="project-html" error={errors.html} hint="One self-contained .html file, up to 5 MB. Its images, sounds and scripts must be inside the file or loaded from full https:// links.">
+            <div className="admin-html-modes" role="group" aria-label="How to add the HTML">
+              {!isNew && (
+                <button type="button" className={"hub-chip" + (htmlMode === "keep" ? " is-active" : "")} aria-pressed={htmlMode === "keep"} onClick={() => setHtmlMode("keep")}>
+                  Keep current game
+                </button>
+              )}
+              <button type="button" className={"hub-chip" + (htmlMode === "file" ? " is-active" : "")} aria-pressed={htmlMode === "file"} onClick={() => setHtmlMode("file")}>
+                Upload a file
               </button>
+              <button type="button" className={"hub-chip" + (htmlMode === "paste" ? " is-active" : "")} aria-pressed={htmlMode === "paste"} onClick={() => setHtmlMode("paste")}>
+                Paste HTML
+              </button>
+            </div>
+            {htmlMode === "keep" && <p className="admin-field-hint">{project.htmlBytes ? "Current game: " + formatBytes(project.htmlBytes) : "This project has no game yet. Upload or paste one."}</p>}
+            {htmlMode === "file" && (
+              <label className="admin-file">
+                <input id="project-html" type="file" accept=".html,.htm,text/html" onChange={onFile} />
+                <Icon name="upload" size={18} />
+                <span>{fileName ? fileName + " · " + formatBytes(htmlBytes) : "Choose an .html file"}</span>
+              </label>
             )}
-            <button type="button" className={"hub-chip" + (htmlMode === "file" ? " is-active" : "")} aria-pressed={htmlMode === "file"} onClick={() => setHtmlMode("file")}>
-              Upload a file
-            </button>
-            <button type="button" className={"hub-chip" + (htmlMode === "paste" ? " is-active" : "")} aria-pressed={htmlMode === "paste"} onClick={() => setHtmlMode("paste")}>
-              Paste HTML
-            </button>
-          </div>
-          {htmlMode === "keep" && <p className="admin-field-hint">{project.htmlBytes ? "Current game: " + formatBytes(project.htmlBytes) : "This project has no game yet. Upload or paste one."}</p>}
-          {htmlMode === "file" && (
-            <label className="admin-file">
-              <input id="project-html" type="file" accept=".html,.htm,text/html" onChange={onFile} />
-              <Icon name="upload" size={18} />
-              <span>{fileName ? fileName + " · " + formatBytes(htmlBytes) : "Choose an .html file"}</span>
-            </label>
-          )}
-          {htmlMode === "paste" && (
-            <textarea
-              id="project-html"
-              className="admin-input admin-code"
-              rows={10}
-              spellCheck={false}
-              placeholder="<!DOCTYPE html>..."
-              value={htmlText}
-              onChange={(event) => {
-                setHtmlText(event.target.value);
-                setErrors((current) => ({ ...current, html: undefined }));
-              }}
-            />
-          )}
-        </Field>
+            {htmlMode === "paste" && (
+              <textarea
+                id="project-html"
+                className="admin-input admin-code"
+                rows={10}
+                spellCheck={false}
+                placeholder="<!DOCTYPE html>..."
+                value={htmlText}
+                onChange={(event) => {
+                  setHtmlText(event.target.value);
+                  setErrors((current) => ({ ...current, html: undefined }));
+                }}
+              />
+            )}
+          </Field>
+        )}
 
         <label className="admin-check">
           <input type="checkbox" checked={form.visible} onChange={set("visible")} />
@@ -259,20 +318,23 @@ function ProjectEditor({ project, onDone, onCancel }) {
         {message && <p className="admin-message is-error" role="alert">{message}</p>}
 
         <div className="admin-actions">
-          <button type="submit" className="hub-pill-btn is-primary" disabled={saving}>
-            {saving ? "Saving…" : isNew ? "Add project" : "Save changes"}
+          <button type="submit" className="hub-pill-btn is-primary" disabled={Boolean(saving)}>
+            {saving || (isNew ? "Add project" : "Save changes")}
           </button>
-          <button type="button" className="hub-pill-btn" onClick={showPreview} disabled={saving}>
-            <Icon name="play" size={16} />Test the game
+          <button type="button" className="hub-pill-btn" onClick={showPreview} disabled={Boolean(saving)}>
+            <Icon name="play" size={16} />{builtIn ? "Open the game" : "Test the game"}
           </button>
-          <button type="button" className="hub-pill-btn" onClick={onCancel} disabled={saving}>Cancel</button>
+          {builtIn && builtIn.edited && (
+            <button type="button" className="hub-pill-btn" onClick={resetBuiltIn} disabled={Boolean(saving)}>Reset to original</button>
+          )}
+          <button type="button" className="hub-pill-btn" onClick={onCancel} disabled={Boolean(saving)}>Cancel</button>
         </div>
       </div>
 
       <aside className="admin-editor-side" aria-label="Preview">
         <span className="hub-kicker">PREVIEW</span>
         <div className="admin-card-preview">
-          <GameCard game={{ ...previewGame, href: "#" }} />
+          <GameCard game={{ ...previewGame, href: "#", studio: builtIn ? "DigitBox Cloud" : previewGame.studio }} />
         </div>
       </aside>
 
@@ -292,6 +354,10 @@ function ProjectEditor({ project, onDone, onCancel }) {
   );
 }
 
+function StateBadge({ live, children }) {
+  return <span className={"admin-state" + (live ? " is-live" : "")}>{children}</span>;
+}
+
 function ProjectRow({ project, busy, onEdit, onToggle, onDelete }) {
   const game = toHubGame(project);
   const playable = project.visible && project.htmlBytes > 0;
@@ -301,7 +367,7 @@ function ProjectRow({ project, busy, onEdit, onToggle, onDelete }) {
       <span className="admin-project-text">
         <strong>{project.name}</strong>
         <span className="admin-project-meta">
-          <span className={"admin-badge" + (playable ? " is-live" : "")}>{!project.htmlBytes ? "No game yet" : project.visible ? "Shown" : "Hidden"}</span>
+          <StateBadge live={playable}>{!project.htmlBytes ? "No game yet" : project.visible ? "Shown" : "Hidden"}</StateBadge>
           {project.htmlBytes > 0 && <span>{formatBytes(project.htmlBytes)}</span>}
           <span>/projects/{project.slug}</span>
         </span>
@@ -318,19 +384,55 @@ function ProjectRow({ project, busy, onEdit, onToggle, onDelete }) {
   );
 }
 
+function BuiltInRow({ game, busy, onEdit, onToggle, onDelete, onRestore }) {
+  const cover = { title: game.name, icon: game.emoji, hue: game.hue };
+  const live = game.visible && !game.deleted;
+  return (
+    <li className={"admin-project" + (game.deleted ? " is-deleted" : "")}>
+      <span className="admin-project-cover"><GameCover game={cover} size="sm" /></span>
+      <span className="admin-project-text">
+        <strong>{game.name}</strong>
+        <span className="admin-project-meta">
+          <StateBadge live={live}>{game.deleted ? "Deleted" : game.visible ? "Shown" : "Hidden"}</StateBadge>
+          {game.edited && <span>Edited</span>}
+          <span>{game.href}</span>
+        </span>
+      </span>
+      <span className="admin-project-actions">
+        {game.deleted ? (
+          <button type="button" className="hub-pill-btn" onClick={onRestore} disabled={busy}>Restore</button>
+        ) : (
+          <>
+            {live && <Link className="hub-pill-btn" href={game.href}>Play</Link>}
+            <button type="button" className="hub-pill-btn" onClick={onEdit} disabled={busy}>Edit</button>
+            <button type="button" className="hub-pill-btn" onClick={onToggle} disabled={busy} aria-pressed={game.visible}>
+              {game.visible ? "Hide" : "Show"}
+            </button>
+            <button type="button" className="hub-pill-btn is-danger" onClick={onDelete} disabled={busy}>Delete</button>
+          </>
+        )}
+      </span>
+    </li>
+  );
+}
+
 export default function AdminProjectsPage() {
   const [phase, setPhase] = useState("checking");
   const [projects, setProjects] = useState([]);
+  const [builtIns, setBuiltIns] = useState([]);
   const [editing, setEditing] = useState(null);
   const [busySlug, setBusySlug] = useState("");
   const [notice, setNotice] = useState(null);
+  const [userId, setUserId] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const { projects: list } = await adminApi("projects");
-      setProjects(list || []);
+      const payload = await adminApi("projects");
+      setProjects(payload.projects || []);
+      setBuiltIns(payload.builtIns || []);
       setPhase("ready");
     } catch (error) {
+      setUserId(error.userId || "");
       setPhase(error.code || (error.status === 401 ? "signed_out" : error.status === 403 ? "not_admin" : "error"));
     }
   }, []);
@@ -340,22 +442,26 @@ export default function AdminProjectsPage() {
     else load();
   }, [load]);
 
-  function finishEditing(project, outcome, detail) {
-    if (outcome === "html-failed") {
-      setNotice({ tone: "error", text: `${project.name} was added, but its HTML didn't upload: ${detail} Open Edit to try the upload again.` });
-    } else {
-      setNotice({ tone: "ok", text: outcome === "added" ? `Added ${project.name}.` : `Saved ${project.name}.` });
-    }
+  function finishEditing(item, outcome, detail) {
+    const name = item.name;
+    const text = {
+      added: `Added ${name}.`,
+      saved: `Saved ${name}.`,
+      reset: `${name} is back to how it shipped.`,
+      "html-failed": `Saved ${name}'s details, but its HTML didn't upload: ${detail} Open Edit to try the upload again.`,
+    }[outcome];
+    setNotice({ tone: outcome === "html-failed" ? "error" : "ok", text });
     setEditing(null);
     load();
   }
 
-  async function toggle(project) {
-    setBusySlug(project.slug);
+  // Run a change, then refresh this list and every list on the site.
+  async function change(slug, run, done) {
+    setBusySlug(slug);
     try {
-      await adminApi("projects/" + encodeURIComponent(project.slug), { method: "PATCH", json: { visible: !project.visible } });
+      await run();
       refreshHubProjects();
-      setNotice({ tone: "ok", text: project.visible ? `${project.name} is hidden.` : `${project.name} is shown on the site.` });
+      setNotice({ tone: "ok", text: done });
       await load();
     } catch (error) {
       setNotice({ tone: "error", text: error.message });
@@ -364,28 +470,33 @@ export default function AdminProjectsPage() {
     }
   }
 
-  async function remove(project) {
+  const projectPath = (project) => "projects/" + encodeURIComponent(project.slug);
+  const builtInPath = (game) => "builtins/" + encodeURIComponent(game.slug);
+
+  function removeProject(project) {
     if (!window.confirm(`Delete ${project.name}? Its game is removed from DigitBox for everyone. This can't be undone.`)) return;
-    setBusySlug(project.slug);
-    try {
-      await adminApi("projects/" + encodeURIComponent(project.slug), { method: "DELETE" });
-      refreshHubProjects();
-      setNotice({ tone: "ok", text: `Deleted ${project.name}.` });
-      await load();
-    } catch (error) {
-      setNotice({ tone: "error", text: error.message });
-    } finally {
-      setBusySlug("");
-    }
+    change(project.slug, () => adminApi(projectPath(project), { method: "DELETE" }), `Deleted ${project.name}.`);
+  }
+
+  function removeBuiltIn(game) {
+    const message = `Delete ${game.name} from DigitBox?\n\nIt disappears from every list, and its page and game files stop loading for everyone. You can restore it from this page later.`;
+    if (!window.confirm(message)) return;
+    change(game.slug, () => adminApi(builtInPath(game), { method: "DELETE" }), `Deleted ${game.name}. Its page and files no longer load.`);
   }
 
   const gate = {
     checking: { title: "Checking admin access…" },
     signed_out: { title: "Sign in to manage projects", body: "Use the DigitBox account that owns this site.", link: { href: "/login?next=/admin/projects", label: "Sign in" } },
-    not_admin: { title: "This account isn't an admin", body: "Only the site owner (and accounts listed in ADMIN_EMAILS) can manage projects." },
+    not_admin: {
+      title: "This account isn't an admin",
+      body: "Only the site owner can manage projects. To make this account an admin too, add its ID to ADMIN_USER_IDS in the site's settings.",
+      id: userId,
+    },
     no_storage: { title: "Project storage isn't available here", body: "Projects are stored in the site's Cloudflare D1 database. Manage them on digitbox.dev." },
     error: { title: "Couldn't load projects", body: "Check your connection and try again.", retry: true },
   }[phase];
+
+  const shownBuiltIns = [...builtIns].sort((a, b) => Number(a.deleted) - Number(b.deleted));
 
   return (
     <>
@@ -399,7 +510,7 @@ export default function AdminProjectsPage() {
           <div>
             <span className="hub-kicker">ADMIN</span>
             <h1>Projects</h1>
-            <p>Add games to DigitBox: give each one a name, an emoji, a colour theme and its HTML. They show up on the home page, the Games page and in search as soon as you save.</p>
+            <p>Add games to DigitBox, and edit, hide or delete any game on the site. Changes show up on the home page, the Games page and in search as soon as you save.</p>
           </div>
           {phase === "ready" && !editing && (
             <button type="button" className="hub-pill-btn is-primary" onClick={() => { setNotice(null); setEditing({ project: null }); }}>
@@ -413,39 +524,73 @@ export default function AdminProjectsPage() {
             <Icon name="settings" />
             <h3>{gate.title}</h3>
             {gate.body && <p>{gate.body}</p>}
+            {gate.id && <p className="admin-user-id">Account ID: <code>{gate.id}</code></p>}
             {gate.link && <Link href={gate.link.href} className="hub-pill-btn is-primary">{gate.link.label}</Link>}
             {gate.retry && <button type="button" className="hub-pill-btn" onClick={() => { setPhase("checking"); load(); }}>Try again</button>}
           </div>
+        ) : editing ? (
+          <section className="hub-shelf" aria-label={editing.project || editing.builtIn ? "Edit project" : "New project"}>
+            <div className="hub-shelf-head">
+              <h2><Icon name="games" />{editing.builtIn ? "Edit " + editing.builtIn.name : editing.project ? "Edit " + editing.project.name : "New project"}</h2>
+            </div>
+            <ProjectEditor
+              key={editing.builtIn ? "builtin:" + editing.builtIn.slug : editing.project ? editing.project.slug : "new"}
+              project={editing.project}
+              builtIn={editing.builtIn}
+              onDone={finishEditing}
+              onCancel={() => { setEditing(null); load(); }}
+            />
+          </section>
         ) : (
           <>
             {notice && <p className={"admin-message " + (notice.tone === "ok" ? "is-ok" : "is-error")} role="status">{notice.text}</p>}
 
-            {editing ? (
-              <section className="hub-shelf" aria-label={editing.project ? "Edit project" : "New project"}>
-                <div className="hub-shelf-head"><h2><Icon name="games" />{editing.project ? "Edit " + editing.project.name : "New project"}</h2></div>
-                <ProjectEditor key={editing.project ? editing.project.slug : "new"} project={editing.project} onDone={finishEditing} onCancel={() => setEditing(null)} />
-              </section>
-            ) : projects.length ? (
+            <section className="hub-shelf" aria-label="Your projects">
+              <div className="hub-shelf-head"><h2><Icon name="plus" />Added projects</h2></div>
+              {projects.length ? (
+                <ul className="admin-projects">
+                  {projects.map((project) => (
+                    <ProjectRow
+                      key={project.slug}
+                      project={project}
+                      busy={busySlug === project.slug}
+                      onEdit={() => { setNotice(null); setEditing({ project }); }}
+                      onToggle={() => change(project.slug, () => adminApi(projectPath(project), { method: "PATCH", json: { visible: !project.visible } }), project.visible ? `${project.name} is hidden.` : `${project.name} is shown on the site.`)}
+                      onDelete={() => removeProject(project)}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <div className="hub-empty">
+                  <Icon name="games" />
+                  <h3>No projects added yet</h3>
+                  <p>Add a game with a name, an emoji, a colour and its HTML, and it appears across DigitBox.</p>
+                  <button type="button" className="hub-pill-btn is-primary" onClick={() => setEditing({ project: null })}>New project</button>
+                </div>
+              )}
+            </section>
+
+            <section className="hub-shelf" aria-label="Built-in games">
+              <div className="hub-shelf-head">
+                <div>
+                  <h2><Icon name="games" />Built-in games</h2>
+                  <p className="hub-shelf-sub">The games DigitBox ships with. Deleting one takes it down everywhere at once; its original file stays in the GitHub repository until it&apos;s removed there.</p>
+                </div>
+              </div>
               <ul className="admin-projects">
-                {projects.map((project) => (
-                  <ProjectRow
-                    key={project.slug}
-                    project={project}
-                    busy={busySlug === project.slug}
-                    onEdit={() => { setNotice(null); setEditing({ project }); }}
-                    onToggle={() => toggle(project)}
-                    onDelete={() => remove(project)}
+                {shownBuiltIns.map((game) => (
+                  <BuiltInRow
+                    key={game.slug}
+                    game={game}
+                    busy={busySlug === game.slug}
+                    onEdit={() => { setNotice(null); setEditing({ builtIn: game }); }}
+                    onToggle={() => change(game.slug, () => adminApi(builtInPath(game), { method: "PATCH", json: { visible: !game.visible } }), game.visible ? `${game.name} is hidden.` : `${game.name} is shown on the site.`)}
+                    onDelete={() => removeBuiltIn(game)}
+                    onRestore={() => change(game.slug, () => adminApi(builtInPath(game), { method: "PATCH", json: { deleted: false } }), `Restored ${game.name}.`)}
                   />
                 ))}
               </ul>
-            ) : (
-              <div className="hub-empty">
-                <Icon name="games" />
-                <h3>No projects yet</h3>
-                <p>Add your first game and it will appear across DigitBox.</p>
-                <button type="button" className="hub-pill-btn is-primary" onClick={() => setEditing({ project: null })}>New project</button>
-              </div>
-            )}
+            </section>
           </>
         )}
       </div>

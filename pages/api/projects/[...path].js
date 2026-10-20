@@ -1,4 +1,6 @@
 import { jsonResponse } from "../../../lib/apiResponse";
+import { isBlockedFile } from "../../../lib/hubProjects";
+import { getD1 } from "../../../lib/serverAuth";
 import { getContentBucket, toR2Key, r2PublicUrlForKey } from "../../../lib/r2";
 import { isGitLfsPointer } from "../../../lib/r2Content";
 import { fetchGithubReleaseAsset } from "../../../lib/githubAssets";
@@ -125,6 +127,8 @@ export default async function handler(req) {
     const parts = projectPath.split("/").filter(Boolean);
     const filePath = safeProjectPath(parts, projectPath.endsWith("/"));
     if (!filePath) return jsonResponse({ error: "Invalid project path" }, 400);
+    // A game deleted or hidden from the admin page (lib/hubProjects.js).
+    if (await isBlockedFile(getD1(), filePath)) return jsonResponse({ error: "This game isn't available." }, 404);
 
     if (filePath === "public/projects/Eaglercraft-Launcher-main/index.html") {
       return fileResponse(EAGLERCRAFT_LAUNCHER_HTML, filePath);

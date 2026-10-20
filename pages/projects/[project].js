@@ -2,7 +2,7 @@ import Head from "next/head";
 import GameFrame from "../../components/GameFrame";
 import HubProjectFrame from "../../components/HubProjectFrame";
 import { GAMES } from "../../lib/catalog";
-import { getProject } from "../../lib/hubProjects";
+import { blockedBuiltIns, getProject, isValidSlug } from "../../lib/hubProjects";
 import { getD1 } from "../../lib/serverAuth";
 
 // Cloudflare Pages only supports the edge runtime for pages with
@@ -25,13 +25,13 @@ export default function ProjectRunner({ hubProject, src, title, slug, isExternal
   return <GameFrame src={src} title={title} slug={slug} isExternal={isExternal} />;
 }
 
-// A shown project from the admin page (lib/hubProjects.js), or null.
-async function findHubProject(slug) {
-  if (GAMES.some((game) => game.slug === slug)) return null;
+// Built-in games hidden or deleted from the admin page get a 404, like their
+// files (see isBlockedFile). Storage problems never block a game.
+async function isBlocked(slug) {
   const db = getD1();
-  if (!db) return null;
-  const project = await getProject(db, slug).catch(() => null);
-  return project && project.visible && project.htmlBytes > 0 ? project : null;
+  if (!db) return false;
+  const blocked = await blockedBuiltIns(db).catch(() => null);
+  return Boolean(blocked && blocked.has(slug));
 }
 
 export async function getServerSideProps({ params }) {
@@ -44,6 +44,7 @@ export async function getServerSideProps({ params }) {
   }
 
   if (slug === "Five Nights at Freddy's Launcher" || slug === "fnaf-launcher") {
+    if (await isBlocked("fnaf-launcher")) return { notFound: true };
     return {
       props: {
         src: "https://irv77.github.io/FnafLauncher/",
@@ -55,6 +56,7 @@ export async function getServerSideProps({ params }) {
   }
 
   if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
+    if (await isBlocked("eaglercraft-launcher")) return { notFound: true };
     const filePath = "public/projects/eaglercraft-launcher.html";
     return {
       props: {
@@ -66,8 +68,14 @@ export async function getServerSideProps({ params }) {
     };
   }
 
-  const hubProject = await findHubProject(slug);
-  if (hubProject) return { props: { hubProject } };
+  if (GAMES.some((game) => game.slug === slug)) {
+    if (await isBlocked(slug)) return { notFound: true };
+  } else if (isValidSlug(slug) && getD1()) {
+    // An address in the added projects' format: one of those or nothing.
+    const project = await getProject(getD1(), slug).catch(() => undefined);
+    if (project && project.visible && project.htmlBytes > 0) return { props: { hubProject: project } };
+    if (project !== undefined) return { notFound: true };
+  }
 
   const filePath = `public/projects/${slug}.html`;
 

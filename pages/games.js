@@ -2,18 +2,19 @@ import Head from "next/head";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
-import { GameCard, GameCover } from "../components/Cards";
-import { GAMES, gameTags, likeKey } from "../lib/catalog";
-import { useAllGames } from "../lib/useHubProjects";
+import { GameCard, GameCover, SkeletonGrid } from "../components/Cards";
+import { gameTags, likeKey } from "../lib/catalog";
+import { useGameCatalog } from "../lib/useHubProjects";
 import { useLikes } from "../lib/useLikes";
-
-const FEATURED = GAMES.find((game) => game.featured) || GAMES[0];
 
 export default function CloudGamesPage() {
   const [likes, toggleLike] = useLikes();
   const [chip, setChip] = useState("All");
-  const allGames = useAllGames();
-  const tags = useMemo(() => gameTags(allGames), [allGames]);
+  const { games: allGames, ready } = useGameCatalog();
+  // "All" and "Saved" are fixed chips, so a genre with those names isn't one.
+  const tags = useMemo(() => gameTags(allGames).filter((tag) => tag !== "All" && tag !== "Saved"), [allGames]);
+  // From the catalog as edited, so a hidden or deleted game is never featured.
+  const FEATURED = useMemo(() => allGames.find((game) => game.featured) || allGames.find((game) => !game.custom) || null, [allGames]);
 
   const games = useMemo(() => {
     if (chip === "Saved") return allGames.filter((game) => likes.includes(likeKey(game)));
@@ -74,10 +75,12 @@ export default function CloudGamesPage() {
             <h1>{chip === "All" ? "Play instantly" : chip === "Saved" ? "Your saved games" : chip + " games"}</h1>
             <p>Every game loads from the DigitBox cloud and runs right in your browser. No downloads or installs, and most games can autosave on this device.</p>
           </div>
-          <span className="hub-count" aria-live="polite">{games.length} {games.length === 1 ? "game" : "games"}</span>
+          {ready && <span className="hub-count" aria-live="polite">{games.length} {games.length === 1 ? "game" : "games"}</span>}
         </div>
 
-        {games.length > 0 ? (
+        {!ready ? (
+          <SkeletonGrid count={8} />
+        ) : games.length > 0 ? (
           <div className="hub-grid">
             {games.map((game) => (
               <GameCard key={game.key} game={game} liked={likes.includes(likeKey(game))} onToggleLike={toggleLike} />

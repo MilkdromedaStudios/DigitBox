@@ -32,12 +32,13 @@ as YouTube's API policies require. Those policies don't allow removing YouTube's
 
 ## Cloud games
 
-**Add games from the admin page:** [`/admin/projects`](docs/ADMIN_PROJECTS.md)
-takes a name, an emoji, a colour theme and the game's HTML. The project
-appears across the site as soon as it's saved (stored in Cloudflare D1, no
-rebuild) and runs in a sandboxed player. See
-**[docs/ADMIN_PROJECTS.md](docs/ADMIN_PROJECTS.md)** for who can use it and
-what a game's HTML can do.
+**Manage games from the admin page:** [`/admin/projects`](docs/ADMIN_PROJECTS.md)
+adds games (a name, an emoji, a colour theme and the game's HTML), and edits,
+hides or deletes any game, the built-in ones included. Changes show across
+the site as soon as they're saved (stored in Cloudflare D1, no rebuild). Added
+games run in a sandboxed player. See
+**[docs/ADMIN_PROJECTS.md](docs/ADMIN_PROJECTS.md)** for who can use it, what
+deleting a built-in game does, and what a game's HTML can do.
 
 The built-in games come from `data/projects-index.json`. `data/cloud-games.json`
 adds how each game is presented, keyed by
