@@ -22,8 +22,10 @@ function useCategories() {
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
         const ids = new Set((body?.categories || []).map((category) => category.id));
-        categoryCache = YOUTUBE_CATEGORIES.filter((category) => ids.has(category.id));
-        if (active) setCategories(categoryCache);
+        const found = YOUTUBE_CATEGORIES.filter((category) => ids.has(category.id));
+        // Only a real answer is kept for the session; a failure is retried next visit.
+        if (found.length) categoryCache = found;
+        if (active) setCategories(found);
       })
       .catch(() => {});
     return () => {

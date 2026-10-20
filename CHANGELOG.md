@@ -7,7 +7,8 @@ most recent work is at the top.
 
 - **Videos from all of YouTube.** With a YouTube Data API key
   (`YOUTUBE_API_KEY`, see `docs/YOUTUBE_API_SETUP.md`) the site shows popular
-  videos for each visitor's country, Shorts, and YouTube search.
+  videos (US charts by default; `YOUTUBE_REGION` picks another country, or
+  `auto` for each visitor's own), Shorts, and YouTube search.
 - **Sections:** the home page is organised as **Recommended** (first),
   **Videos**, **Shorts** and **Games**. Videos has category filters, such as
   Gaming and Music, where YouTube has a chart.
@@ -16,6 +17,8 @@ most recent work is at the top.
 - Videos show their length, LIVE status and channel picture. Videos whose owners
   block playback on other sites show a "Watch on YouTube" button instead of a broken player.
 - The watch page loads YouTube's player only when you press play.
+- Watch history is kept for 30 days, and cached YouTube data for at most a few
+  days, as YouTube's API policies require.
 - "Like" is now **Save** (it saves to your Library, not to YouTube). New
   **Terms** page, and YouTube attribution where videos appear.
 - The DigitBox logo in the header is now the box mark from the favicon.

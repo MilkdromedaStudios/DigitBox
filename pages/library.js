@@ -22,6 +22,32 @@ function resolve(key, title, videos, lookedUp) {
   return GAMES.find((game) => game.slug === key) || null;
 }
 
+// Videos and games in separate groups, so the YouTube attribution sits right
+// next to the YouTube videos rather than over a mixed list.
+function Grouped({ items, card }) {
+  const videos = items.filter((item) => item.kind === "video");
+  const games = items.filter((item) => item.kind !== "video");
+  return (
+    <>
+      {videos.length > 0 && (
+        <div className="library-group">
+          <div className="library-group-head">
+            <h3>Videos</h3>
+            <YouTubeAttribution />
+          </div>
+          <div className="hub-grid">{videos.map(card)}</div>
+        </div>
+      )}
+      {games.length > 0 && (
+        <div className="library-group">
+          <div className="library-group-head"><h3>Games</h3></div>
+          <div className="hub-grid">{games.map(card)}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function Section({ id, icon, title, action, children }) {
   return (
     <section className="library-section" id={id}>
@@ -66,9 +92,9 @@ export default function LibraryPage() {
   }, [notes]);
 
   // YouTube videos are stored by id only: fetch titles, channels and
-  // thumbnails for the ones this device doesn't already know.
+  // thumbnails for the ones this device doesn't already know (saved ones first).
   useEffect(() => {
-    const ids = [...history.map((entry) => entry.key), ...likes]
+    const ids = [...likes, ...history.map((entry) => entry.key)]
       .filter((key) => String(key).startsWith("video:"))
       .map((key) => String(key).slice(6))
       .filter((id) => !videos.some((video) => video.id === id) && !findLoadedVideo(id));
@@ -107,9 +133,8 @@ export default function LibraryPage() {
           <div>
             <span className="hub-kicker">YOU</span>
             <h1>Library</h1>
-            <p>Your history, likes and notes. They&apos;re saved in this browser, so they stay private to this device.</p>
+            <p>Your history, saved videos and games, and notes. They&apos;re kept in this browser, so they stay private to this device.</p>
           </div>
-          <YouTubeAttribution />
         </div>
 
         <Section
@@ -123,7 +148,7 @@ export default function LibraryPage() {
           )}
         >
           {historyItems.length > 0 ? (
-            <div className="hub-grid">{historyItems.slice(0, 24).map(card)}</div>
+            <Grouped items={historyItems.slice(0, 24)} card={card} />
           ) : (
             <div className="hub-empty"><Icon name="history" /><h3>Nothing watched yet</h3><p>Videos you watch and games you play will show up here.</p></div>
           )}
@@ -131,7 +156,7 @@ export default function LibraryPage() {
 
         <Section id="liked" icon="heart" title="Saved">
           {likedItems.length > 0 ? (
-            <div className="hub-grid">{likedItems.map(card)}</div>
+            <Grouped items={likedItems} card={card} />
           ) : (
             <div className="hub-empty">
               <Icon name="heart" />

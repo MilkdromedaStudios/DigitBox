@@ -42,9 +42,10 @@ The simplest way is to push any commit to `main`. Alternatively: on Cloudflare,
 open **Deployments** and start a new production deployment; on Vercel, open
 **Deployments → ⋯ → Redeploy**.
 
-Optional: `YOUTUBE_REGION` (two-letter country code, e.g. `US`) shows every
-visitor that country's popular videos. If it's unset, each visitor gets their
-own country's. Setting it uses less quota because there are fewer separate lists to cache.
+Optional: `YOUTUBE_REGION` picks which country's popular videos everyone sees
+(a two-letter code such as `GB`; the default is `US`). Set it to `auto` to give
+each visitor their own country's instead. That uses more quota, because every
+country is fetched and cached separately.
 
 ## 3. Check it works
 
@@ -67,15 +68,28 @@ Pacific time:
 
 - **10,000 units** for everything except search. Popular charts, Shorts,
   channel uploads and video details cost 1 unit per call.
-- **100 searches**, used only when someone searches in the top bar.
+- **100 searches**, used when someone searches in the top bar (and by the
+  occasional Shorts top-up described below).
 
-DigitBox caches everything (popular lists for an hour, Shorts for six hours,
-searches for twelve), so most visits cost nothing. Each search is cached too,
-so a repeat of the same search is free. If the site gets busy enough to hit
-these limits, the pages keep showing the last good results.
+DigitBox caches everything (popular lists for three hours, Shorts and searches
+for twelve, the setup check for a minute), so most visits cost nothing. A
+repeat of the same search is free. If the Shorts playlists come up short,
+DigitBox also runs one `#shorts` search, at most every twelve hours. If a call
+fails or the quota runs out, the pages keep showing the last good results and
+DigitBox waits five minutes before asking YouTube again.
+
+On Cloudflare the cache is kept per data center, so a busy site spread across
+many countries makes more calls. On Vercel, responses are cached by Vercel's
+CDN instead.
 Usage is under **APIs & Services → YouTube Data API v3 → Quotas**. Google
 offers more quota through its free
 [audit and quota extension form](https://support.google.com/youtube/contact/yt_api_form).
+
+Optional, to stop one visitor from using up the search allowance: in the
+Cloudflare dashboard, open the **digitbox.dev** zone → **Security → WAF →
+Rate limiting rules**, and add a rule for requests whose URI path is
+`/api/youtube` and whose query string contains `feed=search`, for example 20
+requests per minute per IP, with action **Block**.
 
 ## Ads
 

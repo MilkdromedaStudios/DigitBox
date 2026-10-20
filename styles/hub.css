@@ -225,6 +225,25 @@ body[data-theme="light"].digitbox-liquid-active {
 
 .hub-tabs { display: none; }
 
+.hub-main-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  padding: 20px 16px 28px;
+  border-top: 1px solid var(--hub-line);
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.hub-main-foot a { color: var(--muted); font-weight: 600; }
+.hub-main-foot span a { text-decoration: underline; }
+.hub-main-foot a:hover { color: var(--text); }
+@media (min-width: 1200px) {
+  .hub:not(.is-nav-toggled) .hub-main-foot { display: none; }
+}
+
 @media (min-width: 1200px) {
   .hub.is-nav-toggled .hub-main { margin-left: var(--hub-mini-w); }
   .hub.is-nav-toggled .hub-side { width: var(--hub-mini-w); padding: 4px; }
@@ -904,7 +923,10 @@ body[data-theme="light"] .yt-logo-on-dark { display: none !important; }
   background: #000;
   box-shadow: 0 24px 60px rgba(0, 0, 0, .35);
 }
-.watch-player.is-short { height: min(78vh, 760px); width: auto; max-width: 100%; margin: 0 auto; aspect-ratio: 9 / 16; }
+/* The whole player fits between the fixed bars, so no site element ever sits
+   over it, and never drops below YouTube's 200x200 minimum. */
+.watch-player { max-height: calc(100dvh - var(--hub-top-h) - 24px); min-height: 200px; }
+.watch-player.is-short { height: min(78vh, 760px); width: auto; min-width: min(200px, 100%); max-width: 100%; margin: 0 auto; aspect-ratio: 9 / 16; }
 .watch-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .watch-poster { position: absolute; inset: 0; padding: 0; border: 0; background: #000; cursor: pointer; }
 .watch-poster img { width: 100%; height: 100%; object-fit: cover; }
@@ -933,14 +955,15 @@ body[data-theme="light"] .yt-logo-on-dark { display: none !important; }
 .watch-note { margin-top: 12px; color: var(--muted); font-size: .82rem; }
 .watch-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .watch-side h2 { margin: 4px 0 2px; font-size: 1rem; font-weight: 700; }
+.watch-side-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 
 @media (max-width: 1099px) {
   .watch { grid-template-columns: 1fr; }
 }
 @media (max-width: 759px) {
   .watch { gap: 16px; padding: 0 0 40px; }
-  .watch-player { border-radius: 0; box-shadow: none; }
-  .watch-player.is-short { height: min(72vh, 640px); }
+  .watch-player { max-height: calc(100dvh - var(--hub-top-h) - var(--hub-tabs-h) - env(safe-area-inset-bottom)); border-radius: 0; box-shadow: none; }
+  .watch-player.is-short { height: min(72vh, 640px); min-height: 200px; }
   .watch-body, .watch-side { padding: 0 16px; }
 }
 
@@ -969,6 +992,7 @@ body[data-theme="light"] .yt-logo-on-dark { display: none !important; }
   position: relative;
   height: 100%;
   max-height: 860px;
+  min-width: 200px;
   max-width: 100%;
   aspect-ratio: 9 / 16;
   overflow: hidden;
@@ -1029,12 +1053,28 @@ body[data-theme="light"] .yt-logo-on-dark { display: none !important; }
   .short-action { grid-auto-flow: column; align-items: center; gap: 6px; }
   .short-action-icon { width: 38px; height: 38px; }
 }
+/* Small phones on their side: too short for the tab bar and an action bar
+   under the video, so the tab bar goes (the menu still has every page) and
+   the actions sit beside the player, keeping it at least 200px tall. */
+@media (max-width: 759px) and (orientation: landscape) {
+  .hub-tabs { display: none; }
+  .hub-main { padding-bottom: env(safe-area-inset-bottom); }
+  .watch-player { max-height: calc(100dvh - var(--hub-top-h)); }
+  .shorts-page, .short-slide { height: calc(100dvh - var(--hub-top-h)); }
+  .short-slide { flex-direction: row; gap: 12px; padding: 0 12px; }
+  .short-stage { height: 100%; min-height: 200px; }
+  .short-actions { flex-direction: column; align-self: center; justify-content: center; padding: 0; }
+  .short-action { grid-auto-flow: row; }
+}
 
 /* ------------------------------------------------------------------ *
  *  Library
  * ------------------------------------------------------------------ */
 .library-section { margin-bottom: 44px; scroll-margin-top: calc(var(--hub-top-h) + 16px); }
 .library-section .notes-area { margin-top: 0; }
+.library-group + .library-group { margin-top: 24px; }
+.library-group-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.library-group-head h3 { margin: 0; color: var(--muted); font-size: .9rem; font-weight: 700; }
 
 @media (prefers-reduced-motion: reduce) {
   .media-thumb img, .game-cover, .short-card img, .hub-spotlight-media img, .post-tile, .hub-side { transition: none; }
