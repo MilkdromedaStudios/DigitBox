@@ -4,10 +4,11 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import { Avatar, GameCard, VideoCard } from "../components/Cards";
-import { GAMES, channelUrl, isVideoId, likeKey, normalizeVideo, uniqueVideos } from "../lib/catalog";
+import { byFeature, channelUrl, isVideoId, likeKey, normalizeVideo, uniqueVideos } from "../lib/catalog";
 import { formatDate, formatViews } from "../lib/format";
 import { recordHistory } from "../lib/history";
 import { shareLink } from "../lib/share";
+import { useAllGames } from "../lib/useHubProjects";
 import { useLikes } from "../lib/useLikes";
 import { useVideos } from "../lib/useVideos";
 import { findLoadedVideo, lookupYouTube, useYouTubeFeed } from "../lib/useYouTube";
@@ -77,6 +78,7 @@ export default function WatchPage() {
   useEffect(() => {
     if (historyKey) recordHistory(historyKey, historyTitle);
   }, [historyKey, historyTitle]);
+  const allGames = useAllGames();
 
   if (!router.isReady) return <div className="watch" aria-busy="true"><div className="watch-player" /></div>;
 
@@ -95,7 +97,7 @@ export default function WatchPage() {
 
   const liked = likes.includes(likeKey(video));
   const upNext = uniqueVideos(recommended.videos, ownVideos).filter((item) => item.id !== video.id).slice(0, 20);
-  const games = [...GAMES].sort((a, b) => Number(b.featured) - Number(a.featured) || a.order - b.order).slice(0, 4);
+  const games = byFeature(allGames).slice(0, 4);
   const description = video.description.trim();
   const isLong = description.length > LONG_DESCRIPTION || description.split("\n").length > 3;
   const youtubeUrl = "https://www.youtube.com/watch?v=" + video.id;

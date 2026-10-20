@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { getCloudAuthToken } from "../lib/account";
 import { fetchWithRetry, toFriendlyNetworkError } from "../lib/fetchWithRetry";
 
 function markdownToHtml(md) {
@@ -36,7 +37,8 @@ export default function PostForm({ className = "post-form" }) {
         "/api/content/publish",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          // Publishing is admin-only; the server checks this DigitBox account.
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + getCloudAuthToken() },
           body: JSON.stringify({ type: "post", title, html, markdown: content }),
         },
         { retries: 3, timeoutMs: 30000 }

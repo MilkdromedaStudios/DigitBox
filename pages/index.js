@@ -3,9 +3,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import { GameCard, PostCard, ShortCard, SkeletonGrid, VideoCard } from "../components/Cards";
-import { CHANNELS, GAMES, POSTS, channelUrl, likeKey, uniqueVideos } from "../lib/catalog";
+import { CHANNELS, POSTS, byFeature, channelUrl, likeKey, uniqueVideos } from "../lib/catalog";
 import { formatViews, timeAgo } from "../lib/format";
 import { useLikes } from "../lib/useLikes";
+import { useAllGames } from "../lib/useHubProjects";
 import { useVideos } from "../lib/useVideos";
 import { useYouTubeFeed } from "../lib/useYouTube";
 import { YouTubeAttribution } from "../components/YouTubeLogo";
@@ -14,7 +15,6 @@ const CHIPS = ["Recommended", "Videos", "Shorts", "Games"];
 const CHANNEL = CHANNELS[0];
 
 // Featured games lead the shelf; the rest keep their index order.
-const GAMES_BY_FEATURE = [...GAMES].sort((a, b) => Number(b.featured) - Number(a.featured) || a.order - b.order);
 
 function Shelf({ icon, title, subtitle, href, linkLabel = "View all", action, children }) {
   return (
@@ -102,6 +102,8 @@ export default function HomePage() {
 
   const ownLong = useMemo(() => ownVideos.filter((video) => !video.short), [ownVideos]);
   const ownShorts = useMemo(() => ownVideos.filter((video) => video.short), [ownVideos]);
+  const allGames = useAllGames();
+  const gamesByFeature = useMemo(() => byFeature(allGames), [allGames]);
 
   // YouTube feeds when the API key is set up and answering; otherwise the
   // channel's own uploads, so the page is never empty.
@@ -169,7 +171,7 @@ export default function HomePage() {
             )}
 
             <Shelf icon="games" title="Games" href="/games" linkLabel="All games">
-              <div className="hub-row">{GAMES_BY_FEATURE.map(renderGame)}</div>
+              <div className="hub-row">{gamesByFeature.map(renderGame)}</div>
             </Shelf>
 
             {youtubeOn && feed.length > 9 && (
@@ -246,7 +248,7 @@ export default function HomePage() {
           </Shelf>
         )}
 
-        {chip === "Games" && <div className="hub-grid">{GAMES_BY_FEATURE.map(renderGame)}</div>}
+        {chip === "Games" && <div className="hub-grid">{gamesByFeature.map(renderGame)}</div>}
       </div>
     </>
   );

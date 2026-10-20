@@ -3,6 +3,7 @@ import { upsertRepoFile } from "../../../lib/githubContent";
 import { jsonResponse } from "../../../lib/apiResponse";
 import { getContentBucket, toR2Key } from "../../../lib/r2";
 import { deleteGithubReleaseAsset } from "../../../lib/githubAssets";
+import { requireAdmin } from "../../../lib/serverAuth";
 import postsIndex from "../../../data/posts-index.json";
 import projectsIndex from "../../../data/projects-index.json";
 
@@ -30,6 +31,8 @@ async function deleteContentFile({ path, message }) {
 
 export default async function handler(req) {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  const auth = await requireAdmin(req);
+  if (auth.response) return auth.response;
 
   try {
     const { type, slug } = (await req.json().catch(() => null)) || {};

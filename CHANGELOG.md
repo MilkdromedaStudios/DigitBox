@@ -3,6 +3,24 @@
 All notable changes to **digitbox.dev**. This list is grouped by feature; the
 most recent work is at the top.
 
+## Admin projects
+
+- **Add games from the admin page.** `/admin/projects` creates a project from
+  a name, an emoji, a colour theme and its HTML (upload or paste, up to 5 MB),
+  with an optional description and genre. It can also edit, test, hide and
+  delete projects. Projects show up on the home page, the Games page, search
+  and the Library as soon as they're saved, newest first. They're stored in
+  Cloudflare D1, so no rebuild is needed. See `docs/ADMIN_PROJECTS.md`.
+- **Sandboxed player.** Added games run without access to DigitBox's storage,
+  cookies or login tokens. Their `localStorage` and cookies still work and
+  are saved per game, with a **Reset progress** button.
+- **Admin access is checked on the server:** the site owner, plus accounts
+  listed in `ADMIN_EMAILS`.
+- **Security fixes:** publishing and deleting content (`/api/content/publish`,
+  `/api/content/delete`) now requires an admin; before, anyone could call
+  them. `/api/content/file` rejects `..` paths. Game saves no longer copy the
+  site's login token.
+
 ## YouTube videos
 
 - **Videos from all of YouTube.** With a YouTube Data API key
