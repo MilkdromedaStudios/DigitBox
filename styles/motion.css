@@ -26,7 +26,6 @@ body[data-theme="light"] {
 .gallery-item,
 .post-card,
 .hero-box,
-.ai-main,
 .admin-hero,
 .admin-setup-card,
 .admin-task-card,
@@ -47,8 +46,7 @@ body[data-theme="light"] {
 .card,
 .gallery-item,
 .post-card,
-.hero-box,
-.ai-main {
+.hero-box {
   background:
     radial-gradient(120% 85% at 18% -12%, rgba(255, 255, 255, .13), transparent 44%),
     radial-gradient(90% 100% at 100% 0%, color-mix(in srgb, var(--accent-2) 11%, transparent), transparent 58%),

@@ -20,6 +20,7 @@ import {
   setAutosaveEnabled,
   snapshotWeight,
 } from "../lib/gameSaves";
+import { recordHistory } from "../lib/history";
 
 const AUTOSAVE_INTERVAL_MS = 20000;
 // After a (re)load, wait before arming autosave so a freshly-booted game can
@@ -56,6 +57,10 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
   const [status, setStatus] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [nowTick, setNowTick] = useState(0); // forces "x ago" label to refresh
+
+  useEffect(() => {
+    if (slug) recordHistory("game:" + slug, title);
+  }, [slug, title]);
 
   useEffect(() => {
     const enabled = isAutosaveEnabled();
@@ -418,7 +423,7 @@ export default function GameFrame({ src, title, slug, isExternal = false }) {
 
       <div className={`game-toolbar${panelOpen ? " is-open" : ""}`}>
         <div className="game-toolbar-bar">
-          <Link href="/gallery" className="game-btn game-btn-back" aria-label="Back to gallery">
+          <Link href="/games" className="game-btn game-btn-back" aria-label="Back to cloud games">
             <span aria-hidden="true">←</span>
             <span className="game-btn-label">Exit</span>
           </Link>

@@ -1,18 +1,30 @@
-# DigitBox (Next.js + Supabase)
+# DigitBox (Next.js)
 
-This project uses **Next.js (Pages Router)** with **Supabase** for authentication and data storage.
+DigitBox is an entertainment hub: videos, Shorts and cloud games that run in
+the browser, in a YouTube-style layout. It uses **Next.js (Pages Router)**;
+accounts, profiles and DigitBox Pro billing run on the Cloudflare `/v1` API.
 
-## AppGPT
+The portfolio version of the site (including the retired DigitBox AI, AppGPT
+and DEEPFORGE) is archived in [`archive/`](archive/README.md).
 
-AppGPT now lives inside DigitBox and is served at:
+## Videos
 
-`https://digitbox.dev/appgpt`
+`/videos`, `/shorts` and `/watch?v=<id>` list uploads from the channels in
+`data/videos.json`. `GET /api/videos` reads each channel's public YouTube RSS
+feed (no API key) and merges in the `videos` array from the same file, so:
 
-The browser runtime is isolated under `public/appgpt/`, while `next.config.js` rewrites the clean `/appgpt` URL directly to the AppGPT HTML shell. This keeps AppGPT as the top-level document, which is important for Telegram Mini App APIs.
+- **Add a channel:** add `{ "id": "UC…", "name": "…", "url": "…" }` to `channels`.
+- **Pin or add a video:** add an entry to `videos` (its `id` is the 11-character
+  YouTube id; set `"short": true` for Shorts). Entries also act as the fallback
+  list if YouTube's feed is unreachable.
 
-AppGPT supports persistent chat-based app creation, one evolving app per chat, versioned `index.html` artifacts, Code / Preview / Debug tabs, AI provider presets, Telegram-native UI hooks, templates, visual edits, debugging, downloading, and GitHub Pages publishing.
+## Cloud games
 
-The Telegram onboarding bot lives in `appgpt-bot/` and defaults to the DigitBox AppGPT URL. See `appgpt-bot/README.md` for deployment/setup.
+Games come from `data/projects-index.json` (the same index admin publishing
+updates). `data/cloud-games.json` adds how each game is presented, keyed by
+slug: `genre`, `tags` (these become the filter chips), an `icon` emoji and a
+`hue` for the generated cover art, `studio`, an optional `excerpt`, and
+`featured`. Games without an entry still show up with defaults.
 
 ## Eaglercraft Launcher credit
 

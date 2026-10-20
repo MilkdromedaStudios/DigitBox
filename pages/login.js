@@ -5,7 +5,7 @@ import {
   cloudSignup,
   getCloudAuthToken,
   loadCloudAuth,
-} from "../components/deepforge/cloudSync";
+} from "../lib/account";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -70,7 +70,7 @@ export default function LoginPage() {
         <small className="auth-kicker">ONE ACCOUNT · ALL DIGITBOX</small>
         <h1>{mode === "login" ? "Welcome back" : "Create your DigitBox account"}</h1>
         <p className="auth-subcopy">
-          This is the same account used by DEEPFORGE, including your game identity, clan access, and admin permissions.
+          One account for videos, cloud games, your profile, and DigitBox Pro.
         </p>
 
         <form onSubmit={handleSubmit} className="auth-form">

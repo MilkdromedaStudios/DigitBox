@@ -1,60 +1,33 @@
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import Head from "next/head";
+import Icon from "../components/Icon";
+import { PostCard } from "../components/Cards";
+import { POSTS } from "../lib/catalog";
 
 export default function PostsPage() {
-  const [posts, setPosts] = useState([]);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    loadPosts();
-  }, []);
-
-  async function loadPosts() {
-    setError("");
-    const res = await fetch("/api/content/list?type=post");
-    const payload = await res.json();
-    if (!res.ok) {
-      setError(payload.error || "Failed to load posts");
-      return;
-    }
-    setPosts(payload.items || []);
-  }
-
   return (
-    <div className="content">
-      <h1>Posts</h1>
-      {error && <p className="post-meta">{error}</p>}
+    <>
+      <Head>
+        <title>Community - DigitBox</title>
+        <meta name="description" content="News, updates and notes from the DigitBox community." />
+      </Head>
 
-      <div className="content-list">
-        {posts.map((post) => (
-          <article key={post.path} className="post-card">
-            <h2>{post.title}</h2>
-            <p className="post-meta">{post.name}</p>
-            <p className="post-excerpt">
-              {post.excerpt || "No preview available yet."}
-            </p>
+      <div className="hub-page">
+        <div className="hub-page-head">
+          <div>
+            <span className="hub-kicker">COMMUNITY</span>
+            <h1>Community posts</h1>
+            <p>News about new videos and cloud games, plus notes from behind the scenes.</p>
+          </div>
+        </div>
 
-            {/* View Post button */}
-            <Link
-              href={`/posts/${encodeURIComponent(post.slug)}`}
-              className="auth-btn action-btn"
-            >
-              View Post
-            </Link>
-
-            {/* Download button */}
-            <a
-              className="auth-btn action-btn"
-              href={post.download_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ marginLeft: "10px" }}
-            >
-              Download
-            </a>
-          </article>
-        ))}
+        {POSTS.length > 0 ? (
+          <div className="hub-grid hub-grid-posts">
+            {POSTS.map((post) => <PostCard key={post.key} post={post} />)}
+          </div>
+        ) : (
+          <div className="hub-empty"><Icon name="posts" /><h3>No posts yet</h3><p>Community posts will appear here.</p></div>
+        )}
       </div>
-    </div>
+    </>
   );
 }

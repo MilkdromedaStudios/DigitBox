@@ -3,6 +3,27 @@
 All notable changes to **digitbox.dev**. This list is grouped by feature; the
 most recent work is at the top.
 
+## Entertainment hub
+
+DigitBox is now an entertainment site for videos and cloud games instead of a
+portfolio. The old site is saved in `archive/digitbox-portfolio-2026-10-20.zip`.
+
+- **YouTube-style layout** — a top bar with search, a sidebar that collapses
+  to an icon rail, and a bottom tab bar on phones. Works in dark and light
+  themes with your accent colour.
+- **Videos** — uploads from the DigitBox YouTube channel appear automatically.
+  Watch them on a full watch page with Like, Share, Subscribe, a description
+  and an Up next list.
+- **Shorts** — a swipeable, full-screen vertical feed.
+- **Cloud Games** — every project is now a cloud game with its own cover art,
+  genre tags and filters. Games still open in the full-screen player with
+  autosave.
+- **Search** across videos, Shorts, games and posts.
+- **Library** — watch/play history, liked videos and games, and the notes
+  scratchpad, all saved on your device.
+- **Removed** — Digitbox AI, AppGPT and the DEEPFORGE beta, along with their
+  workflows. Accounts, profiles and DigitBox Pro are unchanged.
+
 ## Digitbox AI + easter eggs
 
 - **Digitbox AI** — a real, built-in AI assistant with its own **Digitbox AI**
