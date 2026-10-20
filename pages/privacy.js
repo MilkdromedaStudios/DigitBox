@@ -44,12 +44,15 @@ export default function PrivacyPage() {
         </p>
         <p>
           When you search, the DigitBox server sends your search words to
-          YouTube to get matching videos. To show what is trending where you
-          are, it also uses the country your request comes from (not your
-          precise location). DigitBox does not send YouTube your account,
-          email address, or anything that identifies you, and it keeps video
-          details from YouTube only briefly, in a cache, to stay within
-          YouTube&apos;s usage limits.
+          YouTube to get matching videos. Popular videos are shown for one
+          country (the United States unless the site owner picks another). If
+          the owner turns on per-country charts, the server also uses the
+          country your request comes from (never your precise location).
+          DigitBox does not send YouTube your account, email address, or
+          anything that identifies you. It keeps video details from YouTube
+          only briefly (a few days at most), in a cache, to stay within
+          YouTube&apos;s usage limits, and your browser forgets watch history
+          after 30 days.
         </p>
 
         <h2>The video player</h2>
@@ -128,9 +131,14 @@ export default function PrivacyPage() {
 
         <h2>Questions and changes</h2>
         <p>
-          Features and service providers can change as DigitBox develops. This
-          page will be updated when a change materially affects the information
-          described here. Please return to this page after a major site update.
+          Questions or complaints about privacy or about how DigitBox uses
+          YouTube can be sent by opening an issue on the{" "}
+          <a className="text-link" href="https://github.com/MilkdromedaStudios/DigitBox/issues" target="_blank" rel="noreferrer">
+            DigitBox GitHub repository
+          </a>
+          . Features and service providers can change as DigitBox develops.
+          This page will be updated when a change materially affects the
+          information described here.
         </p>
 
         <div className="gallery-actions">

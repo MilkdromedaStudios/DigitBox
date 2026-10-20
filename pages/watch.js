@@ -38,8 +38,9 @@ export default function WatchPage() {
   const [shareState, setShareState] = useState("");
   const [lookedUp, setLookedUp] = useState(null);
   // The player loads on the viewer's click, so nothing is sent to YouTube
-  // (and no YouTube cookies are set) until they choose to watch.
-  const [playing, setPlaying] = useState(false);
+  // (and no YouTube cookies are set) until they choose to watch. Keyed by
+  // video so moving to another video never mounts its player.
+  const [playingId, setPlayingId] = useState(null);
 
   const id = typeof router.query.v === "string" ? router.query.v : "";
   const validId = isVideoId(id);
@@ -53,6 +54,7 @@ export default function WatchPage() {
     [ownVideos, id, validId, recommended.videos]
   );
   const video = validId ? known || (lookedUp?.id === id ? lookedUp : normalizeVideo({ id, title: "YouTube video" })) : null;
+  const playing = Boolean(video) && playingId === video.id;
 
   useEffect(() => {
     if (!validId || known) return undefined;
@@ -68,7 +70,6 @@ export default function WatchPage() {
   useEffect(() => {
     setExpanded(false);
     setShareState("");
-    setPlaying(false);
   }, [id]);
 
   const historyKey = video?.key;
@@ -117,7 +118,7 @@ export default function WatchPage() {
         <div className="watch-primary">
           <div className={"watch-player" + (video.short ? " is-short" : "")}>
             {video.embeddable && !playing ? (
-              <button type="button" className="watch-poster" onClick={() => setPlaying(true)} aria-label={"Play " + video.title}>
+              <button type="button" className="watch-poster" onClick={() => setPlayingId(video.id)} aria-label={"Play " + video.title}>
                 <img src={video.thumb} alt="" />
                 <span className="hub-spotlight-play"><span><Icon name="play" size={34} /></span></span>
               </button>
@@ -202,7 +203,12 @@ export default function WatchPage() {
         </div>
 
         <aside className="watch-side" aria-label="Up next">
-          {upNext.length > 0 && <h2>Up next</h2>}
+          {upNext.length > 0 && (
+            <div className="watch-side-head">
+              <h2>Up next</h2>
+              <YouTubeAttribution />
+            </div>
+          )}
           {upNext.map((item) => <VideoCard key={item.key} video={item} layout="compact" />)}
           <h2>Cloud games</h2>
           {games.map((game) => <GameCard key={game.key} game={game} layout="compact" />)}

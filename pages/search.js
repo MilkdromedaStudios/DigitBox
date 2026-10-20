@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import { CatalogCard, SkeletonGrid } from "../components/Cards";
-import { likeKey, searchCatalog, uniqueVideos } from "../lib/catalog";
+import { CHANNELS, channelUrl, likeKey, searchCatalog } from "../lib/catalog";
 import { useLikes } from "../lib/useLikes";
 import { useVideos } from "../lib/useVideos";
 import { useYouTubeFeed } from "../lib/useYouTube";
@@ -18,6 +18,7 @@ const FILTERS = [
 
 // Every YouTube results page is a 100-unit search; three pages is plenty.
 const MAX_YOUTUBE_RESULTS = 60;
+const CHANNEL = CHANNELS[0];
 
 export default function SearchPage() {
   const router = useRouter();
@@ -28,15 +29,21 @@ export default function SearchPage() {
   const youtube = useYouTubeFeed("search", { q: query }, { enabled: Boolean(query) });
 
   // YouTube's policies don't allow other content to be mixed into YouTube
-  // results, so DigitBox's games and posts get their own section and every
-  // video (the channel's own uploads included) goes under the YouTube one.
+  // results, so DigitBox's games and posts, and the channel's own uploads,
+  // each get their own section.
   const matches = useMemo(() => searchCatalog(query, ownVideos), [query, ownVideos]);
   const local = matches.filter((item) => item.kind !== "video");
   const localShown = kind === "all" ? local : local.filter((item) => item.kind === kind);
   const ownMatches = matches.filter((item) => item.kind === "video");
-  const youtubeShown = kind === "all" || kind === "video" ? uniqueVideos(ownMatches, youtube.videos) : [];
+  const youtubeTab = kind === "all" || kind === "video";
+  // The channel's own matches come from DigitBox's list, not YouTube search, so
+  // they get their own section and YouTube's results stay as YouTube ranked them.
+  const ownShown = youtubeTab ? ownMatches : [];
+  const youtubeShown = youtubeTab ? youtube.videos : [];
   const youtubeOn = youtube.configured !== false;
-  const total = localShown.length + youtubeShown.length;
+  const total = localShown.length + ownShown.length + youtubeShown.length;
+  // The YouTube section shows its own loading and error states.
+  const youtubePending = youtubeTab && (youtube.loading || (youtubeOn && youtube.error));
 
   const card = (item) => (
     <CatalogCard key={item.key} item={item} layout="row" liked={likes.includes(likeKey(item))} onToggleLike={toggleLike} />
@@ -83,15 +90,25 @@ export default function SearchPage() {
               </section>
             )}
 
-            {(youtubeOn || youtubeShown.length > 0) && (kind === "all" || kind === "video") && (
+            {ownShown.length > 0 && (
+              <section className="hub-shelf">
+                <div className="hub-shelf-head">
+                  <h2><Icon name="user" />{CHANNEL ? "From " + CHANNEL.name : "From the DigitBox channel"}</h2>
+                  {CHANNEL && <YouTubeAttribution href={channelUrl(CHANNEL.id)} label="Channel on" />}
+                </div>
+                <div className="hub-list">{ownShown.map(card)}</div>
+              </section>
+            )}
+
+            {youtubeOn && youtubeTab && (
               <section className="hub-shelf">
                 <div className="hub-shelf-head">
                   <h2><Icon name="videos" />From YouTube</h2>
                   <YouTubeAttribution href={"https://www.youtube.com/results?search_query=" + encodeURIComponent(query)} label="Results from" />
                 </div>
-                {youtubeOn && youtube.loading && !youtubeShown.length ? (
+                {youtube.loading && !youtubeShown.length ? (
                   <SkeletonGrid count={4} />
-                ) : youtubeOn && youtube.error && !youtubeShown.length ? (
+                ) : youtube.error && !youtubeShown.length ? (
                   <p className="hub-count">YouTube search isn&apos;t available right now. Try again in a little while.</p>
                 ) : youtubeShown.length ? (
                   <>
@@ -110,7 +127,7 @@ export default function SearchPage() {
               </section>
             )}
 
-            {total === 0 && !youtube.loading && !(youtubeOn && youtube.error) && (
+            {total === 0 && !youtubePending && (
               <div className="hub-empty"><Icon name="search" /><h3>No results</h3><p>Try a different word, or check the spelling.</p></div>
             )}
           </>

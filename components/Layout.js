@@ -270,7 +270,21 @@ export default function Layout({ children }) {
         </footer>
       </aside>
 
-      <main className="hub-main">{children}</main>
+      <main className="hub-main">
+        {children}
+        {/* Shown when the sidebar footer is hidden (phones, tablets, collapsed
+            sidebar); Shorts is a full-screen feed with its own YouTube links. */}
+        {pathname !== "/shorts" && (
+          <footer className="hub-main-foot">
+            <Link href="/terms">Terms</Link>
+            <Link href="/privacy">Privacy</Link>
+            <span>
+              Videos are provided by YouTube. By using DigitBox you agree to the{" "}
+              <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube Terms of Service</a>.
+            </span>
+          </footer>
+        )}
+      </main>
 
       <nav className="hub-tabs" aria-label="Quick navigation">
         {[...PRIMARY_LINKS, YOU_LINKS[0]].map((link) => {

@@ -40,7 +40,7 @@ function Shelf({ icon, title, subtitle, href, linkLabel = "View all", action, ch
   );
 }
 
-function Spotlight({ video, kicker }) {
+function Spotlight({ video, kicker, attribution }) {
   if (!video) return null;
   return (
     <section className="hub-spotlight" aria-label="Featured video">
@@ -57,6 +57,7 @@ function Spotlight({ video, kicker }) {
         <div className="hub-spotlight-actions">
           <Link href={video.href} className="hub-pill-btn is-primary"><Icon name="play" size={18} />Watch now</Link>
           <Link href="/games" className="hub-pill-btn"><Icon name="games" size={18} />Play games</Link>
+          {attribution}
         </div>
       </div>
       <Link href={video.href} className="hub-spotlight-media" aria-label={"Watch " + video.title}>
@@ -139,7 +140,15 @@ export default function HomePage() {
 
         {chip === "Recommended" && (
           <>
-            {waiting ? <SpotlightSkeleton /> : <Spotlight video={feed[0]} kicker={youtubeOn ? "RECOMMENDED" : "NEW ON DIGITBOX"} />}
+            {waiting ? (
+              <SpotlightSkeleton />
+            ) : (
+              <Spotlight
+                video={feed[0]}
+                kicker={youtubeOn ? "RECOMMENDED" : "NEW ON DIGITBOX"}
+                attribution={<YouTubeAttribution href={feed[0] ? "https://www.youtube.com/watch?v=" + feed[0].id : undefined} label="Watch on" />}
+              />
+            )}
 
             <Shelf icon="videos" title="Recommended" href="/videos" linkLabel="All videos" action={<YouTubeAttribution />}>
               {waiting ? (
@@ -209,27 +218,33 @@ export default function HomePage() {
           </>
         )}
 
-        {chip === "Videos" &&
-          (popular.loading && !popular.videos.length ? (
-            <SkeletonGrid count={12} />
-          ) : (
-            <>
-              <div className="hub-grid">{popularList.map((video) => <VideoCard key={video.key} video={video} />)}</div>
-              <MoreButton feed={popular} />
-            </>
-          ))}
+        {chip === "Videos" && (
+          <Shelf icon="videos" title="Popular" href="/videos" linkLabel="Browse categories" action={<YouTubeAttribution />}>
+            {popular.loading && !popular.videos.length ? (
+              <SkeletonGrid count={12} />
+            ) : (
+              <>
+                <div className="hub-grid">{popularList.map((video) => <VideoCard key={video.key} video={video} />)}</div>
+                <MoreButton feed={popular} />
+              </>
+            )}
+          </Shelf>
+        )}
 
-        {chip === "Shorts" &&
-          (shorts.length > 0 ? (
-            <>
-              <div className="hub-grid hub-grid-shorts">{shorts.map((video) => <ShortCard key={video.key} video={video} />)}</div>
-              <MoreButton feed={ytShorts} />
-            </>
-          ) : ytShorts.loading ? (
-            <SkeletonGrid count={10} shorts />
-          ) : (
-            <div className="hub-empty"><Icon name="shorts" /><h3>No Shorts yet</h3><p>Check back soon.</p></div>
-          ))}
+        {chip === "Shorts" && (
+          <Shelf icon="shorts" title="Shorts" href="/shorts" linkLabel="Watch Shorts" action={<YouTubeAttribution label="Shorts from" />}>
+            {shorts.length > 0 ? (
+              <>
+                <div className="hub-grid hub-grid-shorts">{shorts.map((video) => <ShortCard key={video.key} video={video} />)}</div>
+                <MoreButton feed={ytShorts} />
+              </>
+            ) : ytShorts.loading ? (
+              <SkeletonGrid count={10} shorts />
+            ) : (
+              <div className="hub-empty"><Icon name="shorts" /><h3>No Shorts yet</h3><p>Check back soon.</p></div>
+            )}
+          </Shelf>
+        )}
 
         {chip === "Games" && <div className="hub-grid">{GAMES_BY_FEATURE.map(renderGame)}</div>}
       </div>
