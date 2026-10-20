@@ -3,12 +3,12 @@ import {
   loadCloudProfile,
   uploadCloudAvatar,
   deleteCloudAvatar,
-} from "../components/deepforge/cloudSync";
+} from "../lib/account";
 import {
   loadBillingStatus,
   startBillingCheckout,
   openBillingPortal,
-} from "../components/deepforge/billing";
+} from "../lib/billing";
 import {
   DEFAULT_PROFILE_PREFS,
   THEME_PRESETS,
@@ -219,7 +219,7 @@ export default function ProfilePage() {
       <section className="section profile-account-card">
         <small className="post-meta">DIGITBOX ACCOUNT</small>
         <h1>{account ? account.displayName || "Player" : "Profile"}</h1>
-        <p>{account ? account.email : "Log in to connect this profile to your DigitBox / DEEPFORGE account."}</p>
+        <p>{account ? account.email : "Log in to connect this profile to your DigitBox account."}</p>
         {account && (
           <div className="profile-account-flags">
             <span>{account.owner ? "♛ OWNER" : account.admin ? "◆ ADMIN" : "PLAYER"}</span>

@@ -1,0 +1,82 @@
+{
+  "eaglercraft-launcher": {
+    "genre": "Sandbox",
+    "tags": ["Minecraft", "Sandbox"],
+    "icon": "⛏️",
+    "hue": 132,
+    "studio": "Eaglercraft community",
+    "featured": true
+  },
+  "fnaf-launcher": {
+    "genre": "Horror",
+    "tags": ["Horror"],
+    "icon": "🐻",
+    "hue": 22,
+    "studio": "irv77",
+    "excerpt": "Every Five Nights at Freddy's game in one launcher. Hosted on irv77's site, so autosave isn't available."
+  },
+  "Crystal Seeker 3D": {
+    "genre": "3D",
+    "tags": ["3D", "Scratch"],
+    "icon": "💎",
+    "hue": 190,
+    "featured": true
+  },
+  "IGE Editor": {
+    "genre": "Creator tools",
+    "tags": ["Creator tools", "Scratch"],
+    "icon": "🛠️",
+    "hue": 262,
+    "excerpt": "Build your own scenes and games with the IGE engine editor."
+  },
+  "Appel 3D": {
+    "genre": "3D",
+    "tags": ["3D", "Scratch"],
+    "icon": "🍎",
+    "hue": 352
+  },
+  "Submersible": {
+    "genre": "Adventure",
+    "tags": ["Adventure", "Scratch"],
+    "icon": "🌊",
+    "hue": 206
+  },
+  "How To Use The IGE Engine": {
+    "genre": "Tutorial",
+    "tags": ["Creator tools", "Scratch"],
+    "icon": "📘",
+    "hue": 236,
+    "excerpt": "A playable walkthrough of the IGE engine and how to use it."
+  },
+  "Hypixel Bedwars": {
+    "genre": "PvP",
+    "tags": ["Minecraft", "Action", "Scratch"],
+    "icon": "🛏️",
+    "hue": 4,
+    "featured": true
+  },
+  "Raytraced Minecraft": {
+    "genre": "Tech demo",
+    "tags": ["Minecraft", "3D", "Scratch"],
+    "icon": "✨",
+    "hue": 44
+  },
+  "Onine Bed Wars 2": {
+    "genre": "PvP",
+    "tags": ["Minecraft", "Action", "Scratch"],
+    "icon": "⚔️",
+    "hue": 284
+  },
+  "Battle Arena": {
+    "genre": "Action",
+    "tags": ["Action", "Scratch"],
+    "icon": "🗡️",
+    "hue": 14
+  },
+  "Scratch Skyblock": {
+    "genre": "Survival",
+    "tags": ["Minecraft", "Scratch"],
+    "icon": "🏝️",
+    "hue": 160
+  }
+}

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import "../styles/global.css";
 import "../styles/login.css";
 import "../styles/motion.css";
-import "../styles/deepforge-beta.css";
+import "../styles/hub.css";
 import Layout from "../components/Layout";
 import PageTransition from "../components/PageTransition";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
@@ -27,17 +27,7 @@ export default function MyApp({ Component, pageProps, router }) {
     };
   }, []);
 
-  const cleanPath = String(router?.asPath || "").split(/[?#]/, 1)[0];
-  const isAppGPT = router?.pathname === "/appgpt" || cleanPath === "/appgpt" || cleanPath === "/appgpt/";
-  const isBeta = router?.pathname === "/beta" || router?.pathname?.startsWith("/beta/") || cleanPath === "/beta" || cleanPath === "/beta/" || cleanPath.startsWith("/beta/");
-  const isDeepforgeHome = router?.pathname === "/" || cleanPath === "/" || cleanPath === "";
-
-  // Standalone product/game surfaces do not inherit the old DigitBox
-  // navigation/header/footer chrome. DEEPFORGE is now the main homepage.
-  if (isAppGPT || isBeta || isDeepforgeHome) {
-    return <Component {...pageProps} />;
-  }
-
+  // Cloud games run full screen in GameFrame, without the hub chrome.
   if (router?.pathname?.startsWith("/projects/")) {
     return (
       <>

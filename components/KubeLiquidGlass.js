@@ -171,14 +171,8 @@ export default function KubeLiquidGlass() {
           SVG filters in backdrop-filter; the existing blur remains the fallback.
         */
         @supports (backdrop-filter: url("#beta-kube-liquid-panel")) {
-          .beta-liquid-active .header,
-          .beta-liquid-active .footer,
-          .beta-deepforge-pill,
-          .beta-news-pill,
-          .beta-mini-pill,
-          .digitbox-liquid-active .header,
-          .digitbox-liquid-active .footer,
-          .digitbox-liquid-active .nav a,
+          .digitbox-liquid-active .hub-chip,
+          .digitbox-liquid-active .hub-pill-btn,
           .digitbox-liquid-active .btn-base,
           .digitbox-liquid-active .gallery-tab,
           .digitbox-liquid-active .profile-box {
@@ -186,19 +180,15 @@ export default function KubeLiquidGlass() {
             backdrop-filter: url("#beta-kube-liquid-pill") blur(7px) saturate(150%) !important;
           }
 
-          .beta-liquid-hero-glass,
-          .beta-liquid-section,
+          .digitbox-liquid-active .hub-spotlight-copy,
           .digitbox-liquid-active .section,
           .digitbox-liquid-active .post-form,
-          .digitbox-liquid-active .auth-box,
-          .digitbox-liquid-active .ai-main {
+          .digitbox-liquid-active .auth-box {
             -webkit-backdrop-filter: url("#beta-kube-liquid-panel") blur(8px) saturate(155%) !important;
             backdrop-filter: url("#beta-kube-liquid-panel") blur(8px) saturate(155%) !important;
           }
 
-          .beta-liquid-card,
-          .beta-deepforge-orb,
-          .beta-deepforge-cta,
+          .digitbox-liquid-active .post-tile,
           .digitbox-liquid-active .card,
           .digitbox-liquid-active .gallery-item,
           .digitbox-liquid-active .post-card,
