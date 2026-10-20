@@ -79,14 +79,13 @@ body[data-theme="light"].digitbox-liquid-active {
   letter-spacing: -.035em;
 }
 .hub-logo:hover { color: var(--text); }
+/* The DigitBox box mark (same as the favicon), kept distinct from YouTube's
+   play-button logo so the two are never confused. */
 .hub-logo-mark {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 23px;
-  border-radius: 7px;
-  background: var(--hub-grad);
-  color: #fff;
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
@@ -439,6 +438,16 @@ body[data-theme="light"].digitbox-liquid-active {
   letter-spacing: -.02em;
 }
 .hub-shelf-head h2 .hub-icon { color: color-mix(in srgb, var(--accent) 75%, var(--text)); }
+.hub-shelf-sub { margin: 4px 0 0 34px; color: var(--muted); font-size: .86rem; }
+.hub-more { display: flex; justify-content: center; margin: 28px 0 8px; }
+.hub-channel-card {
+  padding: 18px 18px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--hub-line));
+  border-radius: 22px;
+  background:
+    radial-gradient(70% 120% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    linear-gradient(145deg, var(--lg-tint-2), var(--lg-tint));
+}
 .hub-row {
   display: grid;
   grid-auto-flow: column;
@@ -513,6 +522,46 @@ body[data-theme="light"].digitbox-liquid-active {
   letter-spacing: .05em;
 }
 .media-badge-cloud { top: 8px; right: auto; bottom: auto; left: 8px; background: rgba(6, 10, 24, .6); backdrop-filter: blur(8px); }
+.media-badge-live { background: #e11d48; }
+.hub-avatar { overflow: hidden; }
+.hub-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* YouTube attribution: official logo on a solid background (branding rules). */
+.yt-logo { display: inline-flex; align-items: center; }
+/* Explicit size: Tailwind's img reset (max-width: 100%; height: auto)
+   collapses an SVG with no intrinsic size to 0 inside a shrink-to-fit pill. */
+.yt-logo img { display: block; width: auto; max-width: none; }
+.yt-logo-on-light { display: none !important; }
+body[data-theme="light"] .yt-logo-on-light { display: block !important; }
+body[data-theme="light"] .yt-logo-on-dark { display: none !important; }
+.yt-attrib {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--hub-line);
+  border-radius: 999px;
+  background: var(--bg-elev);
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.yt-attrib:hover { color: var(--text); border-color: var(--ring); }
+.hub-shelf-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+
+/* Loading placeholders */
+.skeleton, .skeleton-line {
+  background: linear-gradient(90deg, var(--hub-soft) 25%, var(--hub-hover) 50%, var(--hub-soft) 75%);
+  background-size: 200% 100%;
+  animation: hubShimmer 1.4s ease-in-out infinite;
+}
+.media-thumb.skeleton, .short-card.skeleton { box-shadow: none; }
+.skeleton-line { display: block; height: 12px; margin: 4px 0 8px; border-radius: 6px; }
+.skeleton-line.is-short { width: 60%; }
+@keyframes hubShimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton, .skeleton-line { animation: none; } }
 .media-hover {
   position: absolute;
   inset: 0;
@@ -857,6 +906,13 @@ body[data-theme="light"].digitbox-liquid-active {
 }
 .watch-player.is-short { height: min(78vh, 760px); width: auto; max-width: 100%; margin: 0 auto; aspect-ratio: 9 / 16; }
 .watch-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.watch-poster { position: absolute; inset: 0; padding: 0; border: 0; background: #000; cursor: pointer; }
+.watch-poster img { width: 100%; height: 100%; object-fit: cover; }
+.watch-poster:hover .hub-spotlight-play span { transform: scale(1.08); }
+.watch-blocked { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: #fff; }
+.watch-blocked img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(6px) brightness(.4); transform: scale(1.06); }
+.watch-blocked div { position: relative; display: grid; justify-items: center; gap: 12px; padding: 16px; }
+.watch-blocked p { margin: 0; font-weight: 700; }
 .watch h1 { margin: 14px 0 12px; font-size: clamp(1.15rem, 1.8vw, 1.45rem); font-weight: 700; line-height: 1.35; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .watch-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; }
 .watch-channel { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -963,14 +1019,15 @@ body[data-theme="light"].digitbox-liquid-active {
 .short-action.is-liked .short-action-icon { color: #f43f5e; }
 .shorts-empty { padding: 40px var(--hub-gutter); }
 
+/* Phones: the actions sit in a bar under the video, never on top of the
+   player (YouTube's player rules forbid overlays on an embed). */
 @media (max-width: 759px) {
   .shorts-page, .short-slide { height: calc(100dvh - var(--hub-top-h) - var(--hub-tabs-h) - env(safe-area-inset-bottom)); }
-  .short-slide { position: relative; gap: 0; padding: 0; }
-  .short-stage { width: 100%; height: 100%; max-height: none; aspect-ratio: auto; border-radius: 0; }
-  .short-actions { position: absolute; right: 10px; bottom: 96px; z-index: 3; padding: 0; }
-  .short-action, .short-action:hover { color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, .6); }
-  .short-action-icon { border-color: transparent; background: rgba(0, 0, 0, .4); }
-  .short-poster-info { right: 72px; }
+  .short-slide { flex-direction: column; gap: 0; padding: 0; }
+  .short-stage { flex: 1; width: 100%; height: auto; min-height: 0; max-height: none; aspect-ratio: auto; border-radius: 0; }
+  .short-actions { flex-direction: row; align-items: center; justify-content: space-evenly; align-self: stretch; gap: 8px; padding: 8px 12px; }
+  .short-action { grid-auto-flow: column; align-items: center; gap: 6px; }
+  .short-action-icon { width: 38px; height: 38px; }
 }
 
 /* ------------------------------------------------------------------ *

@@ -8,12 +8,16 @@ import { HISTORY_UPDATED_EVENT, clearHistory, readHistory } from "../lib/history
 import { readNotes, writeNotes } from "../lib/notes";
 import { useLikes } from "../lib/useLikes";
 import { useVideos } from "../lib/useVideos";
+import { findLoadedVideo, lookupYouTube } from "../lib/useYouTube";
+import { YouTubeAttribution } from "../components/YouTubeLogo";
 
 // Resolve a stored "video:<id>" / "game:<slug>" key back to a catalog item.
-function resolve(key, title, videos) {
+function resolve(key, title, videos, lookedUp) {
   const [kind, ...rest] = String(key).split(":");
   const id = rest.join(":");
-  if (kind === "video") return videos.find((video) => video.id === id) || normalizeVideo({ id, title });
+  if (kind === "video") {
+    return videos.find((video) => video.id === id) || lookedUp.get(id) || findLoadedVideo(id) || normalizeVideo({ id, title });
+  }
   if (kind === "game") return GAMES.find((game) => game.slug === id) || null;
   return GAMES.find((game) => game.slug === key) || null;
 }
@@ -36,6 +40,7 @@ export default function LibraryPage() {
   const [history, setHistory] = useState([]);
   const [notes, setNotes] = useState("");
   const [notesSaved, setNotesSaved] = useState(true);
+  const [lookedUp, setLookedUp] = useState(() => new Map());
   const hydratedRef = useRef(false);
 
   useEffect(() => {
@@ -60,13 +65,30 @@ export default function LibraryPage() {
     return () => clearTimeout(timer);
   }, [notes]);
 
+  // YouTube videos are stored by id only: fetch titles, channels and
+  // thumbnails for the ones this device doesn't already know.
+  useEffect(() => {
+    const ids = [...history.map((entry) => entry.key), ...likes]
+      .filter((key) => String(key).startsWith("video:"))
+      .map((key) => String(key).slice(6))
+      .filter((id) => !videos.some((video) => video.id === id) && !findLoadedVideo(id));
+    if (!ids.length) return undefined;
+    let active = true;
+    lookupYouTube(ids).then((found) => {
+      if (active && found.size) setLookedUp(found);
+    });
+    return () => {
+      active = false;
+    };
+  }, [history, likes, videos]);
+
   const historyItems = useMemo(
-    () => history.map((entry) => resolve(entry.key, entry.title, videos)).filter(Boolean),
-    [history, videos]
+    () => history.map((entry) => resolve(entry.key, entry.title, videos, lookedUp)).filter(Boolean),
+    [history, videos, lookedUp]
   );
   const likedItems = useMemo(
-    () => likes.map((key) => resolve(key, "", videos)).filter(Boolean),
-    [likes, videos]
+    () => likes.map((key) => resolve(key, "", videos, lookedUp)).filter(Boolean),
+    [likes, videos, lookedUp]
   );
 
   const card = (item) => (
@@ -87,6 +109,7 @@ export default function LibraryPage() {
             <h1>Library</h1>
             <p>Your history, likes and notes. They&apos;re saved in this browser, so they stay private to this device.</p>
           </div>
+          <YouTubeAttribution />
         </div>
 
         <Section
@@ -106,13 +129,13 @@ export default function LibraryPage() {
           )}
         </Section>
 
-        <Section id="liked" icon="heart" title="Liked">
+        <Section id="liked" icon="heart" title="Saved">
           {likedItems.length > 0 ? (
             <div className="hub-grid">{likedItems.map(card)}</div>
           ) : (
             <div className="hub-empty">
               <Icon name="heart" />
-              <h3>No likes yet</h3>
+              <h3>Nothing saved yet</h3>
               <p>Tap the heart on a video or game to save it here.</p>
               <Link href="/games" className="hub-pill-btn is-primary">Find a game</Link>
             </div>

@@ -16,10 +16,10 @@ export default function AboutPage() {
         <p className="post-meta">ABOUT DIGITBOX</p>
         <h1>Watch, play, and come back for more.</h1>
         <p>
-          DigitBox is an entertainment hub. Watch videos and Shorts from the
-          DigitBox channel, then jump straight into a cloud game without
-          downloading anything. Everything runs in your browser, on a laptop,
-          a Chromebook, or a phone.
+          DigitBox is an entertainment hub. Watch popular videos and Shorts
+          from YouTube and from the DigitBox channel, then jump straight into
+          a cloud game without downloading anything. Everything runs in your
+          browser, on a laptop, a Chromebook, or a phone.
         </p>
 
         <h2>What you can do here</h2>
@@ -27,9 +27,9 @@ export default function AboutPage() {
           <section className="card">
             <h3>Watch videos</h3>
             <p>
-              New uploads from the channel appear automatically. Watch them in
-              the player, swipe through Shorts, like your favourites, and pick
-              up where you left off from your Library.
+              Browse what&apos;s popular on YouTube, search for anything, and
+              swipe through Shorts. Save favourites and pick up where you left
+              off from your Library.
             </p>
           </section>
           <section className="card">
@@ -54,8 +54,8 @@ export default function AboutPage() {
           The site and its game catalog live in the public DigitBox GitHub
           repository. Larger game files are served from GitHub release assets
           or cloud storage, so games stay quick to load without making the
-          website itself heavy. Videos play through YouTube&apos;s embedded
-          player.
+          website itself heavy. Videos come from YouTube through YouTube API
+          Services and play in YouTube&apos;s own embedded player.
         </p>
         <p>
           DigitBox is independent. It is not an official Minecraft, Scratch,

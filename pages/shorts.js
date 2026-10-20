@@ -3,35 +3,55 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../components/Icon";
-import { isVideoId, likeKey } from "../lib/catalog";
+import { isVideoId, likeKey, normalizeVideo, uniqueVideos } from "../lib/catalog";
 import { formatViews } from "../lib/format";
 import { recordHistory } from "../lib/history";
 import { shareLink } from "../lib/share";
 import { useLikes } from "../lib/useLikes";
 import { useVideos } from "../lib/useVideos";
+import { lookupYouTube, useYouTubeFeed } from "../lib/useYouTube";
+import { YouTubeAttribution } from "../components/YouTubeLogo";
+
+// Each extra page of YouTube Shorts is a 100-unit search, so stop paging here.
+const MAX_YOUTUBE_SHORTS = 72;
 
 export default function ShortsPage() {
   const router = useRouter();
-  const videos = useVideos();
+  const ownVideos = useVideos();
+  const ytShorts = useYouTubeFeed("shorts");
   const [likes, toggleLike] = useLikes();
   const [activeId, setActiveId] = useState("");
   // Players only load after the first tap, so they can start with sound.
   const [started, setStarted] = useState(false);
   const [copiedId, setCopiedId] = useState("");
+  // A Short opened by link that isn't in the feed (from search, a share…).
+  const [linked, setLinked] = useState(null);
   const feedRef = useRef(null);
   const jumpedRef = useRef(false);
 
-  const shorts = useMemo(() => videos.filter((video) => video.short), [videos]);
   const requested = typeof router.query.v === "string" && isVideoId(router.query.v) ? router.query.v : "";
+  const ownShorts = useMemo(() => ownVideos.filter((video) => video.short), [ownVideos]);
+  const shorts = useMemo(() => uniqueVideos(linked ? [linked] : [], ytShorts.videos, ownShorts), [linked, ytShorts.videos, ownShorts]);
+  const ready = router.isReady && !ytShorts.loading;
 
-  // Open at the short from ?v= (e.g. a shared link or a Shorts shelf card).
   useEffect(() => {
-    if (jumpedRef.current || !router.isReady || !shorts.length) return;
+    if (!ready || !requested || linked || shorts.some((video) => video.id === requested)) return;
+    setLinked(normalizeVideo({ id: requested, title: "Short", short: true }));
+    lookupYouTube([requested]).then((found) => {
+      const video = found.get(requested);
+      if (video) setLinked({ ...video, short: true });
+    });
+  }, [ready, requested, linked, shorts]);
+
+  // Open at the requested Short once the feed has settled.
+  useEffect(() => {
+    if (jumpedRef.current || !ready || !shorts.length) return;
+    if (requested && !shorts.some((video) => video.id === requested)) return; // wait for `linked`
     const target = requested && feedRef.current?.querySelector('[data-id="' + requested + '"]');
     if (target) target.scrollIntoView({ block: "start" });
     setActiveId(target ? requested : shorts[0].id);
     jumpedRef.current = true;
-  }, [router.isReady, requested, shorts]);
+  }, [ready, requested, shorts]);
 
   useEffect(() => {
     const feed = feedRef.current;
@@ -47,6 +67,13 @@ export default function ShortsPage() {
     feed.querySelectorAll("[data-id]").forEach((slide) => observer.observe(slide));
     return () => observer.disconnect();
   }, [shorts]);
+
+  // Fetch the next page of YouTube Shorts when nearing the end.
+  const { hasMore, loading, loadMore } = ytShorts;
+  useEffect(() => {
+    const index = shorts.findIndex((video) => video.id === activeId);
+    if (index >= 0 && index >= shorts.length - 3 && hasMore && !loading && ytShorts.videos.length < MAX_YOUTUBE_SHORTS) loadMore();
+  }, [activeId, shorts, hasMore, loading, loadMore, ytShorts.videos.length]);
 
   useEffect(() => {
     const video = shorts.find((item) => item.id === activeId);
@@ -65,17 +92,21 @@ export default function ShortsPage() {
     <>
       <Head>
         <title>Shorts - DigitBox</title>
-        <meta name="description" content="Quick vertical videos on DigitBox. Swipe through Shorts from the channel." />
+        <meta name="description" content="Swipe through popular Shorts, plus Shorts from the DigitBox channel." />
       </Head>
 
       {shorts.length === 0 ? (
         <div className="shorts-empty">
-          <div className="hub-empty">
-            <Icon name="shorts" />
-            <h2>No Shorts yet</h2>
-            <p>New Shorts from the channel show up here automatically.</p>
-            <Link href="/videos" className="hub-pill-btn is-primary">Watch videos instead</Link>
-          </div>
+          {ytShorts.loading ? (
+            <div className="short-slide"><div className="short-stage skeleton" /></div>
+          ) : (
+            <div className="hub-empty">
+              <Icon name="shorts" />
+              <h2>No Shorts yet</h2>
+              <p>New Shorts show up here automatically.</p>
+              <Link href="/videos" className="hub-pill-btn is-primary">Watch videos instead</Link>
+            </div>
+          )}
         </div>
       ) : (
         <div className="shorts-page" ref={feedRef}>
@@ -87,7 +118,7 @@ export default function ShortsPage() {
                 <div className="short-stage">
                   {active && started ? (
                     <iframe
-                      src={"https://www.youtube-nocookie.com/embed/" + video.id + "?autoplay=1&playsinline=1&loop=1&playlist=" + video.id + "&rel=0&modestbranding=1"}
+                      src={"https://www.youtube-nocookie.com/embed/" + video.id + "?autoplay=1&playsinline=1&loop=1&playlist=" + video.id + "&rel=0"}
                       title={video.title}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       referrerPolicy="strict-origin-when-cross-origin"
@@ -123,21 +154,13 @@ export default function ShortsPage() {
                     onClick={() => toggleLike(video)}
                   >
                     <span className="short-action-icon"><Icon name={liked ? "heartFill" : "heart"} /></span>
-                    {liked ? "Liked" : "Like"}
+                    {liked ? "Saved" : "Save"}
                   </button>
                   <button type="button" className="short-action" onClick={() => onShare(video)}>
                     <span className="short-action-icon"><Icon name="share" /></span>
                     {copiedId === video.id ? "Copied" : "Share"}
                   </button>
-                  <a
-                    className="short-action"
-                    href={"https://www.youtube.com/shorts/" + video.id}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <span className="short-action-icon"><Icon name="external" /></span>
-                    YouTube
-                  </a>
+                  <YouTubeAttribution href={"https://www.youtube.com/shorts/" + video.id} label="Watch on" />
                 </div>
               </section>
             );

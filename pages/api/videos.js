@@ -1,10 +1,13 @@
 import videoData from "../../data/videos.json";
 import { jsonResponse } from "../../lib/apiResponse";
+import { cachedJson } from "../../lib/edgeCache";
+import { channelUploads, youtubeConfigured } from "../../lib/youtube";
 
 export const config = { runtime: "edge" };
 
-// Latest uploads for every channel in data/videos.json, read from YouTube's
-// public RSS feed (no API key). Hand-added entries in data/videos.json are
+// Latest uploads for every channel in data/videos.json: through the YouTube
+// Data API when YOUTUBE_API_KEY is set (durations, avatars, proper Shorts),
+// otherwise from YouTube's public RSS feed (no key needed). Hand-added entries in data/videos.json are
 // merged in, so the list survives a feed outage and can hold older videos the
 // feed (latest 15 only) no longer includes.
 
@@ -63,56 +66,28 @@ async function fetchChannel(channel) {
   throw lastError;
 }
 
-// The last good feed, kept in the Cloudflare Cache API: served as-is while
-// fresh, and in place of the stored list when YouTube is failing. Cloudflare
-// doesn't cache function responses from Cache-Control alone, so without this
-// every visitor would hit the flaky feed. Where there is no Cache API (e.g.
-// Vercel) these are no-ops.
-const FEED_CACHE_KEY = "https://digitbox.dev/__cache/api-videos-feed-v1";
-const FRESH_MS = 15 * 60 * 1000;
-
-function feedCache() {
-  try {
-    return globalThis.caches && globalThis.caches.default ? globalThis.caches.default : null;
-  } catch {
-    return null;
-  }
+async function apiUploads() {
+  const lists = await Promise.all(videoData.channels.map((channel) => channelUploads({ channelId: channel.id })));
+  return lists.flatMap((list) => list.videos);
 }
 
-async function readFeedCache() {
-  try {
-    const hit = await feedCache()?.match(FEED_CACHE_KEY);
-    const body = hit ? await hit.json() : null;
-    return body && Array.isArray(body.videos) && body.videos.length ? body : null;
-  } catch {
-    return null;
-  }
-}
-
-async function writeFeedCache(videos) {
-  try {
-    await feedCache()?.put(
-      FEED_CACHE_KEY,
-      new Response(JSON.stringify({ videos, fetchedAt: Date.now() }), {
-        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=604800" },
-      })
-    );
-  } catch {
-    /* caching is best-effort */
-  }
-}
-
+// Fresh for 30 minutes; when YouTube is failing the last good feed is served
+// instead of the stored list (see lib/edgeCache.js).
 async function liveVideos() {
-  const cached = await readFeedCache();
-  if (cached && Date.now() - cached.fetchedAt < FRESH_MS) return cached.videos;
-
-  const results = await Promise.allSettled(videoData.channels.map(fetchChannel));
-  const live = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
-  if (live.length) {
-    await writeFeedCache(live);
-    return live;
+  try {
+    return await cachedJson("api-videos-feed-v2", 30 * 60 * 1000, async () => {
+      if (youtubeConfigured()) {
+        const fromApi = await apiUploads().catch(() => []);
+        if (fromApi.length) return fromApi;
+      }
+      const results = await Promise.allSettled(videoData.channels.map(fetchChannel));
+      const live = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+      if (!live.length) throw new Error("No channel feed could be read");
+      return live;
+    });
+  } catch {
+    return [];
   }
-  return cached ? cached.videos : [];
 }
 
 export default async function handler(req) {

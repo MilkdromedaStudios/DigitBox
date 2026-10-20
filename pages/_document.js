@@ -1,5 +1,7 @@
 import Document, { Html, Head, Main, NextScript } from "next/document";
 
+// Never add /watch or /shorts: pages with a YouTube player must stay free of
+// ad and tracking scripts (YouTube's Made for Kids rules for embeds).
 const AD_ELIGIBLE_ROUTES = new Set(["/", "/posts/[post]", "/changelog"]);
 
 function shouldServeAds(pathname) {
