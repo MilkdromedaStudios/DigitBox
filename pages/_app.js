@@ -3,6 +3,7 @@ import "../styles/global.css";
 import "../styles/login.css";
 import "../styles/motion.css";
 import "../styles/hub.css";
+import "../styles/minecraft.css";
 import Layout from "../components/Layout";
 import PageTransition from "../components/PageTransition";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";

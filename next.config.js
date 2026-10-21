@@ -21,6 +21,7 @@ const nextConfig = {
   async redirects() {
     // Old portfolio URLs land on their entertainment-hub equivalents.
     return [
+      { source: "/projects/eaglercraft-launcher", destination: "/projects/minecraft", permanent: false },
       { source: "/gallery", destination: "/games", permanent: false },
       { source: "/projects", destination: "/games", permanent: false },
       { source: "/ai", destination: "/", permanent: false },

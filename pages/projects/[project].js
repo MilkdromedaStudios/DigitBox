@@ -57,19 +57,6 @@ export async function getServerSideProps({ params }) {
     };
   }
 
-  if (slug === "Eaglercraft Launcher" || slug === "eaglercraft-launcher") {
-    if (await isBlocked("eaglercraft-launcher")) return { notFound: true };
-    const filePath = "public/projects/eaglercraft-launcher.html";
-    return {
-      props: {
-        src: `/api/content/file?path=${encodeURIComponent(filePath)}`,
-        title: "Eaglercraft Launcher",
-        slug: "eaglercraft-launcher",
-        isExternal: false,
-      },
-    };
-  }
-
   if (await isBlocked(slug)) return { notFound: true };
   if (!GAMES.some((game) => game.slug === slug) && isValidSlug(slug) && getD1()) {
     // An address in the added projects' format: one of those or nothing.

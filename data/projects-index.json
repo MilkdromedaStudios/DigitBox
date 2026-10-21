@@ -1,9 +1,9 @@
 [
   {
-    "title": "Eaglercraft Launcher",
-    "slug": "eaglercraft-launcher",
-    "path": "public/projects/eaglercraft-launcher.html",
-    "excerpt": "Browse Eaglercraft web editions, community clients, mobile/controller variants, resource packs, and mods from a DigitBox-native catalog."
+    "title": "Minecraft",
+    "slug": "minecraft",
+    "path": "pages/projects/minecraft.js",
+    "excerpt": "Explore Eaglercraft Minecraft versions, clients and modpacks from the live GitHub game catalog."
   },
   {
     "title": "Five Nights at Freddy's Launcher",
