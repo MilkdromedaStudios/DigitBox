@@ -43,11 +43,13 @@ export default async function handler(req) {
     const { value, errors } = validateProjectFields(rest, { partial: true });
     if (errors) return privateJson({ error: Object.values(errors)[0], fields: errors }, 400);
     // Keep only real changes, so "edited" means something and a field set
-    // back to the original follows future updates to the game.
+    // back to the original follows future updates to the game. An emptied
+    // description or genre also means "the original".
     const shipped = original(game);
     const fields = {};
     for (const [field, fieldValue] of Object.entries(value)) {
-      fields[field] = field in shipped && fieldValue === shipped[field] ? null : fieldValue;
+      const unchanged = field in shipped && (fieldValue === shipped[field] || fieldValue === "");
+      fields[field] = unchanged ? null : fieldValue;
     }
     if (deleted !== undefined) fields.deleted = deleted;
     return privateJson({ change: await saveBuiltInChange(auth.db, slug, fields) });

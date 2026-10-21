@@ -8,7 +8,8 @@ most recent work is at the top.
 - **Edit, hide or delete the built-in games** from `/admin/projects`, for
   example to take a game down after a copyright complaint. A deleted game
   leaves every list, its page answers "not found" and its files stop being
-  served, straight away and without a rebuild. It can be restored. Lists only
+  served (under any folder, case or spelling), within seconds and without a
+  rebuild. It can be restored. Lists only
   show built-in games once these changes have loaded, so a deleted game never
   flashes up.
 - Games are uploaded and loaded in pieces of about 1 MB, which keeps every

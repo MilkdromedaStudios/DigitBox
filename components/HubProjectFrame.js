@@ -14,11 +14,15 @@
 // localStorage, which seeds the game next time it loads.
 
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { recordHistory } from "../lib/history";
 
 export const SAVE_PREFIX = "digitbox_hubsave_v1:";
 const MESSAGE_TYPE = "digitbox:hub-save";
+// The page asks a game to save before it leaves (see requestFlush).
+const FLUSH_TYPE = "digitbox:hub-flush";
+const FLUSHED_TYPE = "digitbox:hub-flushed";
 // Saves share this site's localStorage (about 5M characters) with the login
 // token, likes and history, so cap each game and all of them together.
 const MAX_SAVE_CHARS = 1000000;
@@ -89,6 +93,7 @@ function makeRoomForSaves(needed, keepKey) {
 // A frame's window stays the same object across reloads inside the frame,
 // and saves a game makes as it closes still arrive after the frame is gone.
 const frames = new WeakMap();
+const flushWaiters = new Map();
 const pending = new Map();
 let persistTimer = null;
 let listening = false;
@@ -138,6 +143,11 @@ function persistNow() {
 function onMessage(event) {
   const frame = event.source ? frames.get(event.source) : null;
   const message = event.data;
+  if (frame && message && message.type === FLUSHED_TYPE) {
+    const done = flushWaiters.get(event.source);
+    if (done) done();
+    return;
+  }
   if (!frame || !message || message.type !== MESSAGE_TYPE || message.slug !== frame.slug || !Array.isArray(message.ops)) return;
   const ops = message.ops.filter(validOp);
   if (!ops.length) return;
@@ -145,6 +155,33 @@ function onMessage(event) {
   entry.ops.push(...ops);
   pending.set(frame.slug, entry);
   if (!persistTimer) persistTimer = setTimeout(persistNow, 250);
+}
+
+// Removing a sandboxed frame drops whatever it posts while unloading, so
+// games that save as they're closed would lose that progress. Before the
+// page leaves, ask the game to run its unload handlers and send its changes,
+// and wait briefly for it.
+export function requestFlush(gameWindow, timeoutMs = 400) {
+  if (!gameWindow || !frames.get(gameWindow)) {
+    persistNow();
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      flushWaiters.delete(gameWindow);
+      persistNow();
+      resolve();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    flushWaiters.set(gameWindow, finish);
+    try {
+      // A null-origin frame can only be addressed with "*"; nothing secret is sent.
+      gameWindow.postMessage({ type: FLUSH_TYPE }, "*");
+    } catch {
+      finish();
+    }
+  });
 }
 
 function listen() {
@@ -242,12 +279,23 @@ function storageBridge(config) {
     // Built on Storage.prototype, so instanceof Storage, hasOwnProperty and
     // toString behave like the real thing.
     var target = Object.create(typeof Storage === "function" ? Storage.prototype : Object.prototype);
+    // Chrome lists a stored key named after a Storage method (getItem) in
+    // Object.keys, but not one named after an accessor (length).
+    function listed(key) {
+      for (var proto = target; proto; proto = Object.getPrototypeOf(proto)) {
+        var own = Object.getOwnPropertyDescriptor(proto, key);
+        if (own) return !(own.get || own.set);
+      }
+      return true;
+    }
     var store = new Proxy(target, {
       get: function (_target, prop) {
         if (prop === "length") return Object.keys(data).length;
         if (typeof prop === "string" && hasOwn(api, prop)) return api[prop];
-        if (typeof prop === "string" && hasOwn(data, prop)) return data[prop];
-        return Reflect.get(target, prop);
+        // Like real Storage, a stored key named after a Storage or Object
+        // member (length, toString, ...) is only reachable with getItem().
+        if (prop in target) return Reflect.get(target, prop);
+        return typeof prop === "string" && hasOwn(data, prop) ? data[prop] : undefined;
       },
       set: function (_target, prop, value) {
         if (typeof prop === "symbol") return Reflect.set(target, prop, value);
@@ -262,10 +310,10 @@ function storageBridge(config) {
         return (typeof prop === "string" && (hasOwn(api, prop) || hasOwn(data, prop))) || Reflect.has(target, prop);
       },
       ownKeys: function () {
-        return Object.keys(data);
+        return Object.keys(data).filter(listed);
       },
       getOwnPropertyDescriptor: function (_target, prop) {
-        if (typeof prop !== "string" || !hasOwn(data, prop)) return undefined;
+        if (typeof prop !== "string" || !hasOwn(data, prop) || !listed(prop)) return undefined;
         return { value: data[prop], writable: true, enumerable: true, configurable: true };
       },
     });
@@ -324,6 +372,24 @@ function storageBridge(config) {
   }
   window.addEventListener("pagehide", leaving);
   window.addEventListener("beforeunload", leaving);
+
+  // The page is about to remove this frame (see requestFlush): run the
+  // game's own unload handlers now, send everything, then confirm.
+  window.addEventListener("message", function (event) {
+    if (event.source !== parent || !event.data || event.data.type !== settings.flushType) return;
+    try {
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+    } catch (error) {
+      /* a game handler threw */
+    }
+    try {
+      window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
+    } catch (error) {
+      /* a game handler threw */
+    }
+    send();
+    if (settings.persist) parent.postMessage({ type: settings.flushedType, slug: settings.slug }, settings.origin);
+  });
   /* eslint-enable no-var */
 }
 
@@ -338,7 +404,16 @@ function scriptJson(value) {
 // The game's HTML with the storage bridge inserted first (after the
 // doctype, so the game keeps standards mode).
 export function buildSandboxDocument(html, { slug, saved, origin, persist }) {
-  const config = { type: MESSAGE_TYPE, slug, origin, persist: Boolean(persist), local: saved?.local || {}, cookies: saved?.cookies || {} };
+  const config = {
+    type: MESSAGE_TYPE,
+    flushType: FLUSH_TYPE,
+    flushedType: FLUSHED_TYPE,
+    slug,
+    origin,
+    persist: Boolean(persist),
+    local: saved?.local || {},
+    cookies: saved?.cookies || {},
+  };
   const bridge = `<script>(${storageBridge.toString()})(${scriptJson(config)});</script>`;
   const doctype = html.match(/^\s*<!doctype[^>]*>/i);
   return doctype ? doctype[0] + bridge + html.slice(doctype[0].length) : bridge + html;
@@ -396,6 +471,7 @@ export function SandboxedGame({ html, slug, title, persist = false, reloadKey = 
 
 // Full-screen player page for /projects/<slug>.
 export default function HubProjectFrame({ project }) {
+  const router = useRouter();
   const shellRef = useRef(null);
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
@@ -421,6 +497,28 @@ export default function HubProjectFrame({ project }) {
   }, [project.slug, project.name]);
 
   const onSaveError = useCallback((message) => setNotice(message), []);
+
+  const gameWindow = useCallback(() => {
+    const frame = shellRef.current && shellRef.current.querySelector("iframe.game-frame");
+    return frame ? frame.contentWindow : null;
+  }, []);
+
+  // Any in-site navigation away from the game: ask it to save (can't wait).
+  useEffect(() => {
+    const onLeave = () => {
+      requestFlush(gameWindow());
+    };
+    router.events.on("routeChangeStart", onLeave);
+    return () => router.events.off("routeChangeStart", onLeave);
+  }, [router.events, gameWindow]);
+
+  // Exit waits for the game's last save before leaving.
+  async function exit(event) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    await requestFlush(gameWindow());
+    router.push("/games");
+  }
 
   function resetProgress() {
     if (!window.confirm(`Reset your progress in ${project.name}? The game will restart from the beginning.`)) return;
@@ -467,7 +565,7 @@ export default function HubProjectFrame({ project }) {
 
       <div className="game-toolbar">
         <div className="game-toolbar-bar">
-          <Link href="/games" className="game-btn game-btn-back" aria-label="Back to cloud games">
+          <Link href="/games" className="game-btn game-btn-back" aria-label="Back to cloud games" onClick={exit}>
             <span aria-hidden="true">←</span>
             <span className="game-btn-label">Exit</span>
           </Link>

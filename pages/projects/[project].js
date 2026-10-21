@@ -2,7 +2,7 @@ import Head from "next/head";
 import GameFrame from "../../components/GameFrame";
 import HubProjectFrame from "../../components/HubProjectFrame";
 import { GAMES } from "../../lib/catalog";
-import { blockedBuiltIns, getProject, isValidSlug } from "../../lib/hubProjects";
+import { blockedBuiltIns, builtInForFile, getProject, isValidSlug } from "../../lib/hubProjects";
 import { getD1 } from "../../lib/serverAuth";
 
 // Cloudflare Pages only supports the edge runtime for pages with
@@ -26,8 +26,10 @@ export default function ProjectRunner({ hubProject, src, title, slug, isExternal
 }
 
 // Built-in games hidden or deleted from the admin page get a 404, like their
-// files (see isBlockedFile). Storage problems never block a game.
-async function isBlocked(slug) {
+// files (see isBlockedFile), whatever case or punctuation the address uses.
+// Storage problems never block a game.
+async function isBlocked(name) {
+  const slug = builtInForFile(name) || name;
   const db = getD1();
   if (!db) return false;
   const blocked = await blockedBuiltIns(db).catch(() => null);
@@ -68,9 +70,8 @@ export async function getServerSideProps({ params }) {
     };
   }
 
-  if (GAMES.some((game) => game.slug === slug)) {
-    if (await isBlocked(slug)) return { notFound: true };
-  } else if (isValidSlug(slug) && getD1()) {
+  if (await isBlocked(slug)) return { notFound: true };
+  if (!GAMES.some((game) => game.slug === slug) && isValidSlug(slug) && getD1()) {
     // An address in the added projects' format: one of those or nothing.
     const project = await getProject(getD1(), slug).catch(() => undefined);
     if (project && project.visible && project.htmlBytes > 0) return { props: { hubProject: project } };

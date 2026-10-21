@@ -35,8 +35,8 @@ export default function AboutPage() {
           <section className="card">
             <h3>Play cloud games</h3>
             <p>
-              Every game loads from the DigitBox cloud: Eaglercraft, Bedwars,
-              3D Scratch games, creator tools and more. Many games can
+              Every game loads from the DigitBox cloud: 3D adventures,
+              Scratch games, creator tools and more. Many games can
               autosave, export, and import progress on your device.
             </p>
           </section>
