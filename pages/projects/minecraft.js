@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const SOURCE = "https://github.com/MilkdromedaStudios/all-of-eaglercraft";
 const CATEGORIES = ["All", "Vanilla", "WASM", "Clients", "Modpacks", "Classic"];
 const FEATURED = [
-  { needle: "1.8_Offline", title: "EAGLERCRAFT 1.8", sub: "THE CLASSIC", art: "classic" },
-  { needle: "1.12.2_WASM", title: "EAGLERCRAFT 1.12", sub: "THE ADVENTURE", art: "adventure" },
-  { needle: "26.2", title: "EAGLERCRAFT 26.2", sub: "THE NEW ERA", art: "future" }
+  { needle: "EaglercraftX 1.8 EN", title: "EAGLERCRAFT 1.8", sub: "THE CLASSIC", art: "classic" },
+  { needle: "Eaglercraft 1.12.2 WASM", title: "EAGLERCRAFT 1.12", sub: "THE ADVENTURE", art: "adventure" },
+  { needle: "Eaglercraft 26.2 Modded", title: "EAGLERCRAFT 26.2", sub: "THE NEW ERA", art: "future" }
 ];
 
 function cleanName(filename) {
