@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import EasterEggs from "./EasterEggs";
 import Icon from "./Icon";
+import TabSettings from "./TabSettings";
 import KubeLiquidGlass from "./KubeLiquidGlass";
 import {
   CLOUD_AUTH_UPDATED_EVENT,
@@ -196,6 +197,7 @@ export default function Layout({ children }) {
         </form>
 
         <div className="hub-top-end">
+          <TabSettings />
           <button type="button" className="hub-icon-btn hub-search-toggle" aria-label="Search" onClick={() => setSearchOpen(true)}>
             <Icon name="search" />
           </button>
