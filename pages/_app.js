@@ -3,8 +3,10 @@ import "../styles/global.css";
 import "../styles/login.css";
 import "../styles/motion.css";
 import "../styles/hub.css";
+import "../styles/tab-settings.css";
 import "../styles/minecraft.css";
 import Layout from "../components/Layout";
+import { TabSettingsSync } from "../components/TabSettings";
 import PageTransition from "../components/PageTransition";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
@@ -40,20 +42,17 @@ export default function MyApp({ Component, pageProps, router }) {
   }, []);
 
   // Cloud games run full screen in GameFrame, without the hub chrome.
-  if (router?.pathname?.startsWith("/projects/")) {
-    return (
-      <>
-        <Component {...pageProps} />
-        <PageTransition router={router} />
-      </>
-    );
-  }
-
+  const fullscreenGame = router?.pathname?.startsWith("/projects/");
   return (
     <>
-      <Layout>
+      <TabSettingsSync />
+      {fullscreenGame ? (
         <Component {...pageProps} />
-      </Layout>
+      ) : (
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
+      )}
       <PageTransition router={router} />
     </>
   );
