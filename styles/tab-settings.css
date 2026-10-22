@@ -1,0 +1,56 @@
+/* Header button and dropdown for per-browser tab title/favicon settings. */
+.db-tab-settings { position: relative; flex: none; }
+.db-tab-trigger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 38px; padding: 0 13px; border: 1px solid var(--hub-line);
+  border-radius: 999px; background: var(--hub-soft); color: var(--text);
+  font: inherit; font-size: 13px; font-weight: 650; white-space: nowrap;
+  cursor: pointer; transition: background .2s ease, border-color .2s ease;
+}
+.db-tab-trigger:hover, .db-tab-trigger[aria-expanded="true"] {
+  background: var(--hub-hover); border-color: var(--accent);
+}
+.db-tab-trigger:focus-visible, .db-tab-panel button:focus-visible,
+.db-tab-panel input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.db-tab-panel {
+  position: absolute; top: calc(100% + 12px); right: 0; z-index: 100;
+  box-sizing: border-box; width: min(340px, calc(100vw - 24px));
+  padding: 20px; border: 1px solid var(--hub-line); border-radius: 18px;
+  background: var(--bg-elev); color: var(--text);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, .32); text-align: left;
+}
+.db-tab-heading { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.db-tab-heading h2 { margin: 0 0 6px; font-size: 18px; font-weight: 750; }
+.db-tab-heading p { margin: 0 0 18px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.db-tab-close {
+  display: grid; place-items: center; flex: none;
+  width: 30px; height: 30px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.db-tab-close:hover { background: var(--hub-hover); }
+.db-tab-panel label { display: block; margin: 12px 0 7px; font-size: 13px; font-weight: 650; }
+.db-tab-panel input {
+  box-sizing: border-box; width: 100%; min-width: 0; height: 40px;
+  padding: 0 12px; border: 1px solid var(--hub-line); border-radius: 10px;
+  background: var(--bg); color: var(--text); font: inherit; font-size: 13px;
+}
+.db-tab-panel input::placeholder { color: var(--muted); }
+.db-tab-panel .db-tab-hint { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.db-tab-actions { display: flex; gap: 10px; margin-top: 18px; }
+.db-tab-actions button {
+  flex: 1; min-height: 38px; border: 0; border-radius: 10px;
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.db-tab-reset { background: var(--hub-soft); color: var(--text); }
+.db-tab-reset:hover { background: var(--hub-hover); }
+.db-tab-save { color: #fff; background: linear-gradient(110deg, #805cf6, #56acff); }
+.db-tab-save:hover { filter: brightness(1.1); }
+.db-tab-panel .db-tab-message { margin: 12px 0 0; color: var(--accent-2); font-size: 12px; }
+.db-tab-panel .db-tab-footnote { margin: 14px 0 0; color: var(--muted); font-size: 11px; }
+@media (max-width: 900px) {
+  .db-tab-trigger { width: 38px; padding: 0; }
+  .db-tab-trigger span { display: none; }
+}
+@media (max-width: 759px) {
+  .db-tab-panel { right: -42px; }
+}
