@@ -24,7 +24,6 @@ const nextConfig = {
       { source: "/projects/eaglercraft-launcher", destination: "/projects/minecraft", permanent: false },
       { source: "/gallery", destination: "/games", permanent: false },
       { source: "/projects", destination: "/games", permanent: false },
-      { source: "/ai", destination: "/", permanent: false },
       { source: "/appgpt", destination: "/", permanent: false },
       { source: "/beta", destination: "/", permanent: false },
       { source: "/beta/:path*", destination: "/", permanent: false },

@@ -1,11 +1,26 @@
 # DigitBox (Next.js)
 
-DigitBox is an entertainment hub: videos, Shorts and cloud games that run in
-the browser, in a YouTube-style layout. It uses **Next.js (Pages Router)**;
-accounts, profiles and DigitBox Pro billing run on the Cloudflare `/v1` API.
+DigitBox is an entertainment hub: videos, Shorts, cloud games that run in
+the browser and DigitBox AI, in a YouTube-style layout. It uses **Next.js
+(Pages Router)**; accounts, profiles and DigitBox Pro billing run on the
+Cloudflare `/v1` API.
 
-The portfolio version of the site (including the retired DigitBox AI, AppGPT
+The portfolio version of the site (including the first DigitBox AI, AppGPT
 and DEEPFORGE) is archived in [`archive/`](archive/README.md).
+
+## DigitBox AI
+
+The **AI** tab (`/ai`) is a chat assistant powered by
+[Static](https://github.com/MilkdromedaStudios/Static). Free accounts get 5
+messages a day with NVIDIA's Nemotron 3.5 Lightning; DigitBox Pro is unlimited
+and adds Claude Haiku 5.5. Replies can include downloadable files (documents,
+CSV, SVG images, 3D models, calendar events). The same API gives real answers
+to the [Static web demo](https://milkdromedastudios.github.io/Static/), which
+connects to a visitor's DigitBox account at `/ai/connect`.
+
+It needs one server-side variable, `AI_API_KEY` (an OpenRouter key), set in
+Cloudflare Pages. **[docs/DIGITBOX_AI_SETUP.md](docs/DIGITBOX_AI_SETUP.md)**
+covers the key, the plans and limits, other models and providers, and the API.
 
 ## Videos
 

@@ -232,7 +232,7 @@ export default function ProfilePage() {
         <small className="post-meta">SUBSCRIPTION</small>
         <h2>DigitBox Pro</h2>
         <p>
-          DigitBox Pro unlocks the full Nexus Sidebar. Free DigitBox members keep the same feature limits as Nexus Guest mode.
+          DigitBox Pro unlocks the full Nexus Sidebar and unlimited <a href="/ai">DigitBox AI</a>, including its Pro model. Free DigitBox members keep the same feature limits as Nexus Guest mode and a few DigitBox AI messages a day.
         </p>
 
         {!account ? (

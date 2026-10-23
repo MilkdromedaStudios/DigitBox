@@ -3,6 +3,18 @@
 All notable changes to **digitbox.dev**. This list is grouped by feature; the
 most recent work is at the top.
 
+## DigitBox AI is back
+
+- **An AI tab** (`/ai`, in the sidebar and the phone tab bar): DigitBox AI,
+  powered by Static, in the hub's look with light and dark themes. Chats are
+  saved on your device, replies stream in, and files it makes (documents,
+  CSV, SVG images, 3D models, calendar events) download with one tap.
+- **Plans:** free accounts get 5 messages a day with Nemotron 3.5 Lightning;
+  DigitBox Pro is unlimited and adds Claude Haiku 5.5.
+- **The Static web demo gives real answers** by connecting to your DigitBox
+  account at `/ai/connect`, with an AI-only token that can't see your account.
+- Setup: [docs/DIGITBOX_AI_SETUP.md](docs/DIGITBOX_AI_SETUP.md).
+
 ## Admin projects
 
 - **Edit, hide or delete the built-in games** from `/admin/projects`, for
