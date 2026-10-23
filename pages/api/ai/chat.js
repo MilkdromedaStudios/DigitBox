@@ -68,7 +68,7 @@ export default async function handler(req) {
         {
           error:
             plan === "pro"
-              ? "You've used today's " + model.label + " messages. Nemotron is still unlimited."
+              ? "You've used today's " + model.label + " messages. The free models are still unlimited."
               : "You've used today's free messages. They come back tomorrow, or go unlimited with DigitBox Pro.",
           code: "limit_reached",
           plan,
