@@ -1,16 +1,44 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../components/Icon";
 import { GameCard, GameCover, SkeletonGrid } from "../components/Cards";
 import { gameTags, likeKey } from "../lib/catalog";
 import { useGameCatalog } from "../lib/useHubProjects";
 import { useLikes } from "../lib/useLikes";
 
+const GAME_LAYOUT_KEY = "digitbox.games.layout";
+const GAME_LAYOUTS = [
+  { value: "grid", label: "Grid", icon: "grid" },
+  { value: "compact", label: "Compact", icon: "gridCompact" },
+  { value: "list", label: "List", icon: "list" },
+];
+
 export default function CloudGamesPage() {
   const [likes, toggleLike] = useLikes();
   const [chip, setChip] = useState("All");
   const [search, setSearch] = useState("");
+  const [layout, setLayout] = useState("grid");
+
+  // The default stays deterministic for server rendering; restore the
+  // visitor's preference once the browser mounts.
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(GAME_LAYOUT_KEY);
+      if (GAME_LAYOUTS.some((option) => option.value === stored)) setLayout(stored);
+    } catch {
+      // Private browsing or blocked storage should not break the page.
+    }
+  }, []);
+
+  function changeLayout(next) {
+    setLayout(next);
+    try {
+      window.localStorage.setItem(GAME_LAYOUT_KEY, next);
+    } catch {
+      // In-memory preference still works for this visit.
+    }
+  }
   const searchInputRef = useRef(null);
   const query = search.trim().toLowerCase();
   const { games: allGames, ready } = useGameCatalog();
@@ -131,12 +159,38 @@ export default function CloudGamesPage() {
           {ready && <span className="hub-count" aria-live="polite">{games.length} {games.length === 1 ? "game" : "games"}{query ? " found" : ""}</span>}
         </div>
 
+        <div className="dg-games-controls">
+          <span className="dg-games-view-label" id="dg-games-view-label">Layout</span>
+          <div className="dg-games-view-switch" role="group" aria-labelledby="dg-games-view-label">
+            {GAME_LAYOUTS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={"dg-games-view-btn" + (layout === option.value ? " is-active" : "")}
+                aria-label={option.label + " view"}
+                aria-pressed={layout === option.value}
+                onClick={() => changeLayout(option.value)}
+                title={option.label + " view"}
+              >
+                <Icon name={option.icon} size={17} />
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {!ready ? (
           <SkeletonGrid count={8} />
         ) : games.length > 0 ? (
-          <div className="hub-grid">
+          <div className={"hub-grid dg-game-grid--" + layout}>
             {games.map((game) => (
-              <GameCard key={game.key} game={game} liked={likes.includes(likeKey(game))} onToggleLike={toggleLike} />
+              <GameCard
+                key={game.key}
+                game={game}
+                layout={layout === "list" ? "row" : "grid"}
+                liked={likes.includes(likeKey(game))}
+                onToggleLike={toggleLike}
+              />
             ))}
           </div>
         ) : (
