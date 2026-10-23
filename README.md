@@ -13,8 +13,9 @@ and DEEPFORGE) is archived in [`archive/`](archive/README.md).
 The **AI** tab (`/ai`) is a chat assistant powered by
 [Static](https://github.com/MilkdromedaStudios/Static). Free accounts get 5
 messages a day with NVIDIA's Nemotron 3.5 Lightning; DigitBox Pro is unlimited
-and adds Claude Haiku 5.5. Replies can include downloadable files (documents,
-CSV, SVG images, 3D models, calendar events). The same API gives real answers
+and adds Nemotron 3 Ultra. Both models are free on OpenRouter. Replies can
+include downloadable files (documents, CSV, SVG images, 3D models, calendar
+events). The same API gives real answers
 to the [Static web demo](https://milkdromedastudios.github.io/Static/), which
 connects to a visitor's DigitBox account at `/ai/connect`.
 

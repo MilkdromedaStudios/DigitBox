@@ -10,7 +10,9 @@ visitor's DigitBox account.
 | --- | --- | --- |
 | Signed out | — | Sign in to chat |
 | Free account | Nemotron 3.5 Lightning (`nvidia/nemotron-3.5-lightning:free`) | 5 messages a day |
-| DigitBox Pro | Claude Haiku 5.5 **and** Nemotron 3.5 Lightning | Unlimited |
+| DigitBox Pro | Nemotron 3 Ultra (`nvidia/nemotron-3-ultra-550b-a55b:free`) **and** Nemotron 3.5 Lightning | Unlimited |
+
+Both models are free on OpenRouter, so DigitBox AI costs nothing to run.
 
 The site owner (the Numberstring account) and anyone in `ADMIN_USER_IDS` get
 Pro. Pro comes from the same Stripe subscription as the rest of DigitBox Pro
@@ -23,23 +25,22 @@ events, email drafts, HTML…): the model writes them in a fenced block such as
 
 ## 1. Get an API key
 
-The defaults use **OpenRouter**, so one key runs both models:
+The defaults use **OpenRouter**, so one key runs both (free) models:
 
 1. Sign in at <https://openrouter.ai> and open **Keys → Create key**.
 2. Copy the key (`sk-or-v1-…`). That is your `AI_API_KEY`.
 3. **Settings → Privacy:** allow free model endpoints that may store or train
-   on prompts. Without it, the free Nemotron model fails with "No endpoints
-   found matching your data policy".
-4. Add a few dollars of credit for the Pro model (Claude costs money; Nemotron
-   `:free` doesn't).
+   on prompts. Without it, the free models fail with "No endpoints found
+   matching your data policy".
 
 OpenRouter caps `:free` models per minute and per day for the whole
-**account**, so every DigitBox AI user shares one allowance. The daily cap is
-much higher once the account has bought a small amount of credit (about $10
-when this was written; the current numbers are at
-<https://openrouter.ai/docs/api-reference/limits>). Buy that credit before
-launching, or free users will see "The free Nemotron model is busy" early in
-the day.
+**account**, so every DigitBox AI user, free and Pro, shares one allowance.
+"Unlimited" for Pro means DigitBox doesn't count Pro messages; OpenRouter's
+cap still applies. The daily cap is much higher once the account has bought a
+small amount of credit (about $10 when this was written; the current numbers
+are at <https://openrouter.ai/docs/api-reference/limits>). The credit isn't
+spent by free models. Buy it before launching, or people will see "… is busy
+right now" early in the day.
 
 ## 2. Add it to Cloudflare Pages
 
@@ -68,19 +69,17 @@ without D1 say "Use digitbox.dev".
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `AI_FREE_DAILY_LIMIT` | `5` | Messages a day for free accounts. `0` turns the free plan off. |
-| `AI_PRO_DAILY_LIMIT` | unlimited | Caps Pro's **paid** model per day (Nemotron stays unlimited). Leave unset for unlimited. |
 | `AI_FREE_MODEL` / `AI_FREE_LABEL` | `nvidia/nemotron-3.5-lightning:free` / `Nemotron 3.5 Lightning` | The model everyone can use. |
-| `AI_PRO_MODEL` / `AI_PRO_LABEL` | `anthropic/claude-haiku-5.5` / `Claude Haiku 5.5` | The Pro-only model, e.g. `anthropic/claude-sonnet-5.5` for stronger answers. |
+| `AI_PRO_MODEL` / `AI_PRO_LABEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` / `Nemotron 3 Ultra` | The Pro-only model. Any OpenRouter id; ids ending in `:free` cost nothing. |
+| `AI_PRO_DAILY_LIMIT` | unlimited | Only matters if `AI_PRO_MODEL` is a **paid** model: caps it per day. Free models are never capped for Pro. |
 | `AI_BASE_URL` | `https://openrouter.ai/api/v1` | Any OpenAI-compatible provider (Groq, NVIDIA, a self-hosted server…). |
 | `AI_MAX_TOKENS` | `4096` | Longest reply, in tokens. |
 | `AI_CONNECT_ORIGINS` | — | Extra sites that may connect, comma separated (e.g. `http://localhost:8080` for a local Static preview). `https://milkdromedastudios.github.io` is always allowed. |
 | `AI_MODELS` | — | Replaces the model list with JSON: `[{"id":"nemotron","label":"…","model":"…","tier":"free","paid":false},{"id":"pro","label":"…","model":"…","tier":"pro","baseUrl":"…","keyEnv":"OTHER_KEY"}]`. |
 
-**What Pro costs you.** DigitBox Pro is $1.99 a month. With the default Claude
-Haiku 5.5 a typical message costs about $0.001, so even heavy use stays far
-below the subscription. Claude Sonnet 5.5 is roughly $0.01–0.02 a message; if
-you switch to it, consider `AI_PRO_DAILY_LIMIT` (for example `100`). Nemotron
-`:free` costs nothing.
+**Costs.** With the default models DigitBox AI costs nothing. If you switch
+`AI_PRO_MODEL` to a paid model, you pay per message (DigitBox Pro is $1.99 a
+month), so consider `AI_PRO_DAILY_LIMIT` too.
 
 ## 4. The Static web demo
 
