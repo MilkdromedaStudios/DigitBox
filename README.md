@@ -99,10 +99,11 @@ In Supabase Dashboard:
 1. Go to **Authentication → Providers → Email**.
 2. Enable Email provider.
 3. Enable **Email + Password** sign-in.
-4. If you want users to log in immediately without email verification:
-   - Disable **Confirm email** in auth settings.
+4. Enable **Confirm email**. Never grant privileges from an unverified email address.
 
-> Note: Disabling email verification is less secure and can allow fake/unowned emails.
+For current Cloudflare accounts, deploy the fixes and follow
+[the account security rollout](docs/ACCOUNT_SECURITY.md). Existing Supabase
+installations must also run `supabase/sql/protect_profile_roles.sql`.
 
 ### 3) Create required tables (minimum)
 You should create and secure these tables:
@@ -149,3 +150,4 @@ This repository includes a daily GitHub Actions workflow that sends a small requ
 - `SUPABASE_KEEPALIVE_PASSWORD` (optional; enables sign-in/sign-out)
 
 If the optional keepalive credentials are not set, the workflow only calls the Supabase Auth settings endpoint with the anon key. You can also run it manually from the Actions tab with the `Supabase Keepalive` workflow.
+

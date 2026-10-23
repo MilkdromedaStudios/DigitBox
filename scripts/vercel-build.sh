@@ -69,6 +69,17 @@ fi
 echo "[build] Running next build..."
 next build
 
+# Some Next/Vercel combinations retain the temporary prerender export marker.
+# This app has Edge API routes; treating that marker as a user-requested static
+# export would silently drop login/admin handlers from the deployment output.
+node <<'NODE'
+const fs = require("node:fs");
+const manifest = JSON.parse(fs.readFileSync(".next/required-server-files.json", "utf8"));
+if (manifest.config.output !== "export") {
+  fs.rmSync(".next/export-detail.json", { force: true });
+}
+NODE
+
 # Vercel/CI can spend a long time uploading Next's incremental build cache
 # after a successful build. It is not required to run the deployed site, so
 # drop it in CI to keep deployments from hanging at "Uploading build output cache".
@@ -76,3 +87,4 @@ if [ -n "${IS_CI_BUILD}" ]; then
   rm -rf .next/cache
   echo "[build] Removed .next/cache before CI cache upload"
 fi
+

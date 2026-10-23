@@ -7,6 +7,7 @@
     "build": "bash scripts/vercel-build.sh",
     "start": "next start",
     "lint": "npm run typecheck",
+    "test:security": "node --test tests/security/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "vercel-build": "bash scripts/vercel-build.sh"
   },
@@ -14,19 +15,23 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
     "autoprefixer": "^10.4.21",
-    "next": "13.4.0",
-    "postcss": "^8.4.49",
+    "next": "15.5.28",
+    "postcss": "^8.5.31",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tailwindcss": "3.4.19"
   },
+  "overrides": {
+    "next": {
+      "postcss": "$postcss"
+    }
+  },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20260710.1",
     "@types/node": "25.9.1",
     "@types/react": "19.2.7",
-    "typescript": "5.9.3", 
-    "@cloudflare/workers-types": "5.20260710.1"
+    "typescript": "5.9.3"
   }
-  
 }
