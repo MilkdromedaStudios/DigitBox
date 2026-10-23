@@ -250,7 +250,7 @@ export default function ProfilePage() {
         {account && (
           <div className="profile-account-flags">
             <span>{account.owner ? "♛ OWNER" : account.admin ? "◆ ADMIN" : "PLAYER"}</span>
-            <span>{isPro ? "DIGITBOX PRO" : "FREE MEMBER"}</span>
+            <span>{promoActive && !paidSubscriptionActive ? "VIP · 30-DAY PRO" : isPro ? "DIGITBOX PRO" : "FREE MEMBER"}</span>
           </div>
         )}
       </section>
@@ -366,7 +366,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {account && billing?.configuration?.stripe === false && (
+        {account && !isPro && billing?.configuration?.stripe === false && (
           <p style={{ marginTop: 12 }}>Billing is not active yet. The Stripe server key still needs to be added to the DigitBox Cloudflare environment.</p>
         )}
         {billingError && (
