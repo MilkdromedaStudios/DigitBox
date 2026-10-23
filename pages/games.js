@@ -1,6 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Icon from "../components/Icon";
 import { GameCard, GameCover, SkeletonGrid } from "../components/Cards";
 import { gameTags, likeKey } from "../lib/catalog";
@@ -11,6 +11,7 @@ export default function CloudGamesPage() {
   const [likes, toggleLike] = useLikes();
   const [chip, setChip] = useState("All");
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef(null);
   const query = search.trim().toLowerCase();
   const { games: allGames, ready } = useGameCatalog();
   // "All" and "Saved" are fixed chips, so a genre with those names isn't one.
@@ -42,32 +43,6 @@ export default function CloudGamesPage() {
       </Head>
 
       <div className="hub-page">
-        <div className="dg-search-wrap" role="search" aria-label="Search DigitBox games">
-          <div className="dg-search-field">
-            <span className="dg-search-icon" aria-hidden="true">⌕</span>
-            <input
-              id="dg-game-search"
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={ready ? `Search ${allGames.length} games...` : "Search games..."}
-              aria-label="Search games by name or category"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {search.length > 0 && (
-              <button
-                className="dg-search-clear"
-                type="button"
-                onClick={() => setSearch("")}
-                aria-label="Clear game search"
-              >
-                Clear ✕
-              </button>
-            )}
-          </div>
-          <span className="dg-search-hint">Find games instantly by title or category</span>
-        </div>
         <div className="hub-chips" role="tablist" aria-label="Filter games">
           {["All", "Saved", ...tags].map((label) => (
             <button
@@ -81,6 +56,48 @@ export default function CloudGamesPage() {
               {label === "Saved" ? "♥ Saved" : label}
             </button>
           ))}
+        </div>
+
+        <div className="dg-search-wrap" role="search" aria-label="Search DigitBox games">
+          <label className="dg-search-label" htmlFor="dg-game-search">Find a game</label>
+          <div className="dg-search-row">
+            <div className="dg-search-field">
+              <span className="dg-search-icon" aria-hidden="true">
+                <Icon name="search" size={20} />
+              </span>
+              <input
+                id="dg-game-search"
+                ref={searchInputRef}
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setSearch("");
+                }}
+                placeholder={ready ? `Search ${allGames.length} games...` : "Search games..."}
+                aria-label="Search games by name or category"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {search.length > 0 && (
+                <button
+                  className="dg-search-clear"
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    searchInputRef.current?.focus();
+                  }}
+                  aria-label="Clear game search"
+                  title="Clear search"
+                >
+                  <Icon name="close" size={16} />
+                </button>
+              )}
+            </div>
+            <span className="dg-search-hint">
+              {ready ? (query ? `${games.length} ${games.length === 1 ? "match" : "matches"}` : "Search by title or genre") : "Loading games..."}
+            </span>
+          </div>
         </div>
 
         {FEATURED && chip === "All" && !query && (
@@ -137,68 +154,111 @@ export default function CloudGamesPage() {
       </div>
       <style jsx>{`
         .dg-search-wrap {
+          margin: 4px 0 28px;
+        }
+        .dg-search-label {
+          display: block;
+          margin: 0 0 10px 2px;
+          color: var(--muted);
+          font-size: .72rem;
+          font-weight: 800;
+          letter-spacing: .1em;
+          text-transform: uppercase;
+        }
+        .dg-search-row {
           display: flex;
           align-items: center;
-          gap: 12px;
           flex-wrap: wrap;
-          margin: 0 0 22px;
+          gap: 10px 18px;
         }
         .dg-search-field {
           display: flex;
           align-items: center;
-          gap: 8px;
-          width: min(100%, 620px);
+          gap: 12px;
+          width: min(100%, 600px);
           min-height: 52px;
-          padding: 0 14px;
-          border: 1px solid #4b5a84;
-          border-radius: 14px;
-          background: #171f38;
-          color: #fff;
-          transition: border-color 0.15s, box-shadow 0.15s;
+          padding: 0 10px 0 17px;
+          border: 1px solid var(--hub-line);
+          border-radius: 15px;
+          background: color-mix(in srgb, var(--surface) 76%, var(--bg));
+          box-shadow: 0 6px 24px rgba(0, 0, 0, .1);
+          color: var(--text);
+          transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+        .dg-search-field:hover {
+          border-color: color-mix(in srgb, var(--text) 22%, transparent);
         }
         .dg-search-field:focus-within {
-          border-color: #a6baff;
-          box-shadow: 0 0 0 3px rgba(115, 144, 255, 0.18);
+          border-color: color-mix(in srgb, var(--accent-2) 60%, var(--accent));
+          background: var(--surface);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent),
+            0 8px 28px rgba(0, 0, 0, .13);
         }
         .dg-search-icon {
-          color: #a6baff;
-          font-size: 32px;
-          line-height: 1;
-          user-select: none;
+          flex: none;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--muted);
+        }
+        .dg-search-field:focus-within .dg-search-icon {
+          color: var(--accent-2);
         }
         .dg-search-field input {
           flex: 1;
-          width: 100%;
           min-width: 0;
-          height: 46px;
-          border: none;
+          height: 50px;
+          padding: 0;
+          border: 0;
           outline: none;
           background: transparent;
-          color: white;
+          color: var(--text);
           font: inherit;
-          font-size: 16px;
+          font-size: .95rem;
+          font-weight: 500;
+          appearance: none;
+          -webkit-appearance: none;
         }
-        .dg-search-field input::placeholder { color: #aebbd5; opacity: 1; }
-        .dg-search-field input::-webkit-search-cancel-button { display: none; }
+        .dg-search-field input::placeholder {
+          color: var(--muted);
+          opacity: .85;
+        }
+        .dg-search-field input::-webkit-search-cancel-button {
+          display: none;
+        }
         .dg-search-clear {
-          flex-shrink: 0;
-          padding: 7px 9px;
+          flex: none;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          padding: 0;
           border: 0;
-          border-radius: 8px;
-          background: #303c60;
-          color: #dce7ff;
-          font: inherit;
-          font-size: 12px;
-          font-weight: 700;
+          border-radius: 9px;
+          background: var(--hub-soft);
+          color: var(--muted);
           cursor: pointer;
+          transition: background .15s ease, color .15s ease;
         }
-        .dg-search-clear:hover { background: #445480; }
-        .dg-search-clear:focus-visible { outline: 2px solid #a6baff; outline-offset: 2px; }
-        .dg-search-hint { color: #abb9d4; font-size: 13px; }
+        .dg-search-clear:hover {
+          background: var(--hub-hover);
+          color: var(--text);
+        }
+        .dg-search-clear:focus-visible {
+          outline: 2px solid var(--accent-2);
+          outline-offset: 2px;
+        }
+        .dg-search-hint {
+          color: var(--muted);
+          font-size: .82rem;
+          font-weight: 550;
+          white-space: nowrap;
+        }
         @media (max-width: 640px) {
-          .dg-search-wrap { margin-bottom: 16px; }
+          .dg-search-wrap { margin-bottom: 20px; }
           .dg-search-field { width: 100%; }
-          .dg-search-hint { font-size: 12px; }
+          .dg-search-hint { padding-left: 2px; font-size: .78rem; }
         }
       `}</style>
     </>
