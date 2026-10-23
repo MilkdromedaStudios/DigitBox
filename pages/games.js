@@ -10,6 +10,8 @@ import { useLikes } from "../lib/useLikes";
 export default function CloudGamesPage() {
   const [likes, toggleLike] = useLikes();
   const [chip, setChip] = useState("All");
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLowerCase();
   const { games: allGames, ready } = useGameCatalog();
   // "All" and "Saved" are fixed chips, so a genre with those names isn't one.
   const tags = useMemo(() => gameTags(allGames).filter((tag) => tag !== "All" && tag !== "Saved"), [allGames]);
@@ -17,10 +19,18 @@ export default function CloudGamesPage() {
   const FEATURED = useMemo(() => allGames.find((game) => game.featured) || allGames.find((game) => !game.custom) || null, [allGames]);
 
   const games = useMemo(() => {
-    if (chip === "Saved") return allGames.filter((game) => likes.includes(likeKey(game)));
-    if (chip === "All") return allGames;
-    return allGames.filter((game) => game.tags.includes(chip));
-  }, [chip, likes, allGames]);
+    // Apply the selected category and the search together.
+    const filtered = allGames.filter((game) => (
+      chip === "All" ||
+      (chip === "Saved" ? likes.includes(likeKey(game)) : game.tags.includes(chip))
+    ));
+    if (!query) return filtered;
+    const words = query.split(/\s+/);
+    return filtered.filter((game) => {
+      const searchable = [game.title, game.genre, ...(game.tags || [])].join(" ").toLowerCase();
+      return words.every((word) => searchable.includes(word));
+    });
+  }, [allGames, chip, likes, query]);
 
   const featuredLiked = FEATURED ? likes.includes(likeKey(FEATURED)) : false;
 
@@ -32,6 +42,32 @@ export default function CloudGamesPage() {
       </Head>
 
       <div className="hub-page">
+        <div className="dg-search-wrap" role="search" aria-label="Search DigitBox games">
+          <div className="dg-search-field">
+            <span className="dg-search-icon" aria-hidden="true">⌕</span>
+            <input
+              id="dg-game-search"
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={ready ? `Search ${allGames.length} games...` : "Search games..."}
+              aria-label="Search games by name or category"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {search.length > 0 && (
+              <button
+                className="dg-search-clear"
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear game search"
+              >
+                Clear ✕
+              </button>
+            )}
+          </div>
+          <span className="dg-search-hint">Find games instantly by title or category</span>
+        </div>
         <div className="hub-chips" role="tablist" aria-label="Filter games">
           {["All", "Saved", ...tags].map((label) => (
             <button
@@ -47,7 +83,7 @@ export default function CloudGamesPage() {
           ))}
         </div>
 
-        {FEATURED && chip === "All" && (
+        {FEATURED && chip === "All" && !query && (
           <section className="hub-spotlight is-game" style={{ "--h": FEATURED.hue }} aria-label="Featured game">
             <div className="hub-spotlight-copy">
               <span className="hub-kicker">FEATURED CLOUD GAME</span>
@@ -72,10 +108,10 @@ export default function CloudGamesPage() {
         <div className="hub-page-head">
           <div>
             <span className="hub-kicker">CLOUD GAMES</span>
-            <h1>{chip === "All" ? "Play instantly" : chip === "Saved" ? "Your saved games" : chip + " games"}</h1>
+            <h1>{query ? "Search results" : chip === "All" ? "Play instantly" : chip === "Saved" ? "Your saved games" : chip + " games"}</h1>
             <p>Every game loads from the DigitBox cloud and runs right in your browser. No downloads or installs, and most games can autosave on this device.</p>
           </div>
-          {ready && <span className="hub-count" aria-live="polite">{games.length} {games.length === 1 ? "game" : "games"}</span>}
+          {ready && <span className="hub-count" aria-live="polite">{games.length} {games.length === 1 ? "game" : "games"}{query ? " found" : ""}</span>}
         </div>
 
         {!ready ? (
@@ -88,12 +124,83 @@ export default function CloudGamesPage() {
           </div>
         ) : (
           <div className="hub-empty">
-            <Icon name="heart" />
-            <h3>No saved games yet</h3>
-            <p>Tap the heart on any game to keep it here.</p>
+            <Icon name={query ? "games" : "heart"} />
+            <h3>{query ? "No games found" : chip === "Saved" ? "No saved games yet" : "No games in this category"}</h3>
+            <p>{query
+              ? "Try a different name or clear the search to see all games."
+              : chip === "Saved"
+                ? "Tap the heart on any game to keep it here."
+                : "Choose another category to explore more games."}</p>
+            {query && <button type="button" className="hub-pill-btn" onClick={() => setSearch("")}>Clear search</button>}
           </div>
         )}
       </div>
+      <style jsx>{`
+        .dg-search-wrap {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin: 0 0 22px;
+        }
+        .dg-search-field {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: min(100%, 620px);
+          min-height: 52px;
+          padding: 0 14px;
+          border: 1px solid #4b5a84;
+          border-radius: 14px;
+          background: #171f38;
+          color: #fff;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .dg-search-field:focus-within {
+          border-color: #a6baff;
+          box-shadow: 0 0 0 3px rgba(115, 144, 255, 0.18);
+        }
+        .dg-search-icon {
+          color: #a6baff;
+          font-size: 32px;
+          line-height: 1;
+          user-select: none;
+        }
+        .dg-search-field input {
+          flex: 1;
+          width: 100%;
+          min-width: 0;
+          height: 46px;
+          border: none;
+          outline: none;
+          background: transparent;
+          color: white;
+          font: inherit;
+          font-size: 16px;
+        }
+        .dg-search-field input::placeholder { color: #aebbd5; opacity: 1; }
+        .dg-search-field input::-webkit-search-cancel-button { display: none; }
+        .dg-search-clear {
+          flex-shrink: 0;
+          padding: 7px 9px;
+          border: 0;
+          border-radius: 8px;
+          background: #303c60;
+          color: #dce7ff;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .dg-search-clear:hover { background: #445480; }
+        .dg-search-clear:focus-visible { outline: 2px solid #a6baff; outline-offset: 2px; }
+        .dg-search-hint { color: #abb9d4; font-size: 13px; }
+        @media (max-width: 640px) {
+          .dg-search-wrap { margin-bottom: 16px; }
+          .dg-search-field { width: 100%; }
+          .dg-search-hint { font-size: 12px; }
+        }
+      `}</style>
     </>
   );
 }
