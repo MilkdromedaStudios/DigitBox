@@ -8,6 +8,7 @@ import {
   loadBillingStatus,
   startBillingCheckout,
   openBillingPortal,
+  redeemVipCode,
 } from "../lib/billing";
 import {
   DEFAULT_PROFILE_PREFS,
@@ -35,6 +36,10 @@ export default function ProfilePage() {
   const [billing, setBilling] = useState(null);
   const [billingBusy, setBillingBusy] = useState("");
   const [billingError, setBillingError] = useState("");
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -110,6 +115,10 @@ export default function ProfilePage() {
   const isPro = isOwner || !!billing?.entitlements?.features?.includes("nexus_pro");
   const subscriptionStatus = billing?.entitlements?.subscriptionStatus || "none";
   const renewalDate = formatBillingDate(billing?.entitlements?.currentPeriodEnd);
+  const promoExpiryDate = formatBillingDate(billing?.entitlements?.promoExpiresAt);
+  const promoActive = !!billing?.entitlements?.promoActive;
+  const promoUsed = !!billing?.entitlements?.promoUsed;
+  const paidSubscriptionActive = ["active", "trialing", "past_due"].includes(subscriptionStatus);
 
   function updateField(field, value) {
     const next = sanitizeProfilePrefs({ ...prefs, [field]: value });
@@ -126,6 +135,24 @@ export default function ProfilePage() {
     } catch (error) {
       setBillingError(error?.message || "Could not reach the DigitBox billing backend.");
       return null;
+    }
+  }
+
+  async function submitPromo(event) {
+    event.preventDefault();
+    if (promoBusy) return;
+    setPromoError("");
+    setPromoBusy(true);
+    try {
+      const result = await redeemVipCode(promoCode.trim());
+      setPromoOpen(false);
+      setPromoCode("");
+      setMessage("VIP unlocked for 30 days" + (result.expiresAt ? " (until " + formatBillingDate(result.expiresAt) + ")" : "") + "!");
+      await refreshBilling();
+    } catch (error) {
+      setPromoError(error?.message || "Couldn't redeem your VIP code.");
+    } finally {
+      setPromoBusy(false);
     }
   }
 
@@ -242,7 +269,7 @@ export default function ProfilePage() {
             <h3 style={{ marginTop: 0 }}>Pro is active</h3>
             {isOwner ? (
               <p>Owner access includes DigitBox Pro for free. No Stripe subscription is required.</p>
-            ) : (
+            ) : paidSubscriptionActive ? (
               <>
                 {subscriptionStatus === "past_due" && (
                   <p>Your payment needs attention. Pro remains available while Stripe retries the payment.</p>
@@ -256,6 +283,8 @@ export default function ProfilePage() {
                   {billingBusy === "portal" ? "Opening Stripe…" : "Manage subscription"}
                 </button>
               </>
+            ) : (
+              <p>Your code-unlocked VIP access ends{promoExpiryDate ? " on " + promoExpiryDate : " after 30 days"}. No payment or auto-renewal.</p>
             )}
           </div>
         ) : (
@@ -271,6 +300,69 @@ export default function ProfilePage() {
             >
               {billingBusy === "monthly" ? "Opening Stripe…" : "Upgrade to Pro"}
             </button>
+          </div>
+        )}
+
+        {account && !isOwner && !paidSubscriptionActive && (
+          <div style={{ marginTop: 14 }}>
+            {promoUsed ? (
+              <small style={{ color: "var(--muted)" }}>
+                {promoActive
+                  ? "🎟️ VIP code active" + (promoExpiryDate ? " until " + promoExpiryDate : "") + "."
+                  : "Your one-time VIP code has already been used."}
+              </small>
+            ) : (
+              <button
+                type="button"
+                className="btn-base"
+                style={{ fontSize: 12, padding: "5px 10px", minHeight: 0, borderRadius: 999 }}
+                onClick={() => { setPromoError(""); setPromoOpen(true); }}
+              >
+                🎟️ Have a VIP code?
+              </button>
+            )}
+          </div>
+        )}
+
+        {promoOpen && account && (
+          <div
+            role="presentation"
+            onMouseDown={(event) => { if (event.target === event.currentTarget && !promoBusy) setPromoOpen(false); }}
+            style={{ position: "fixed", inset: 0, zIndex: 1000, display: "grid", placeItems: "center", background: "rgba(0, 0, 0, 0.7)", padding: 16 }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="vip-code-title"
+              style={{ width: "100%", maxWidth: 360, background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, boxShadow: "var(--shadow)" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <h3 id="vip-code-title" style={{ margin: 0 }}>Redeem a VIP code</h3>
+                <button type="button" aria-label="Close popup" disabled={promoBusy} onClick={() => setPromoOpen(false)} style={{ color: "var(--text)", background: "transparent", fontSize: 24, lineHeight: 1, border: 0, cursor: "pointer" }}>×</button>
+              </div>
+              <p style={{ margin: "12px 0", color: "var(--muted)", fontSize: 13 }}>30 days of DigitBox Pro. One redemption per account, no auto-renewal.</p>
+              <form onSubmit={submitPromo}>
+                <label htmlFor="digitbox-vip-code" style={{ display: "block", fontSize: 13, marginBottom: 6 }}>VIP code</label>
+                <input
+                  id="digitbox-vip-code"
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoFocus
+                  maxLength={128}
+                  required
+                  disabled={promoBusy}
+                  value={promoCode}
+                  onChange={(event) => setPromoCode(event.target.value)}
+                  placeholder="Enter your code"
+                  style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-elev)", color: "var(--text)" }}
+                />
+                {promoError && <p role="alert" style={{ color: "#fca5a5", fontSize: 13, margin: "10px 0 0" }}>{promoError}</p>}
+                <button type="submit" className="btn-base" disabled={promoBusy} style={{ width: "100%", marginTop: 14 }}>
+                  {promoBusy ? "Checking code…" : "Activate VIP"}
+                </button>
+              </form>
+            </div>
           </div>
         )}
 
