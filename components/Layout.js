@@ -21,6 +21,7 @@ const PRIMARY_LINKS = [
   { href: "/videos", icon: "videos", label: "Videos" },
   { href: "/shorts", icon: "shorts", label: "Shorts" },
   { href: "/games", icon: "games", label: "Games" },
+  { href: "/ai", icon: "ai", label: "AI" },
 ];
 
 const YOU_LINKS = [
@@ -275,8 +276,9 @@ export default function Layout({ children }) {
       <main className="hub-main">
         {children}
         {/* Shown when the sidebar footer is hidden (phones, tablets, collapsed
-            sidebar); Shorts is a full-screen feed with its own YouTube links. */}
-        {pathname !== "/shorts" && (
+            sidebar); Shorts is a full-screen feed with its own YouTube links,
+            and DigitBox AI is a full-height chat. */}
+        {pathname !== "/shorts" && !pathname.startsWith("/ai") && (
           <footer className="hub-main-foot">
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>

@@ -71,6 +71,34 @@ const PATHS = {
   upload: <path d="M12 15.5V4.5m-4.5 4.5L12 4.5 16.5 9M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15" />,
   play: <path d="M8 5.5v13l10.5-6.5z" fill="currentColor" />,
   trash: <path d="M4.5 7h15M10 4h4M6.5 7l1 12.5a1 1 0 0 0 1 .9h7a1 1 0 0 0 1-.9l1-12.5" />,
+  ai: (
+    <>
+      <path d="M10 3.5 11.6 8a3 3 0 0 0 1.9 1.9l4.5 1.6-4.5 1.6a3 3 0 0 0-1.9 1.9L10 19.5 8.4 15a3 3 0 0 0-1.9-1.9L2 11.5l4.5-1.6A3 3 0 0 0 8.4 8z" />
+      <path d="M18.5 3v4M16.5 5h4M18 16.5v3M16.5 18h3" />
+    </>
+  ),
+  send: <path d="M12 19V5M6 11l6-6 6 6" />,
+  stop: <rect x="6.5" y="6.5" width="11" height="11" rx="2.5" fill="currentColor" stroke="none" />,
+  download: <path d="M12 4.5v11m-4.5-4.5 4.5 4.5 4.5-4.5M5 19.5h14" />,
+  file: (
+    <>
+      <path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z" />
+      <path d="M13.5 3.5v5h5M9 13h6M9 16.5h4" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
+      <path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" />
+      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+    </>
+  ),
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
 };
 
 export default function Icon({ name, size = 24, className = "", strokeWidth = 1.8 }) {
