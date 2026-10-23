@@ -16,7 +16,8 @@ search and the Library. No commit or rebuild is needed.
 The server checks every request; the page only decides what to show.
 
 - **The site owner.** This is the DigitBox account that holds the owner slot,
-  the one created with the display name **Numberstring**. It also sees
+  pinned by `OWNER_USER_ID` or the existing trusted D1 `owner_user_id`.
+  A display name never grants privileges. It also sees
   **Admin** in the menu.
 - **Optional extra admins**, by account ID:
   1. Have the person sign in and open `/admin/projects`. The "isn't an admin"
@@ -135,3 +136,4 @@ account.
 
 The older content endpoints `POST /api/content/publish` and
 `/api/content/delete` require an admin too.
+

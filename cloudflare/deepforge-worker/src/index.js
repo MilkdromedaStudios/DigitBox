@@ -1,3 +1,5 @@
+import { accountRole, authRateLimit, bearerToken, getOwnerId, passwordHash, randomHex, readAuthBody, sha256Hex, verifyPassword } from "../../../lib/accountSecurity.js";
+
 function cors(env) {
   return {
     "Access-Control-Allow-Origin": env.__requestOrigin || env.ALLOWED_ORIGIN || "https://digitbox.dev",
@@ -14,7 +16,7 @@ function normalizeBindings(env, request) {
 
   if (env) {
     for (const value of Object.values(env)) {
-      if (!db && value && typeof value.prepare === "function" && typeof value.batch === "function") {
+      if (!db && value && typeof value.prepare === "function" && typeof value.batch === "function" && typeof value.fetch !== "function") {
         db = value;
       }
       if (
@@ -47,6 +49,8 @@ function normalizeBindings(env, request) {
     ...(env || {}),
     DB: db,
     BUCKET: bucket,
+    OWNER_USER_ID: env?.OWNER_USER_ID,
+    ADMIN_USER_IDS: env?.ADMIN_USER_IDS,
     __requestOrigin: allowedOrigin,
   };
 }
@@ -58,20 +62,31 @@ function json(body, status, env) {
   });
 }
 
+function rateLimited(seconds, env) {
+  const response = json({ error: "Too many attempts. Please try again later." }, 429, env);
+  response.headers.set("Retry-After", String(seconds));
+  return response;
+}
+
 function validPlayerId(value) {
   return typeof value === "string" && /^[a-zA-Z0-9_-]{8,96}$/.test(value);
 }
 
-let schemaReadyPromise = null;
+const schemaPromises = new WeakMap();
 
 async function ensureSchema(env) {
   if (!env.DB) throw new Error("D1 binding DB is missing.");
 
-  if (!schemaReadyPromise) {
-    schemaReadyPromise = (async () => {
+  if (!schemaPromises.has(env.DB)) {
+    const ready = (async () => {
       // Stage 1: tables first. This must finish before SQLite is asked to
       // prepare indexes that reference those tables.
       await env.DB.batch([
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS deepforge_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS clan_designs (clan_id TEXT PRIMARY KEY, shape TEXT NOT NULL, pattern TEXT NOT NULL, primary_color TEXT NOT NULL, secondary_color TEXT NOT NULL, symbol TEXT NOT NULL, updated_at INTEGER NOT NULL)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS player_cities (user_id TEXT PRIMARY KEY, city_slot INTEGER NOT NULL UNIQUE, created_at INTEGER NOT NULL)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS player_presence (user_id TEXT PRIMARY KEY, x REAL NOT NULL, y REAL NOT NULL, company_value INTEGER NOT NULL DEFAULT 0, trophies INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS auth_rate_limits (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, reset_at INTEGER NOT NULL)"),
         env.DB.prepare(
           "CREATE TABLE IF NOT EXISTS users (" +
           "id TEXT PRIMARY KEY, " +
@@ -129,6 +144,7 @@ async function ensureSchema(env) {
 
       // Stage 2: indexes only after every referenced table exists.
       await env.DB.batch([
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_reset ON auth_rate_limits(reset_at)"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at)"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_player_saves_updated_at ON player_saves(updated_at)"),
@@ -137,72 +153,17 @@ async function ensureSchema(env) {
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_clan_join_requests_player ON clan_join_requests(player_id)")
       ]);
     })().catch((error) => {
-      schemaReadyPromise = null;
+      schemaPromises.delete(env.DB);
       throw error;
     });
+    schemaPromises.set(env.DB, ready);
   }
 
-  return schemaReadyPromise;
+  return schemaPromises.get(env.DB);
 }
 
 function cleanName(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
-}
-
-function bytesToHex(bytes) {
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
-}
-
-function hexToBytes(hex) {
-  const clean = String(hex || "");
-  const bytes = new Uint8Array(Math.floor(clean.length / 2));
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
-
-function randomHex(size) {
-  const bytes = new Uint8Array(size);
-  crypto.getRandomValues(bytes);
-  return bytesToHex(bytes);
-}
-
-async function sha256Hex(value) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value || "")));
-  return bytesToHex(new Uint8Array(digest));
-}
-
-async function passwordHash(password, saltHex) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(String(password || "")),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: hexToBytes(saltHex),
-      iterations: 120000,
-    },
-    key,
-    256
-  );
-  return bytesToHex(new Uint8Array(bits));
-}
-
-function constantTimeEqual(a, b) {
-  const left = String(a || "");
-  const right = String(b || "");
-  if (left.length !== right.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < left.length; i += 1) {
-    mismatch |= left.charCodeAt(i) ^ right.charCodeAt(i);
-  }
-  return mismatch === 0;
 }
 
 function cleanEmail(value) {
@@ -221,7 +182,8 @@ async function createSession(env, userId) {
   const token = randomHex(32);
   const tokenHash = await sha256Hex(token);
   const now = Date.now();
-  const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+  const { admin } = await accountRole(env, userId);
+  const expiresAt = now + (admin ? 8 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000);
   await env.DB.prepare(
     "INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)"
   ).bind(tokenHash, userId, now, expiresAt).run();
@@ -229,11 +191,10 @@ async function createSession(env, userId) {
 }
 
 async function authenticatedD1User(request, env) {
-  const auth = request.headers.get("Authorization") || "";
-  const match = auth.match(/^Bearer\s+(.+)$/i);
-  if (!match) return { error: "Log in before creating a clan.", status: 401 };
+  const token = bearerToken(request);
+  if (!token) return { error: "Sign in to DigitBox first.", status: 401 };
 
-  const tokenHash = await sha256Hex(match[1]);
+  const tokenHash = await sha256Hex(token);
   const now = Date.now();
   const row = await env.DB.prepare(
     "SELECT u.id, u.email, u.display_name, s.expires_at " +
@@ -243,65 +204,6 @@ async function authenticatedD1User(request, env) {
 
   if (!row) return { error: "Your login session is invalid or expired.", status: 401 };
   return { user: publicUser(row), tokenHash };
-}
-
-async function authSelfTest(env) {
-  const suffix = randomHex(8);
-  const userId = "user_health_" + suffix;
-  const email = "health-" + suffix + "@example.invalid";
-  const password = "DfHealth-" + suffix + "-A9x!";
-  const salt = randomHex(16);
-  const hash = await passwordHash(password, salt);
-  const now = Date.now();
-
-  try {
-    await env.DB.prepare(
-      "INSERT INTO users (id, email, display_name, password_hash, password_salt, created_at) " +
-      "VALUES (?1, ?2, 'Health Check', ?3, ?4, ?5)"
-    ).bind(userId, email, hash, salt, now).run();
-
-    const row = await env.DB.prepare(
-      "SELECT id, email, display_name, password_hash, password_salt FROM users WHERE email = ?1"
-    ).bind(email).first();
-    if (!row || row.id !== userId) throw new Error("Auth self-test user lookup failed.");
-
-    const verifyHash = await passwordHash(password, row.password_salt);
-    if (!constantTimeEqual(verifyHash, row.password_hash)) {
-      throw new Error("Auth self-test password verification failed.");
-    }
-
-    const session = await createSession(env, userId);
-    const tokenHash = await sha256Hex(session.token);
-    const sessionRow = await env.DB.prepare(
-      "SELECT u.id FROM auth_sessions s JOIN users u ON u.id = s.user_id " +
-      "WHERE s.token_hash = ?1 AND s.expires_at > ?2"
-    ).bind(tokenHash, Date.now()).first();
-    if (!sessionRow || sessionRow.id !== userId) {
-      throw new Error("Auth self-test session lookup failed.");
-    }
-
-    return true;
-  } finally {
-    await env.DB.prepare("DELETE FROM auth_sessions WHERE user_id = ?1").bind(userId).run().catch(() => {});
-    await env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(userId).run().catch(() => {});
-  }
-}
-
-async function r2SelfTest(env) {
-  if (!env.BUCKET) return false;
-  const key = "health/" + randomHex(8) + ".txt";
-  try {
-    await env.BUCKET.put(key, "deepforge-ok", {
-      httpMetadata: { contentType: "text/plain" },
-    });
-    const object = await env.BUCKET.get(key);
-    if (!object) throw new Error("R2 self-test read failed.");
-    const text = await object.text();
-    if (text !== "deepforge-ok") throw new Error("R2 self-test content mismatch.");
-    return true;
-  } finally {
-    await env.BUCKET.delete(key).catch(() => {});
-  }
 }
 
 function inviteCode() {
@@ -323,15 +225,35 @@ function clanEmblemKey(value) {
   return "clans/" + value + "/emblem";
 }
 
-async function canonicalNumberstringId(env) {
-  const row = await env.DB.prepare(
-    "SELECT id FROM users WHERE lower(display_name)='numberstring' ORDER BY created_at ASC LIMIT 1"
-  ).first();
-  return row ? String(row.id) : "";
+async function deleteClan(env, clanId) {
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM clan_members WHERE clan_id = ?1").bind(clanId),
+    env.DB.prepare("DELETE FROM clan_designs WHERE clan_id = ?1").bind(clanId),
+    env.DB.prepare("DELETE FROM clans WHERE id = ?1").bind(clanId),
+  ]);
+  if (env.BUCKET) await env.BUCKET.delete("clans/" + clanId + "/emblem").catch(() => {});
+}
+async function removeMembership(env, userId) {
+  const membership = await env.DB.prepare("SELECT clan_id, role FROM clan_members WHERE player_id = ?1").bind(userId).first();
+  if (!membership) return;
+  if (membership.role === "owner") {
+    const replacement = await env.DB.prepare("SELECT player_id FROM clan_members WHERE clan_id = ?1 AND player_id != ?2 ORDER BY joined_at ASC LIMIT 1").bind(membership.clan_id, userId).first();
+    if (replacement) {
+      await env.DB.batch([
+        env.DB.prepare("UPDATE clan_members SET role = 'owner' WHERE clan_id = ?1 AND player_id = ?2").bind(membership.clan_id, replacement.player_id),
+        env.DB.prepare("UPDATE clans SET owner_id = ?1 WHERE id = ?2").bind(replacement.player_id, membership.clan_id),
+        env.DB.prepare("DELETE FROM clan_members WHERE clan_id = ?1 AND player_id = ?2").bind(membership.clan_id, userId),
+      ]);
+    } else {
+      await deleteClan(env, membership.clan_id);
+    }
+  } else {
+    await env.DB.prepare("DELETE FROM clan_members WHERE clan_id = ?1 AND player_id = ?2").bind(membership.clan_id, userId).run();
+  }
 }
 
 async function canonicalAdminClan(env) {
-  const ownerId = await canonicalNumberstringId(env);
+  const ownerId = await getOwnerId(env);
   if (!ownerId) return null;
   return env.DB.prepare(
     "SELECT id, name, tag, owner_id FROM clans WHERE owner_id=?1 AND lower(name)='admin' ORDER BY created_at ASC LIMIT 1"
@@ -451,58 +373,35 @@ export default {
     } catch (error) {
       return json({
         error: "DEEPFORGE database initialization failed.",
-        detail: error && error.message ? error.message : String(error),
       }, 500, env);
     }
 
     if (url.pathname === "/v1/health" && request.method === "GET") {
-      try {
-        const probe = await env.DB.prepare("SELECT 1 AS ok").first();
-        const deep = url.searchParams.get("deep") === "1";
-        const auth = deep ? await authSelfTest(env) : null;
-        const r2 = deep ? await r2SelfTest(env) : Boolean(env.BUCKET);
-        const ok = Boolean(probe && Number(probe.ok) === 1) && (!deep || (auth && r2));
-        return json({
-          ok,
-          d1: true,
-          r2,
-          auth: deep ? Boolean(auth) : undefined,
-          deep,
-          apiVersion: 5,
-          project: "digitbox",
-        }, ok ? 200 : 500, env);
-      } catch (error) {
-        return json({
-          ok: false,
-          d1: Boolean(env.DB),
-          r2: Boolean(env.BUCKET),
-          auth: false,
-          deep: url.searchParams.get("deep") === "1",
-          apiVersion: 5,
-          project: "digitbox",
-          error: error && error.message ? error.message : String(error),
-        }, 500, env);
-      }
+      // A public health check must never create users, sessions or bucket objects.
+      const probe = await env.DB.prepare("SELECT 1 AS ok").first();
+      return json({ ok: Boolean(probe?.ok), d1: true, r2: Boolean(env.BUCKET), apiVersion: 8, project: "digitbox" }, 200, env);
     }
 
     if (url.pathname === "/v1/auth/signup" && request.method === "POST") {
-      let body;
-      try {
-        body = await request.json();
-      } catch (_) {
-        return json({ error: "Invalid JSON" }, 400, env);
+      const body = await readAuthBody(request);
+      if (!body || typeof body.email !== "string" || typeof body.password !== "string") {
+        return json({ error: "Invalid login details." }, 400, env);
       }
 
       const email = cleanEmail(body.email);
       const password = String(body.password || "");
-      const displayName = cleanName(body.displayName).slice(0, 24);
+      const displayName = (cleanName(body.displayName) || email.split("@")[0]).slice(0, 24);
+      if (displayName.toLowerCase() === "numberstring") return json({ error: "That username is reserved." }, 409, env);
 
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 160) {
         return json({ error: "Enter a valid email address." }, 400, env);
       }
-      if (password.length < 8 || password.length > 128) {
-        return json({ error: "Password must be 8–128 characters." }, 400, env);
+      if (password.length < 12 || password.length > 128) {
+        return json({ error: "Password must be 12–128 characters." }, 400, env);
       }
+
+      const retryAfter = await authRateLimit(request, env, "signup", email);
+      if (retryAfter) return rateLimited(retryAfter, env);
 
       const exists = await env.DB.prepare("SELECT id FROM users WHERE email = ?1").bind(email).first();
       if (exists) return json({ error: "An account with that email already exists." }, 409, env);
@@ -522,56 +421,50 @@ export default {
       ).bind(user.id, user.email, user.displayName, hash, salt, now).run();
 
       const session = await createSession(env, user.id);
-      return json({ user, token: session.token, expiresAt: session.expiresAt }, 201, env);
+      return json({ user: { ...user, owner: false, admin: false }, token: session.token, expiresAt: session.expiresAt }, 201, env);
     }
 
     if (url.pathname === "/v1/auth/login" && request.method === "POST") {
-      let body;
-      try {
-        body = await request.json();
-      } catch (_) {
-        return json({ error: "Invalid JSON" }, 400, env);
+      const body = await readAuthBody(request);
+      if (!body || typeof body.email !== "string" || typeof body.password !== "string") {
+        return json({ error: "Invalid login details." }, 400, env);
       }
 
       const email = cleanEmail(body.email);
       const password = String(body.password || "");
+      if (!email || email.length > 160 || !password || password.length > 128) return json({ error: "Email or password is incorrect." }, 401, env);
+      const retryAfter = await authRateLimit(request, env, "login", email);
+      if (retryAfter) return rateLimited(retryAfter, env);
+
       const row = await env.DB.prepare(
         "SELECT id, email, display_name, password_hash, password_salt FROM users WHERE email = ?1"
       ).bind(email).first();
 
-      if (!row) return json({ error: "Email or password is incorrect." }, 401, env);
-      const hash = await passwordHash(password, row.password_salt);
-      if (!constantTimeEqual(hash, row.password_hash)) {
+      // Do password work for unknown emails too; never skip rate limits.
+      const valid = row
+        ? await verifyPassword(password, row.password_salt, row.password_hash)
+        : (await passwordHash(password, "00000000000000000000000000000000"), false);
+      if (!valid) {
         return json({ error: "Email or password is incorrect." }, 401, env);
       }
 
+      if (!row.password_hash.startsWith("pbkdf2-sha256$")) {
+        const salt = randomHex(16);
+        const hash = await passwordHash(password, salt);
+        await env.DB.prepare("UPDATE users SET password_hash = ?1, password_salt = ?2 WHERE id = ?3 AND password_hash = ?4")
+          .bind(hash, salt, row.id, row.password_hash).run();
+      }
       await env.DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?1").bind(Date.now()).run();
       const session = await createSession(env, row.id);
-      return json({ user: publicUser(row), token: session.token, expiresAt: session.expiresAt }, 200, env);
+      return json({ user: { ...publicUser(row), ...(await accountRole(env, row.id)) }, token: session.token, expiresAt: session.expiresAt }, 200, env);
     }
 
     if (url.pathname === "/v1/auth/me" && request.method === "GET") {
       const authResult = await authenticatedD1User(request, env);
       if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
 
-      const ownerId = await canonicalNumberstringId(env);
-      const adminClan = await canonicalAdminClan(env);
-      const delegated = adminClan
-        ? await env.DB.prepare(
-            "SELECT player_id FROM clan_members WHERE clan_id=?1 AND player_id=?2 LIMIT 1"
-          ).bind(adminClan.id, authResult.user.id).first()
-        : null;
-      const permanentOwner = Boolean(ownerId && authResult.user.id === ownerId);
-      const admin = Boolean(permanentOwner || delegated);
-
-      return json({
-        user: {
-          ...authResult.user,
-          owner: permanentOwner,
-          admin,
-          accessRole: permanentOwner ? "owner" : delegated ? "admin" : "user",
-        },
-      }, 200, env);
+      const role = await accountRole(env, authResult.user.id);
+      return json({ user: { ...authResult.user, ...role, accessRole: role.owner ? "owner" : role.admin ? "admin" : "user" } }, 200, env);
     }
 
     if (url.pathname === "/v1/auth/logout" && request.method === "POST") {
@@ -586,25 +479,28 @@ export default {
       const authResult = await authenticatedD1User(request, env);
       if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
 
-      const membership = await env.DB.prepare(
-        "SELECT clan_id FROM clan_members WHERE player_id = ?1"
-      ).bind(authResult.user.id).first();
-
-      if (membership) {
-        return json({ error: "Leave your clan before deleting this account." }, 409, env);
+      if ((await accountRole(env, authResult.user.id)).owner) {
+        return json({ error: "The owner account cannot be deleted through this API." }, 403, env);
       }
 
+      await removeMembership(env, authResult.user.id);
       await env.DB.batch([
         env.DB.prepare("DELETE FROM auth_sessions WHERE user_id = ?1").bind(authResult.user.id),
+        env.DB.prepare("DELETE FROM player_saves WHERE player_id = ?1").bind(authResult.user.id),
+        env.DB.prepare("DELETE FROM player_presence WHERE user_id = ?1").bind(authResult.user.id),
+        env.DB.prepare("DELETE FROM player_cities WHERE user_id = ?1").bind(authResult.user.id),
+        env.DB.prepare("DELETE FROM clan_join_requests WHERE player_id = ?1").bind(authResult.user.id),
         env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(authResult.user.id),
       ]);
-
-      return json({ ok: true }, 200, env);
+      return json({ ok: true, deleted: true }, 200, env);
     }
 
     if (url.pathname.startsWith("/v1/save/")) {
       const playerId = decodeURIComponent(url.pathname.slice("/v1/save/".length));
       if (!validPlayerId(playerId)) return json({ error: "Invalid player id" }, 400, env);
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+      if (playerId !== authResult.user.id) return json({ error: "You cannot access another player's progression." }, 403, env);
 
       if (request.method === "GET") {
         const row = await env.DB.prepare(
@@ -724,7 +620,12 @@ export default {
     }
 
     if (url.pathname === "/v1/clans" && request.method === "GET") {
-      return json(await clanSnapshot(env, url.searchParams.get("playerId")), 200, env);
+      const requestedId = url.searchParams.get("playerId");
+      if (!requestedId) return json(await clanSnapshot(env, null), 200, env);
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+      if (requestedId !== authResult.user.id) return json({ error: "You cannot access another player's clan details." }, 403, env);
+      return json(await clanSnapshot(env, authResult.user.id), 200, env);
     }
 
     if (url.pathname === "/v1/clans" && request.method === "POST") {
@@ -782,7 +683,10 @@ export default {
         return json({ error: "Invalid JSON" }, 400, env);
       }
 
-      const playerId = body.playerId;
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+      const playerId = authResult.user.id;
+      if (body.playerId && body.playerId !== playerId) return json({ error: "Account mismatch." }, 403, env);
       if (!validPlayerId(playerId)) return json({ error: "Invalid player id" }, 400, env);
 
       const existing = await env.DB.prepare(
@@ -805,7 +709,7 @@ export default {
 
       if (!clan) return json({ error: "Clan not found." }, 404, env);
 
-      const canonicalOwnerId = await canonicalNumberstringId(env);
+      const canonicalOwnerId = await getOwnerId(env);
       const isAdminClan = Boolean(
         canonicalOwnerId &&
         clan.owner_id === canonicalOwnerId &&
@@ -857,7 +761,10 @@ export default {
         return json({ error: "Invalid JSON" }, 400, env);
       }
 
-      const playerId = body.playerId;
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+      const playerId = authResult.user.id;
+      if (body.playerId && body.playerId !== playerId) return json({ error: "Account mismatch." }, 403, env);
       if (!validPlayerId(playerId)) return json({ error: "Invalid player id" }, 400, env);
 
       const membership = await env.DB.prepare(
@@ -908,14 +815,16 @@ export default {
         return json({ error: "Invalid JSON" }, 400, env);
       }
 
-      if (!validPlayerId(body.playerId)) return json({ error: "Invalid player id" }, 400, env);
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+      if (body.playerId && body.playerId !== authResult.user.id) return json({ error: "Account mismatch." }, 403, env);
 
       await env.DB.prepare(
         "UPDATE clan_members SET company_value = ?1, trophies = ?2 WHERE player_id = ?3"
       ).bind(
         Math.max(0, Math.floor(Number(body.companyValue) || 0)),
         Math.max(0, Math.floor(Number(body.trophies) || 0)),
-        body.playerId
+        authResult.user.id
       ).run();
 
       return json({ ok: true }, 200, env);
@@ -924,3 +833,4 @@ export default {
     return json({ error: "Not found" }, 404, env);
   },
 };
+
