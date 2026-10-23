@@ -175,7 +175,7 @@ export default function TabSettings() {
         onClick={() => { setOpen(!open); setMessage(""); }}
       >
         <Icon name="settings" size={18} />
-        <span>Tab Settings</span>
+        <span>Filter Protection</span>
       </button>
       {open && (
         <form className="db-tab-panel" id="db-tab-panel" onSubmit={save} aria-label="Customize browser tab">
