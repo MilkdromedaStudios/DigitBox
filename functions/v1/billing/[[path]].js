@@ -26,6 +26,7 @@ function normalizeEnv(env, request) {
     ...(env || {}),
     DB: db,
     STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY,
+    CODES: env?.CODES,
     STRIPE_WEBHOOK_SECRET: env?.STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_ID_MONTHLY: env?.STRIPE_PRICE_ID_MONTHLY,
     DIGITBOX_SITE_URL: env?.DIGITBOX_SITE_URL,
@@ -83,6 +84,23 @@ async function ensureBillingSchema(env) {
           "cancel_at_period_end INTEGER NOT NULL DEFAULT 0, " +
           "current_period_end INTEGER, " +
           "updated_at INTEGER NOT NULL, " +
+          "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"
+      ).run();
+      // Codes are stored only in the Cloudflare CODES secret. D1 stores
+      // one redemption per account; changing CODES never grants a second use.
+      await env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS promo_redemptions (" +
+          "user_id TEXT PRIMARY KEY, " +
+          "code_hash TEXT NOT NULL, " +
+          "redeemed_at INTEGER NOT NULL, " +
+          "expires_at INTEGER NOT NULL, " +
+          "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"
+      ).run();
+      await env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS promo_attempts (" +
+          "user_id TEXT PRIMARY KEY, " +
+          "window_started_at INTEGER NOT NULL, " +
+          "attempts INTEGER NOT NULL, " +
           "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"
       ).run();
       await env.DB.batch([
@@ -192,15 +210,25 @@ async function billingRow(env, userId) {
   ).bind(userId).first();
 }
 
-function entitlementsFromRow(row) {
+async function promoRow(env, userId) {
+  return env.DB.prepare(
+    "SELECT redeemed_at, expires_at FROM promo_redemptions WHERE user_id = ?1"
+  ).bind(userId).first();
+}
+
+function entitlementsFromRow(row, promo) {
   const status = String(row?.status || "none");
-  const pro = PRO_STATUSES.has(status);
+  const promoActive = !!promo && Number(promo.expires_at) > Date.now();
+  const pro = PRO_STATUSES.has(status) || promoActive;
   return {
     plan: pro ? "pro" : "free",
     features: pro ? ["nexus_pro"] : [],
     subscriptionStatus: status,
     cancelAtPeriodEnd: !!Number(row?.cancel_at_period_end || 0),
     currentPeriodEnd: row?.current_period_end ? Number(row.current_period_end) : null,
+    promoUsed: !!promo,
+    promoActive,
+    promoExpiresAt: promo ? Number(promo.expires_at) : null,
   };
 }
 
@@ -281,10 +309,13 @@ async function findOpenStripeSubscription(env, stripeCustomerId) {
 async function handleStatus(request, env) {
   const auth = await authenticatedUser(request, env);
   if (auth.error) return json({ error: auth.error }, auth.status, env);
-  const row = await billingRow(env, auth.user.id);
+  const [row, promo] = await Promise.all([
+    billingRow(env, auth.user.id),
+    promoRow(env, auth.user.id),
+  ]);
   return json({
     user: auth.user,
-    entitlements: entitlementsFromRow(row),
+    entitlements: entitlementsFromRow(row, promo),
     configuration: {
       stripe: stripeConfigured(env),
       monthly: !!String(env.STRIPE_PRICE_ID_MONTHLY || "").trim(),
@@ -296,6 +327,56 @@ async function handleStatus(request, env) {
       },
     },
   }, 200, env);
+}
+
+// One shared code, configured in the server-only Cloudflare secret CODES.
+// Every signed-in account can redeem it at most once for 30 days of Pro.
+// Limit guesses per account to five per rolling one-hour window.
+async function handleRedeem(request, env) {
+  const auth = await authenticatedUser(request, env);
+  if (auth.error) return json({ error: auth.error }, auth.status, env);
+
+  const secretCode = String(env.CODES || "").trim();
+  if (!secretCode) return json({ error: "VIP codes are not configured yet.", code: "not_configured" }, 503, env);
+
+  const existing = await promoRow(env, auth.user.id);
+  if (existing) return json({ error: "This account has already used its one-time VIP code.", code: "already_redeemed" }, 409, env);
+
+  const paid = await billingRow(env, auth.user.id);
+  if (PRO_STATUSES.has(String(paid?.status || ""))) {
+    return json({ error: "Your paid Pro plan is already active. A code won't extend your subscription.", code: "already_pro" }, 409, env);
+  }
+
+  const body = await request.json().catch(() => null);
+  const code = typeof body?.code === "string" ? body.code.trim() : "";
+  if (!code || code.length > 128) return json({ error: "Enter a valid VIP code.", code: "invalid_code" }, 400, env);
+
+  const now = Date.now();
+  const windowCutoff = now - 60 * 60 * 1000;
+  await env.DB.prepare(
+    "INSERT INTO promo_attempts (user_id, window_started_at, attempts) VALUES (?1, ?2, 1) " +
+      "ON CONFLICT(user_id) DO UPDATE SET " +
+      "attempts = CASE WHEN window_started_at <= ?3 THEN 1 ELSE attempts + 1 END, " +
+      "window_started_at = CASE WHEN window_started_at <= ?3 THEN excluded.window_started_at ELSE window_started_at END"
+  ).bind(auth.user.id, now, windowCutoff).run();
+  const attemptRow = await env.DB.prepare(
+    "SELECT attempts FROM promo_attempts WHERE user_id = ?1"
+  ).bind(auth.user.id).first();
+  if (Number(attemptRow?.attempts || 0) > 5) {
+    return json({ error: "Too many code attempts. Try again in an hour.", code: "rate_limited" }, 429, env);
+  }
+
+  const valid = constantTimeEqual(await sha256Hex(code), await sha256Hex(secretCode));
+  if (!valid) return json({ error: "That VIP code is incorrect.", code: "invalid_code" }, 400, env);
+
+  const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+  const result = await env.DB.prepare(
+    "INSERT OR IGNORE INTO promo_redemptions (user_id, code_hash, redeemed_at, expires_at) VALUES (?1, ?2, ?3, ?4)"
+  ).bind(auth.user.id, await sha256Hex(secretCode), now, expiresAt).run();
+  if (!Number(result.meta?.changes || 0)) {
+    return json({ error: "This account has already redeemed a VIP code.", code: "already_redeemed" }, 409, env);
+  }
+  return json({ ok: true, expiresAt }, 200, env);
 }
 
 async function handleCheckout(request, env) {
@@ -420,6 +501,7 @@ export async function onRequest(context) {
     await ensureBillingSchema(env);
     const path = new URL(request.url).pathname.replace(/\/+$/, "");
     if (path === "/v1/billing/status" && request.method === "GET") return handleStatus(request, env);
+    if (path === "/v1/billing/redeem" && request.method === "POST") return handleRedeem(request, env);
     if (path === "/v1/billing/checkout" && request.method === "POST") return handleCheckout(request, env);
     if (path === "/v1/billing/portal" && request.method === "POST") return handlePortal(request, env);
     if (path === "/v1/billing/webhook" && request.method === "POST") return handleWebhook(request, env);
