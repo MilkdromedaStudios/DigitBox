@@ -51,7 +51,28 @@ const PATHS = {
     </>
   ),
   shield: <path d="M12 3.5 19.5 6v5.6c0 4.7-3.2 7.8-7.5 8.9-4.3-1.1-7.5-4.2-7.5-8.9V6z" />,
-  list: <path d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" />,
+  grid: (
+    <>
+      <rect x="3" y="3" width="7.5" height="7.5" rx="1.2" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2" />
+    </>
+  ),
+  gridCompact: (
+    <>
+      <rect x="3" y="3" width="4.5" height="4.5" rx=".6" />
+      <rect x="9.75" y="3" width="4.5" height="4.5" rx=".6" />
+      <rect x="16.5" y="3" width="4.5" height="4.5" rx=".6" />
+      <rect x="3" y="9.75" width="4.5" height="4.5" rx=".6" />
+      <rect x="9.75" y="9.75" width="4.5" height="4.5" rx=".6" />
+      <rect x="16.5" y="9.75" width="4.5" height="4.5" rx=".6" />
+      <rect x="3" y="16.5" width="4.5" height="4.5" rx=".6" />
+      <rect x="9.75" y="16.5" width="4.5" height="4.5" rx=".6" />
+      <rect x="16.5" y="16.5" width="4.5" height="4.5" rx=".6" />
+    </>
+  ),
+    list: <path d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" />,
   settings: (
     <>
       <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
