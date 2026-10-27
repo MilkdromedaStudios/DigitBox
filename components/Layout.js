@@ -237,10 +237,6 @@ export default function Layout({ children }) {
           <div className="hub-side-title">Explore</div>
           <SideLink href="/posts" icon="posts" label="Community" pathname={pathname} onClick={closeDrawer} />
           <SideLink href="/profile#digitbox-pro" icon="pro" label="DigitBox Pro" pathname={pathname} onClick={closeDrawer} />
-          <a className="hub-side-link" href="https://github.com/MilkdromedaStudios/Nexus-Sidebar" target="_blank" rel="noopener noreferrer" title="Nexus AI browser sidebar extension">
-            <Icon name="ai" />
-            <span>Nexus AI Sidebar</span>
-          </a>
           {isAdmin && <SideLink href="/admin" icon="settings" label="Admin" pathname={pathname} onClick={closeDrawer} />}
         </nav>
 
