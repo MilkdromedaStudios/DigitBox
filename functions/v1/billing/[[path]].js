@@ -94,8 +94,15 @@ async function ensureBillingSchema(env) {
           "code_hash TEXT NOT NULL, " +
           "redeemed_at INTEGER NOT NULL, " +
           "expires_at INTEGER NOT NULL, " +
+          "is_permanent INTEGER NOT NULL DEFAULT 0, " +
           "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"
       ).run();
+      const promoColumns = await env.DB.prepare("PRAGMA table_info(promo_redemptions)").all();
+      if (!(promoColumns.results || []).some(column => column.name === "is_permanent")) {
+        await env.DB.prepare(
+          "ALTER TABLE promo_redemptions ADD COLUMN is_permanent INTEGER NOT NULL DEFAULT 0"
+        ).run();
+      }
       await env.DB.prepare(
         "CREATE TABLE IF NOT EXISTS promo_attempts (" +
           "user_id TEXT PRIMARY KEY, " +
@@ -212,13 +219,14 @@ async function billingRow(env, userId) {
 
 async function promoRow(env, userId) {
   return env.DB.prepare(
-    "SELECT redeemed_at, expires_at FROM promo_redemptions WHERE user_id = ?1"
+    "SELECT redeemed_at, expires_at, is_permanent FROM promo_redemptions WHERE user_id = ?1"
   ).bind(userId).first();
 }
 
 function entitlementsFromRow(row, promo) {
   const status = String(row?.status || "none");
-  const promoActive = !!promo && Number(promo.expires_at) > Date.now();
+  const promoPermanent = !!promo && Number(promo.is_permanent) === 1;
+  const promoActive = !!promo && (promoPermanent || Number(promo.expires_at) > Date.now());
   const pro = PRO_STATUSES.has(status) || promoActive;
   return {
     plan: pro ? "pro" : "free",
@@ -228,7 +236,8 @@ function entitlementsFromRow(row, promo) {
     currentPeriodEnd: row?.current_period_end ? Number(row.current_period_end) : null,
     promoUsed: !!promo,
     promoActive,
-    promoExpiresAt: promo ? Number(promo.expires_at) : null,
+    promoPermanent,
+    promoExpiresAt: promo && !promoPermanent ? Number(promo.expires_at) : null,
   };
 }
 
@@ -330,7 +339,7 @@ async function handleStatus(request, env) {
 }
 
 // One shared code, configured in the server-only Cloudflare secret CODES.
-// Every signed-in account can redeem it at most once for 30 days of Pro.
+// Every signed-in account can redeem it once for permanent Pro access.
 // Limit guesses per account to five per rolling one-hour window.
 async function handleRedeem(request, env) {
   const auth = await authenticatedUser(request, env);
@@ -369,14 +378,13 @@ async function handleRedeem(request, env) {
   const valid = constantTimeEqual(await sha256Hex(code), await sha256Hex(secretCode));
   if (!valid) return json({ error: "That VIP code is incorrect.", code: "invalid_code" }, 400, env);
 
-  const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
   const result = await env.DB.prepare(
-    "INSERT OR IGNORE INTO promo_redemptions (user_id, code_hash, redeemed_at, expires_at) VALUES (?1, ?2, ?3, ?4)"
-  ).bind(auth.user.id, await sha256Hex(secretCode), now, expiresAt).run();
+    "INSERT OR IGNORE INTO promo_redemptions (user_id, code_hash, redeemed_at, expires_at, is_permanent) VALUES (?1, ?2, ?3, 0, 1)"
+  ).bind(auth.user.id, await sha256Hex(secretCode), now).run();
   if (!Number(result.meta?.changes || 0)) {
     return json({ error: "This account has already redeemed a VIP code.", code: "already_redeemed" }, 409, env);
   }
-  return json({ ok: true, expiresAt }, 200, env);
+  return json({ ok: true, permanent: true }, 200, env);
 }
 
 async function handleCheckout(request, env) {
