@@ -147,7 +147,7 @@ export default function ProfilePage() {
       const result = await redeemVipCode(promoCode.trim());
       setPromoOpen(false);
       setPromoCode("");
-      setMessage("VIP unlocked for 30 days" + (result.expiresAt ? " (until " + formatBillingDate(result.expiresAt) + ")" : "") + "!");
+      setMessage(result.permanent ? "Permanent VIP unlocked!" : "VIP code redeemed!");
       await refreshBilling();
     } catch (error) {
       setPromoError(error?.message || "Couldn't redeem your VIP code.");
@@ -250,7 +250,7 @@ export default function ProfilePage() {
         {account && (
           <div className="profile-account-flags">
             <span>{account.owner ? "♛ OWNER" : account.admin ? "◆ ADMIN" : "PLAYER"}</span>
-            <span>{promoActive && !paidSubscriptionActive ? "VIP · 30-DAY PRO" : isPro ? "DIGITBOX PRO" : "FREE MEMBER"}</span>
+            <span>{promoActive && !paidSubscriptionActive ? "VIP · PERMANENT PRO" : isPro ? "DIGITBOX PRO" : "FREE MEMBER"}</span>
           </div>
         )}
       </section>
@@ -284,7 +284,7 @@ export default function ProfilePage() {
                 </button>
               </>
             ) : (
-              <p>Your code-unlocked VIP access ends{promoExpiryDate ? " on " + promoExpiryDate : " after 30 days"}. No payment or auto-renewal.</p>
+              <p>Your code-unlocked VIP access is permanent. No payment or auto-renewal.</p>
             )}
           </div>
         ) : (
@@ -308,7 +308,7 @@ export default function ProfilePage() {
             {promoUsed ? (
               <small style={{ color: "var(--muted)" }}>
                 {promoActive
-                  ? "🎟️ VIP code active" + (promoExpiryDate ? " until " + promoExpiryDate : "") + "."
+                  ? "🎟️ Permanent VIP code active."
                   : "Your one-time VIP code has already been used."}
               </small>
             ) : (
@@ -340,7 +340,7 @@ export default function ProfilePage() {
                 <h3 id="vip-code-title" style={{ margin: 0 }}>Redeem a VIP code</h3>
                 <button type="button" aria-label="Close popup" disabled={promoBusy} onClick={() => setPromoOpen(false)} style={{ color: "var(--text)", background: "transparent", fontSize: 24, lineHeight: 1, border: 0, cursor: "pointer" }}>×</button>
               </div>
-              <p style={{ margin: "12px 0", color: "var(--muted)", fontSize: 13 }}>30 days of DigitBox Pro. One redemption per account, no auto-renewal.</p>
+              <p style={{ margin: "12px 0", color: "var(--muted)", fontSize: 13 }}>Permanent DigitBox Pro access. One redemption per account, no auto-renewal.</p>
               <form onSubmit={submitPromo}>
                 <label htmlFor="digitbox-vip-code" style={{ display: "block", fontSize: 13, marginBottom: 6 }}>VIP code</label>
                 <input
