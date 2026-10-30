@@ -99,7 +99,7 @@ export default function LoginPage() {
             className="auth-input"
             type="password"
             placeholder="Password"
-            minLength={8}
+            minLength={mode === "signup" ? 12 : 8}
             maxLength={128}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -127,3 +127,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
