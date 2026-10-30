@@ -3,6 +3,8 @@ import {
   loadCloudProfile,
   uploadCloudAvatar,
   deleteCloudAvatar,
+  changeCloudPassword,
+  deleteCloudAccount,
 } from "../lib/account";
 import {
   loadBillingStatus,
@@ -41,6 +43,13 @@ export default function ProfilePage() {
   const [promoBusy, setPromoBusy] = useState(false);
   const [promoError, setPromoError] = useState("");
   const [message, setMessage] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -195,6 +204,41 @@ export default function ProfilePage() {
     } catch (error) {
       setMessage(error?.message || "Could not open Stripe billing settings.");
       setBillingBusy("");
+    }
+  }
+
+  async function submitPasswordChange(event) {
+    event.preventDefault();
+    if (passwordBusy) return;
+    setPasswordBusy(true);
+    setPasswordMessage("");
+    try {
+      await changeCloudPassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setPasswordMessage("Password changed. Other active sessions have been signed out.");
+    } catch (error) {
+      setPasswordMessage(error?.message || "Could not change your password.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
+  async function submitAccountDeletion(event) {
+    event.preventDefault();
+    if (deleteBusy || isOwner) return;
+    const confirmed = window.confirm(
+      "Permanently delete your DigitBox account and its associated account data? This cannot be undone."
+    );
+    if (!confirmed) return;
+    setDeleteBusy(true);
+    setDeleteMessage("");
+    try {
+      await deleteCloudAccount(deletePassword);
+      window.location.assign("/login");
+    } catch (error) {
+      setDeleteMessage(error?.message || "Could not delete your account.");
+      setDeleteBusy(false);
     }
   }
 
@@ -440,6 +484,75 @@ export default function ProfilePage() {
           </div>
         </form>
       </section>
+
+      {account && (
+        <section className="section" style={{ maxWidth: 680 }}>
+          <h2>Account security</h2>
+          <p>Change your password using your current password. Use at least 12 characters.</p>
+          <form className="post-form" onSubmit={submitPasswordChange}>
+            <label>
+              Current password
+              <input
+                className="auth-input"
+                type="password"
+                autoComplete="current-password"
+                minLength={1}
+                maxLength={128}
+                required
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+              />
+            </label>
+            <label>
+              New password
+              <input
+                className="auth-input"
+                type="password"
+                autoComplete="new-password"
+                minLength={12}
+                maxLength={128}
+                required
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+            </label>
+            <button className="btn-base" type="submit" disabled={passwordBusy}>
+              {passwordBusy ? "Changing password…" : "Change password"}
+            </button>
+          </form>
+          {passwordMessage && <p role="status">{passwordMessage}</p>}
+
+          <div style={{ marginTop: 30, paddingTop: 22, borderTop: "1px solid var(--border)" }}>
+            <h3>Delete account</h3>
+            {isOwner ? (
+              <p>The DigitBox owner account cannot be deleted.</p>
+            ) : (
+              <>
+                <p>Permanently deletes your account and associated account data. This cannot be undone. You must enter your current password to confirm.</p>
+                <form className="post-form" onSubmit={submitAccountDeletion}>
+                  <label>
+                    Current password
+                    <input
+                      className="auth-input"
+                      type="password"
+                      autoComplete="current-password"
+                      minLength={1}
+                      maxLength={128}
+                      required
+                      value={deletePassword}
+                      onChange={(event) => setDeletePassword(event.target.value)}
+                    />
+                  </label>
+                  <button className="btn-base" type="submit" disabled={deleteBusy}>
+                    {deleteBusy ? "Deleting account…" : "Delete account"}
+                  </button>
+                </form>
+                {deleteMessage && <p role="alert">{deleteMessage}</p>}
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="section" style={{ maxWidth: 680 }}>
         <h3>Preview</h3>

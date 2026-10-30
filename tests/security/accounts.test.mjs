@@ -124,6 +124,59 @@ for (const [name, invoke] of Object.entries(entryPoints)) {
     assert.equal((await invoke(request("/v1/auth/me", { token: body.token }), env)).status, 401);
   });
 
+  test(`${name}: password changes verify the current password and revoke other sessions`, async (t) => {
+    const { env, DB, memberToken } = await fixture(t);
+    const otherToken = "e".repeat(64);
+    await DB.prepare("INSERT INTO auth_sessions VALUES (?1, ?2, ?3, ?4)")
+      .bind(await sha256Hex(otherToken), memberId, Date.now(), Date.now() + 60000).run();
+
+    const wrong = await invoke(request("/v1/auth/password", {
+      method: "POST", token: memberToken,
+      body: { currentPassword: "not-the-password", newPassword: "new secure password 2026" },
+    }), env);
+    assert.equal(wrong.status, 401);
+
+    const changed = await invoke(request("/v1/auth/password", {
+      method: "POST", token: memberToken,
+      body: { currentPassword: password, newPassword: "new secure password 2026" },
+    }), env);
+    assert.equal(changed.status, 200);
+    assert.equal((await invoke(request("/v1/auth/me", { token: memberToken }), env)).status, 200);
+    assert.equal((await invoke(request("/v1/auth/me", { token: otherToken }), env)).status, 401);
+
+    assert.equal((await invoke(request("/v1/auth/login", {
+      method: "POST", body: { email: "member@example.test", password },
+    }), env)).status, 401);
+    assert.equal((await invoke(request("/v1/auth/login", {
+      method: "POST", body: { email: "member@example.test", password: "new secure password 2026" },
+    }), env)).status, 200);
+    const stored = await DB.prepare("SELECT password_hash, password_salt FROM users WHERE id = ?1").bind(memberId).first();
+    assert.match(stored.password_hash, /^pbkdf2-sha256\$/);
+  });
+
+  test(`${name}: account deletion requires the current password and never deletes the owner`, async (t) => {
+    const { env, DB, ownerToken, memberToken } = await fixture(t);
+    const ownerDelete = await invoke(request("/v1/auth/account", {
+      method: "DELETE", token: ownerToken, body: { password },
+    }), env);
+    assert.equal(ownerDelete.status, 403);
+    assert.ok(await DB.prepare("SELECT id FROM users WHERE id = ?1").bind(ownerId).first());
+
+    const wrong = await invoke(request("/v1/auth/account", {
+      method: "DELETE", token: memberToken, body: { password: "incorrect password" },
+    }), env);
+    assert.equal(wrong.status, 401);
+    assert.ok(await DB.prepare("SELECT id FROM users WHERE id = ?1").bind(memberId).first());
+
+    const deleted = await invoke(request("/v1/auth/account", {
+      method: "DELETE", token: memberToken, body: { password },
+    }), env);
+    assert.equal(deleted.status, 200);
+    assert.equal(await DB.prepare("SELECT id FROM users WHERE id = ?1").bind(memberId).first(), null);
+    assert.ok(await DB.prepare("SELECT id FROM users WHERE id = ?1").bind(ownerId).first());
+    assert.equal((await invoke(request("/v1/auth/me", { token: memberToken }), env)).status, 401);
+  });
+
   test(`${name}: account data requires the matching session, including encoded paths`, async (t) => {
     const { env, DB, ownerToken, memberToken } = await fixture(t);
     await DB.prepare("INSERT INTO player_saves VALUES (?1, '{\"private\":true}', 1)").bind(ownerId).run();
