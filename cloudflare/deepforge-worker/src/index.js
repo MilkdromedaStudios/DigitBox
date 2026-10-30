@@ -475,12 +475,65 @@ export default {
       return json({ ok: true }, 200, env);
     }
 
+    if (url.pathname === "/v1/auth/password" && request.method === "POST") {
+      const authResult = await authenticatedD1User(request, env);
+      if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
+
+      const body = await readAuthBody(request);
+      const currentPassword = typeof body?.currentPassword === "string" ? body.currentPassword : "";
+      const newPassword = typeof body?.newPassword === "string" ? body.newPassword : "";
+      if (!currentPassword || currentPassword.length > 128 || newPassword.length < 12 || newPassword.length > 128) {
+        return json({ error: "Enter your current password and a new password of 12–128 characters." }, 400, env);
+      }
+
+      const retryAfter = await authRateLimit(request, env, "password-change", authResult.user.email);
+      if (retryAfter) return rateLimited(retryAfter, env);
+
+      const row = await env.DB.prepare(
+        "SELECT password_hash, password_salt FROM users WHERE id = ?1"
+      ).bind(authResult.user.id).first();
+      if (!row || !(await verifyPassword(currentPassword, row.password_salt, row.password_hash))) {
+        return json({ error: "Your current password is incorrect." }, 401, env);
+      }
+
+      const salt = randomHex(16);
+      const hash = await passwordHash(newPassword, salt);
+      const updated = await env.DB.prepare(
+        "UPDATE users SET password_hash = ?1, password_salt = ?2 WHERE id = ?3 AND password_hash = ?4"
+      ).bind(hash, salt, authResult.user.id, row.password_hash).run();
+      if (updated?.meta?.changes === 0) {
+        return json({ error: "Your password changed in another request. Sign in again and retry." }, 409, env);
+      }
+
+      // Keep this session active, but invalidate every other device/session.
+      await env.DB.prepare(
+        "DELETE FROM auth_sessions WHERE user_id = ?1 AND token_hash != ?2"
+      ).bind(authResult.user.id, authResult.tokenHash).run();
+      return json({ ok: true }, 200, env);
+    }
+
     if (url.pathname === "/v1/auth/account" && request.method === "DELETE") {
       const authResult = await authenticatedD1User(request, env);
       if (authResult.error) return json({ error: authResult.error }, authResult.status, env);
 
       if ((await accountRole(env, authResult.user.id)).owner) {
         return json({ error: "The owner account cannot be deleted through this API." }, 403, env);
+      }
+
+      const body = await readAuthBody(request);
+      const password = typeof body?.password === "string" ? body.password : "";
+      if (!password || password.length > 128) {
+        return json({ error: "Enter your current password to confirm account deletion." }, 400, env);
+      }
+
+      const retryAfter = await authRateLimit(request, env, "account-delete", authResult.user.email);
+      if (retryAfter) return rateLimited(retryAfter, env);
+
+      const row = await env.DB.prepare(
+        "SELECT password_hash, password_salt FROM users WHERE id = ?1"
+      ).bind(authResult.user.id).first();
+      if (!row || !(await verifyPassword(password, row.password_salt, row.password_hash))) {
+        return json({ error: "Your current password is incorrect." }, 401, env);
       }
 
       await removeMembership(env, authResult.user.id);
