@@ -151,7 +151,7 @@ for (const [name, invoke] of Object.entries(entryPoints)) {
       method: "POST", body: { email: "member@example.test", password: "new secure password 2026" },
     }), env)).status, 200);
     const stored = await DB.prepare("SELECT password_hash, password_salt FROM users WHERE id = ?1").bind(memberId).first();
-    assert.match(stored.password_hash, /^pbkdf2-sha256\\$/);
+    assert.match(stored.password_hash, /^pbkdf2-sha256\$/);
   });
 
   test(`${name}: account deletion requires the current password and never deletes the owner`, async (t) => {
