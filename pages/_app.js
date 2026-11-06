@@ -11,16 +11,16 @@ import { TabSettingsSync } from "../components/TabSettings";
 import PageTransition from "../components/PageTransition";
 import { PROFILE_PREFS_UPDATED_EVENT, readProfilePrefsFromCookie } from "../lib/profilePreferences";
 
-// Pages with a YouTube player must not run ad or tracking scripts (YouTube's
-// Made for Kids rules). _document.js only adds ads to a few server-rendered
-// routes, but client-side navigation keeps a loaded ad script running, so a
-// player page reached from an ad page reloads itself without it.
-const PLAYER_ROUTES = new Set(["/watch", "/shorts"]);
+// Match the server document allowlist: client-side navigation must not carry
+// the AdSense script from an editorial article onto unrelated app screens.
+const AD_ELIGIBLE_ROUTES = new Set(["/guides/[guide]"]);
 
 export default function MyApp({ Component, pageProps, router }) {
   const pathname = router?.pathname;
   useEffect(() => {
-    if (PLAYER_ROUTES.has(pathname) && document.querySelector('script[src*="adsbygoogle"]')) window.location.reload();
+    const hasAdScript = Boolean(document.querySelector('script[src*="adsbygoogle.js"]'));
+    const routeAllowsAds = AD_ELIGIBLE_ROUTES.has(pathname);
+    if (hasAdScript !== routeAllowsAds) window.location.reload();
   }, [pathname]);
 
   useEffect(() => {
@@ -42,18 +42,11 @@ export default function MyApp({ Component, pageProps, router }) {
     };
   }, []);
 
-  // Cloud games run full screen in GameFrame, without the hub chrome.
   const fullscreenGame = router?.pathname?.startsWith("/projects/");
   return (
     <>
       <TabSettingsSync />
-      {fullscreenGame ? (
-        <Component {...pageProps} />
-      ) : (
-        <Layout>
-          <Component {...pageProps} />
-        </Layout>
-      )}
+      {fullscreenGame ? <Component {...pageProps} /> : <Layout><Component {...pageProps} /></Layout>}
       <PageTransition router={router} />
     </>
   );
