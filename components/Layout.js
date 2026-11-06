@@ -235,6 +235,7 @@ export default function Layout({ children }) {
 
         <nav className="hub-side-group hub-side-extra" aria-label="More from DigitBox">
           <div className="hub-side-title">Explore</div>
+          <SideLink href="/guides" icon="book-open" label="Guides" pathname={pathname} onClick={closeDrawer} />
           <SideLink href="/posts" icon="posts" label="Community" pathname={pathname} onClick={closeDrawer} />
           <SideLink href="/profile#digitbox-pro" icon="pro" label="DigitBox Pro" pathname={pathname} onClick={closeDrawer} />
           {isAdmin && <SideLink href="/admin" icon="settings" label="Admin" pathname={pathname} onClick={closeDrawer} />}
@@ -260,6 +261,7 @@ export default function Layout({ children }) {
         <footer className="hub-side-foot" onClick={onFooterTap}>
           <div>
             <Link href="/about">About</Link>
+            <Link href="/guides">Guides</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/changelog">Changelog</Link>
@@ -281,6 +283,7 @@ export default function Layout({ children }) {
         {pathname !== "/shorts" && !pathname.startsWith("/ai") && (
           <footer className="hub-main-foot">
             <Link href="/terms">Terms</Link>
+            <Link href="/guides">Guides</Link>
             <Link href="/privacy">Privacy</Link>
             <span>
               Videos are provided by YouTube. By using DigitBox you agree to the{" "}
