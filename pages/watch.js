@@ -114,6 +114,7 @@ export default function WatchPage() {
       <Head>
         <title>{video.title + " - DigitBox"}</title>
         <meta name="description" content={description.slice(0, 160) || "Watch " + video.title + " on DigitBox."} />
+        <meta name="robots" content="noindex,follow" />
       </Head>
 
       <div className="watch">
