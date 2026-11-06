@@ -235,7 +235,7 @@ export default function Layout({ children }) {
 
         <nav className="hub-side-group hub-side-extra" aria-label="More from DigitBox">
           <div className="hub-side-title">Explore</div>
-          <SideLink href="/guides" icon="book-open" label="Guides" pathname={pathname} onClick={closeDrawer} />
+          <SideLink href="/guides" icon="posts" label="Guides" pathname={pathname} onClick={closeDrawer} />
           <SideLink href="/posts" icon="posts" label="Community" pathname={pathname} onClick={closeDrawer} />
           <SideLink href="/profile#digitbox-pro" icon="pro" label="DigitBox Pro" pathname={pathname} onClick={closeDrawer} />
           {isAdmin && <SideLink href="/admin" icon="settings" label="Admin" pathname={pathname} onClick={closeDrawer} />}
