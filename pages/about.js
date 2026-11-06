@@ -49,6 +49,17 @@ export default function AboutPage() {
           </section>
         </div>
 
+        <h2>Guides and practical help</h2>
+        <p>
+          DigitBox publishes original help articles about features that need
+          more explanation than a button or game card can provide. The current
+          guides cover the beta game-save system, browser-game troubleshooting,
+          and how to choose an entry in the unofficial Minecraft browser-build
+          directory. Each guide includes its review date and explains known
+          limitations rather than promising that every game behaves the same way.
+        </p>
+        <p><Link href="/guides" className="text-link">Read the DigitBox guides</Link>.</p>
+
         <h2>How it works</h2>
         <p>
           The site and its game catalog live in the public DigitBox GitHub
