@@ -1,3 +1,4 @@
+import Head from "next/head";
 import { fetchR2File, isGitLfsPointer } from "../../lib/r2Content";
 import { getGithubRepo } from "../../lib/githubRepo";
 
@@ -13,12 +14,15 @@ function toDisplayTitle(slug) {
 
 export default function PostPage({ title, html }) {
   return (
-    <div className="content">
+    <>
+      <Head><meta name="robots" content="noindex,follow" /></Head>
+      <div className="content">
       <article className="post-card">
         <h1>{title}</h1>
         <div className="post-body" dangerouslySetInnerHTML={{ __html: html }} />
       </article>
-    </div>
+      </div>
+    </>
   );
 }
 
