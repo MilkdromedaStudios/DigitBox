@@ -1,8 +1,9 @@
 import Document, { Html, Head, Main, NextScript } from "next/document";
 
-// Never add /watch or /shorts: pages with a YouTube player must stay free of
-// ad and tracking scripts (YouTube's Made for Kids rules for embeds).
-const AD_ELIGIBLE_ROUTES = new Set(["/", "/posts/[post]", "/changelog"]);
+// Keep the AdSense loader off navigation, feeds, community submissions,
+// video players, game frames, account pages and utility screens. The only
+// eligible pages are the original, editorial guide articles.
+const AD_ELIGIBLE_ROUTES = new Set(["/guides/[guide]"]);
 
 function shouldServeAds(pathname) {
   return AD_ELIGIBLE_ROUTES.has(pathname);
@@ -11,10 +12,7 @@ function shouldServeAds(pathname) {
 class DigitBoxDocument extends Document {
   static async getInitialProps(ctx) {
     const initialProps = await Document.getInitialProps(ctx);
-    return {
-      ...initialProps,
-      serveAds: shouldServeAds(ctx.pathname),
-    };
+    return { ...initialProps, serveAds: shouldServeAds(ctx.pathname) };
   }
 
   render() {
