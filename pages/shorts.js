@@ -94,6 +94,7 @@ export default function ShortsPage() {
       <Head>
         <title>Shorts - DigitBox</title>
         <meta name="description" content="Swipe through popular Shorts, plus Shorts from the DigitBox channel." />
+        <meta name="robots" content="noindex,follow" />
       </Head>
 
       {/* Wait for the YouTube feed so the order doesn't change under the viewer. */}
