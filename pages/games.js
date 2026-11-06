@@ -154,7 +154,8 @@ export default function CloudGamesPage() {
           <div>
             <span className="hub-kicker">CLOUD GAMES</span>
             <h1>{query ? "Search results" : chip === "All" ? "Play instantly" : chip === "Saved" ? "Your saved games" : chip + " games"}</h1>
-            <p>Every game loads from the DigitBox cloud and runs right in your browser. No downloads or installs, and most games can autosave on this device.</p>
+            <p>Choose a title or filter by genre to open a browser game. Games run in an embedded player; saving depends on the game’s own design and whether the browser lets DigitBox access its storage. Autosave is a beta feature and is not available for every title.</p>
+            <p className="dg-guide-links"><Link href="/guides/game-saves">How game saves work</Link> · <Link href="/guides/browser-game-help">Browser game troubleshooting</Link></p>
           </div>
           {ready && <span className="hub-count" aria-live="polite">{games.length} {games.length === 1 ? "game" : "games"}{query ? " found" : ""}</span>}
         </div>
