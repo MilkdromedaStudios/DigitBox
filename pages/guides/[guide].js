@@ -31,7 +31,7 @@ export default function GuideArticlePage({ guide }) {
           ))}
         </div>
         <div className="hub-guide-related">
-          <Link href="/guides"><Icon name="book-open" size={17} /> Browse all DigitBox guides</Link>
+          <Link href="/guides"><Icon name="posts" size={17} /> Browse all DigitBox guides</Link>
           <Link href="/games"><Icon name="games" size={17} /> Explore cloud games</Link>
         </div>
       </article>
