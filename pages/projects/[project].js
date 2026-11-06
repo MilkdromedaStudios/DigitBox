@@ -17,12 +17,21 @@ export default function ProjectRunner({ hubProject, src, title, slug, isExternal
         <Head>
           <title>{hubProject.name + " - DigitBox"}</title>
           {hubProject.description && <meta name="description" content={hubProject.description} />}
+          <meta name="robots" content="noindex,follow" />
         </Head>
         <HubProjectFrame project={hubProject} />
       </>
     );
   }
-  return <GameFrame src={src} title={title} slug={slug} isExternal={isExternal} />;
+  return (
+    <>
+      <Head>
+        <title>{(title || "Game") + " - DigitBox"}</title>
+        <meta name="robots" content="noindex,follow" />
+      </Head>
+      <GameFrame src={src} title={title} slug={slug} isExternal={isExternal} />
+    </>
+  );
 }
 
 // Built-in games hidden or deleted from the admin page get a 404, like their
