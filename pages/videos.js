@@ -56,6 +56,7 @@ export default function VideosPage() {
       <Head>
         <title>Videos - DigitBox</title>
         <meta name="description" content="Popular videos across gaming, music, movies and more, plus uploads from the DigitBox channel." />
+        <meta name="robots" content="noindex,follow" />
       </Head>
 
       <div className="hub-page">
