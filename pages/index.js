@@ -10,6 +10,7 @@ import { useGameCatalog } from "../lib/useHubProjects";
 import { useVideos } from "../lib/useVideos";
 import { useYouTubeFeed } from "../lib/useYouTube";
 import { YouTubeAttribution } from "../components/YouTubeLogo";
+import { GUIDES } from "../lib/guides";
 
 const CHIPS = ["Recommended", "Videos", "Shorts", "Games"];
 const CHANNEL = CHANNELS[0];
@@ -121,10 +122,19 @@ export default function HomePage() {
     <>
       <Head>
         <title>DigitBox — Videos, Shorts &amp; Games</title>
-        <meta name="description" content="Watch videos and Shorts and play cloud games in your browser. No downloads, no installs: DigitBox entertainment." />
+        <meta name="description" content="Play browser games, explore an independent Minecraft browser-build directory, and read practical guides to DigitBox game saves and troubleshooting." />
       </Head>
 
       <div className="hub-page">
+        {chip === "Recommended" && (
+          <section className="hub-home-intro" aria-labelledby="hub-home-title">
+            <span className="hub-kicker">AN INDEPENDENT BROWSER GAME HUB</span>
+            <h1 id="hub-home-title">Play, explore, and learn on DigitBox</h1>
+            <p>DigitBox brings together browser games, an independent directory of community Minecraft builds, and video discovery through YouTube. Game listings link to playable projects, while the guides explain how important parts of the site work.</p>
+            <p>Our help articles cover details that are easy to miss in an interactive page: which games support local saves, how to troubleshoot keyboard and loading problems, and what to check before choosing a Minecraft browser build.</p>
+            <Link href="/guides">Read the DigitBox guides <Icon name="chevron" size={16} /></Link>
+          </section>
+        )}
         <div className="hub-chips" role="tablist" aria-label="Sections">
           {CHIPS.map((label) => (
             <button
@@ -173,6 +183,26 @@ export default function HomePage() {
             <Shelf icon="games" title="Games" href="/games" linkLabel="All games">
               {gamesReady ? <div className="hub-row">{gamesByFeature.map(renderGame)}</div> : <SkeletonGrid count={4} />}
             </Shelf>
+
+            <section className="hub-shelf" aria-labelledby="hub-help-heading">
+              <div className="hub-shelf-head">
+                <div>
+                  <h2 id="hub-help-heading"><Icon name="book-open" /> Guides and help</h2>
+                  <p className="hub-shelf-sub">Original explanations of DigitBox features, limitations, and common fixes.</p>
+                </div>
+                <Link href="/guides" className="hub-pill-btn">All guides <Icon name="chevron" size={16} /></Link>
+              </div>
+              <div className="hub-guide-grid">
+                {GUIDES.map((guide) => (
+                  <article className="hub-guide-card" key={guide.slug}>
+                    <span className="hub-guide-meta">{guide.readingTime} · Reviewed {guide.updated}</span>
+                    <h3><Link href={"/guides/" + guide.slug}>{guide.title}</Link></h3>
+                    <p>{guide.description}</p>
+                    <Link className="hub-guide-link" href={"/guides/" + guide.slug}>Read guide <Icon name="chevron" size={16} /></Link>
+                  </article>
+                ))}
+              </div>
+            </section>
 
             {youtubeOn && feed.length > 9 && (
               <Shelf icon="videos" title="More to watch" href="/videos" linkLabel="All videos" action={<YouTubeAttribution />}>
