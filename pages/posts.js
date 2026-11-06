@@ -9,6 +9,7 @@ export default function PostsPage() {
       <Head>
         <title>Community - DigitBox</title>
         <meta name="description" content="News, updates and notes from the DigitBox community." />
+        <meta name="robots" content="noindex,follow" />
       </Head>
 
       <div className="hub-page">
