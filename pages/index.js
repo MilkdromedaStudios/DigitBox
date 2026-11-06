@@ -187,7 +187,7 @@ export default function HomePage() {
             <section className="hub-shelf" aria-labelledby="hub-help-heading">
               <div className="hub-shelf-head">
                 <div>
-                  <h2 id="hub-help-heading"><Icon name="book-open" /> Guides and help</h2>
+                  <h2 id="hub-help-heading"><Icon name="posts" /> Guides and help</h2>
                   <p className="hub-shelf-sub">Original explanations of DigitBox features, limitations, and common fixes.</p>
                 </div>
                 <Link href="/guides" className="hub-pill-btn">All guides <Icon name="chevron" size={16} /></Link>
