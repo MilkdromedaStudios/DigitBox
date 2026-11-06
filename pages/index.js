@@ -2,8 +2,8 @@ import Head from "next/head";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
-import { GameCard, PostCard, ShortCard, SkeletonGrid, VideoCard } from "../components/Cards";
-import { CHANNELS, POSTS, byFeature, channelUrl, likeKey, uniqueVideos } from "../lib/catalog";
+import { GameCard, ShortCard, SkeletonGrid, VideoCard } from "../components/Cards";
+import { CHANNELS, byFeature, channelUrl, likeKey, uniqueVideos } from "../lib/catalog";
 import { formatViews, timeAgo } from "../lib/format";
 import { useLikes } from "../lib/useLikes";
 import { useGameCatalog } from "../lib/useHubProjects";
@@ -226,14 +226,6 @@ export default function HomePage() {
               >
                 <div className="hub-channel-card">
                   <div className="hub-row">{uniqueVideos(ownLong, ownShorts).map((video) => <VideoCard key={video.key} video={video} />)}</div>
-                </div>
-              </Shelf>
-            )}
-
-            {POSTS.length > 0 && (
-              <Shelf icon="posts" title="From the community" href="/posts">
-                <div className="hub-grid hub-grid-posts">
-                  {POSTS.slice(0, 3).map((post) => <PostCard key={post.key} post={post} />)}
                 </div>
               </Shelf>
             )}
