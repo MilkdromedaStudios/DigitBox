@@ -17,7 +17,7 @@ const PROJECTS = [
   {
     number: "02",
     category: "MINECRAFT SERVER",
-    title: "DigitBox SMP",
+    title: "Minecraft Server",
     description: "A community Minecraft server. Add the server address to your multiplayer list and come explore.",
     address: "mc.digitbox.dev",
     icon: "games",
