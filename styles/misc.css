@@ -69,3 +69,5 @@
 .misc-note p { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.55; }
 @media (prefers-reduced-motion: reduce) { .misc-card { transition: none; } .misc-card:hover { transform: none; } }
 @media (max-width: 520px) { .misc-card { min-height: 0; padding: 20px; } .misc-card-top { margin-bottom: 22px; } .misc-server-address code { font-size: .85rem; } }
+
+@media (max-width: 759px) { .hub-tabs { grid-template-columns: repeat(7, 1fr); } }
