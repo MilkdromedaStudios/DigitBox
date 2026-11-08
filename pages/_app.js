@@ -6,6 +6,7 @@ import "../styles/hub.css";
 import "../styles/tab-settings.css";
 import "../styles/minecraft.css";
 import "../styles/ai.css";
+import "../styles/misc.css";
 import Layout from "../components/Layout";
 import { TabSettingsSync } from "../components/TabSettings";
 import PageTransition from "../components/PageTransition";
