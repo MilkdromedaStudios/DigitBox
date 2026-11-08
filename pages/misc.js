@@ -138,7 +138,7 @@ export default function MiscPage() {
               <span className="hub-kicker">THE COLLECTION</span>
               <h2 id="misc-featured-title">Featured</h2>
             </div>
-            <span className="misc-count">0{PROJECTS.length} PROJECTS</span>
+            <span className="misc-count">{String(PROJECTS.length).padStart(2, "0")} PROJECTS</span>
           </div>
 
           <div className="misc-grid">
@@ -146,7 +146,7 @@ export default function MiscPage() {
               <article className={"misc-card misc-card-" + project.accent} key={project.number}>
                 <div className="misc-card-top">
                   <span className="misc-card-icon"><Icon name={project.icon} size={25} /></span>
-                  <span className="misc-card-number">{project.number} / 0{PROJECTS.length}</span>
+                  <span className="misc-card-number">{project.number} / {String(PROJECTS.length).padStart(2, "0")}</span>
                 </div>
                 <span className="misc-card-category">{project.category}</span>
                 <h3>{project.title}</h3>
