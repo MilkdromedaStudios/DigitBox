@@ -22,6 +22,7 @@ const PRIMARY_LINKS = [
   { href: "/shorts", icon: "shorts", label: "Shorts" },
   { href: "/games", icon: "games", label: "Games" },
   { href: "/ai", icon: "ai", label: "AI" },
+  { href: "/misc", icon: "grid", label: "Misc" },
 ];
 
 const YOU_LINKS = [
