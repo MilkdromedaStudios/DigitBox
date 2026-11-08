@@ -78,9 +78,11 @@ export default function MiscPage() {
                     <button type="button" onClick={copyAddress} aria-label="Copy Minecraft server address"><Icon name={copied ? "check" : "copy"} size={17} /> {copied ? "Copied" : "Copy"}</button>
                   </div>
                 ) : null}
-                <a className="misc-card-link" href={project.href} target="_blank" rel="noopener noreferrer">
-                  {project.action}<Icon name="external" size={17} />
-                </a>
+                {project.href ? (
+                  <a className="misc-card-link" href={project.href} target="_blank" rel="noopener noreferrer">
+                    {project.action}<Icon name="external" size={17} />
+                  </a>
+                ) : null}
               </article>
             ))}
           </div>
