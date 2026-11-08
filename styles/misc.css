@@ -71,3 +71,7 @@
 @media (max-width: 520px) { .misc-card { min-height: 0; padding: 20px; } .misc-card-top { margin-bottom: 22px; } .misc-server-address code { font-size: .85rem; } }
 
 @media (max-width: 759px) { .hub-tabs { grid-template-columns: repeat(7, 1fr); } }
+
+.misc-card-cyan { --misc-accent: #22d3ee; }
+.misc-card-blue { --misc-accent: #60a5fa; }
+.misc-card-orange { --misc-accent: #fb923c; }
