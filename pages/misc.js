@@ -1,4 +1,5 @@
 import Head from "next/head";
+import { useState } from "react";
 import Icon from "../components/Icon";
 
 const PROJECTS = [
@@ -19,18 +20,19 @@ const PROJECTS = [
     title: "DigitBox SMP",
     description: "A community Minecraft server. Add the server address to your multiplayer list and come explore.",
     address: "mc.digitbox.dev",
-    href: "https://mc.digitbox.dev",
-    action: "Open server address",
     icon: "games",
     accent: "green",
   },
 ];
 
 export default function MiscPage() {
+  const [copied, setCopied] = useState(false);
+
   async function copyAddress() {
     try {
       await navigator.clipboard.writeText("mc.digitbox.dev");
-      window.dispatchEvent(new CustomEvent("digitbox:easteregg", { detail: { type: "toast", message: "Server address copied" } }));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
     } catch {
       window.prompt("Copy the Minecraft server address:", "mc.digitbox.dev");
     }
@@ -73,7 +75,7 @@ export default function MiscPage() {
                   <div className="misc-server-address">
                     <span><i /> SERVER ADDRESS</span>
                     <code>{project.address}</code>
-                    <button type="button" onClick={copyAddress} aria-label="Copy Minecraft server address"><Icon name="copy" size={17} /> Copy</button>
+                    <button type="button" onClick={copyAddress} aria-label="Copy Minecraft server address"><Icon name={copied ? "check" : "copy"} size={17} /> {copied ? "Copied" : "Copy"}</button>
                   </div>
                 ) : null}
                 <a className="misc-card-link" href={project.href} target="_blank" rel="noopener noreferrer">
